@@ -1,0 +1,106 @@
+name: Heartsync CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  validate-and-test:
+    name: Code Quality & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci || npm install --prefer-offline --no-audit
+
+      - name: Static Code Analysis & TypeScript Verification
+        run: npm run lint
+
+  build-and-package:
+    name: Production Build & Bundle Verification
+    runs-on: ubuntu-latest
+    needs: validate-and-test
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci || npm install --prefer-offline --no-audit
+
+      - name: Compile Frontend & Server Bundle
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Verify Production Artifacts Integrity
+        run: |
+          echo "Verifying generated bundle artifacts..."
+          test -f dist/index.html || { echo "ERROR: dist/index.html is missing"; exit 1; }
+          test -f dist/server.cjs || { echo "ERROR: dist/server.cjs is missing"; exit 1; }
+          echo "Artifacts verified successfully!"
+          ls -lh dist/
+
+      - name: Security Vulnerability Scan
+        run: npm audit --omit=dev --audit-level=critical || true
+
+  smoke-test-deployment:
+    name: Health Check Smoke Test
+    runs-on: ubuntu-latest
+    needs: build-and-package
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci || npm install --prefer-offline --no-audit
+
+      - name: Build Application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Start Production Server in Background
+        run: |
+          node dist/server.cjs &
+          SERVER_PID=$!
+          echo "Waiting for server on port 3000..."
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:3000/api/health | grep -q '"status":"ok"'; then
+              echo "Server health check passed!"
+              kill $SERVER_PID
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start or /api/health did not respond."
+          kill $SERVER_PID || true
+          exit 1
