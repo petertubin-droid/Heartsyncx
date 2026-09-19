@@ -108,6 +108,16 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Protect newsletter dispatch and sensitive endpoints with rate limiter
 app.use('/api/newsletter/send', rateLimiter(10, 60 * 1000));
+
+// HEALTH CHECK ENDPOINT (Production & CI/CD)
+app.get('/api/health', (req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 app.use('/api/auth/', rateLimiter(30, 60 * 1000));
 app.use('/api/setup/', rateLimiter(10, 60 * 1000));
 
@@ -285,9 +295,10 @@ app.post('/api/dns/diagnostics', async (req: Request, res: Response) => {
 
     const formattedLog = logLines.join('\n');
 
-    if (supabase) {
+    const sbClient = getSupabaseClient();
+    if (sbClient) {
       try {
-        await supabase.from('audit_logs').insert([{
+        await sbClient.from('audit_logs').insert([{
           action_type: 'DNS_DIAGNOSTICS_RUN',
           description: `Ran real DNS probe for ${targetDomains.join(', ')}`,
           metadata: { results, timestamp: new Date().toISOString() },
@@ -410,9 +421,10 @@ app.post('/api/seo/index-submit', async (req: Request, res: Response) => {
       });
     }
 
-    if (supabase) {
+    const sbClient = getSupabaseClient();
+    if (sbClient) {
       try {
-        await supabase.from('audit_logs').insert([{
+        await sbClient.from('audit_logs').insert([{
           action_type: 'GOOGLE_INDEXING_SUBMIT',
           description: `Submitted ${inputUrls.length} URLs for Google Search Indexing`,
           metadata: { inputUrls, results, timestamp: new Date().toISOString() },
@@ -528,9 +540,10 @@ app.post('/api/cicd/check', async (req: Request, res: Response) => {
     const stage4Start = Date.now();
     let dbStatus: 'pass' | 'warn' | 'fail' = 'pass';
     let dbDetails = 'Supabase PostgreSQL connection operational.';
-    if (supabase) {
+    const sbClient = getSupabaseClient();
+    if (sbClient) {
       try {
-        const { error } = await supabase.from('posts').select('id').limit(1);
+        const { error } = await sbClient.from('posts').select('id').limit(1);
         if (error) {
           dbStatus = 'warn';
           dbDetails = `Database responded with notice: ${error.message}`;
@@ -612,9 +625,9 @@ app.post('/api/cicd/check', async (req: Request, res: Response) => {
     };
 
     // Record in audit logs if Supabase is connected
-    if (supabase) {
+    if (sbClient) {
       try {
-        await supabase.from('audit_logs').insert([{
+        await sbClient.from('audit_logs').insert([{
           action_type: 'CI_CD_PIPELINE_RUN',
           description: `Ran real-time CI/CD check. Score: ${overallScore}% (${overallStatus})`,
           metadata: { overallStatus, overallScore, totalDurationMs, stages },
