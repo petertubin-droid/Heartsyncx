@@ -1,0 +1,6 @@
+{
+  "name": "Heartsync",
+  "description": "A premium SaaS relationship, emotional wellness, dating advice, and mindful lifestyle blog platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,17 @@
+{
+  "short_name": "Heartsync",
+  "name": "Heartsync — Mindful Relationship Insights",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512 192x192 64x64 32x32"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#09090b",
+  "theme_color": "#e11d48",
+  "display": "standalone",
+  "orientation": "portrait",
+  "description": "Cozy offline reader for relationship guides, intimacy workbooks, and attachment psychology."
+}

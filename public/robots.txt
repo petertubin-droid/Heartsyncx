@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login
+Disallow: /search
+Disallow: /access-denied
+
+Sitemap: https://heartsync-836754107982.europe-west2.run.app/sitemap.xml

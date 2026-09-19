@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <defs>
+    <!-- Outer ring gradient: Violet to Rose-Pink -->
+    <linearGradient id="outerRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B21B6" /> <!-- deep violet -->
+      <stop offset="50%" stop-color="#EC4899" /> <!-- vibrant pink -->
+      <stop offset="100%" stop-color="#F43F5E" /> <!-- warm rose -->
+    </linearGradient>
+
+    <!-- Left Heart Lobe gradient: Deep purple to medium violet -->
+    <linearGradient id="leftLobeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4C1D95" />
+      <stop offset="100%" stop-color="#7C3AED" />
+    </linearGradient>
+
+    <!-- Right Heart Lobe & Pulse gradient: Magenta to vibrant pink -->
+    <linearGradient id="rightLobeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EC4899" />
+      <stop offset="100%" stop-color="#F43F5E" />
+    </linearGradient>
+  </defs>
+
+  <!-- Ambient light-mode / dark-mode compatible transparent background circle -->
+  <circle cx="250" cy="250" r="235" fill="none" />
+
+  <!-- Main Outer Gradient Circle Ring -->
+  <circle cx="250" cy="250" r="218" fill="none" stroke="url(#outerRingGrad)" stroke-width="10" />
+
+  <!-- Centered Heart and Pulse Graphic Group -->
+  <g transform="translate(10, 5)">
+    <!-- 1. Left Lobe of stylized heart (Purple Ribbon) -->
+    <!-- Starts near bottom-middle, curves left, arches up to top-left, loops inside -->
+    <path d="M 240 375 
+             C 170 320, 115 255, 115 190 
+             C 115 125, 170 85, 230 85
+             C 270 85, 305 110, 315 145" 
+          fill="none" 
+          stroke="url(#leftLobeGrad)" 
+          stroke-width="26" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+
+    <!-- 2. Bottom Right Lobe Segment (Pink Ribbon) -->
+    <!-- Creates the overlapping heart point at the bottom right, curving upwards -->
+    <path d="M 240 375
+             C 300 320, 365 255, 365 190
+             C 365 155, 345 120, 310 100"
+          fill="none"
+          stroke="url(#rightLobeGrad)"
+          stroke-width="26"
+          stroke-linecap="round"
+          stroke-linejoin="round" />
+
+    <!-- 3. Dynamic ECG Pulse Line starting from inside left, sharp spikes, curving out into a right external pulse loop -->
+    <path d="M 160 230
+             L 190 230
+             L 205 190
+             L 220 280
+             L 240 170
+             L 255 260
+             L 270 230
+             L 295 230
+             C 340 230, 380 210, 380 160
+             C 380 130, 355 105, 325 105"
+          fill="none"
+          stroke="url(#rightLobeGrad)"
+          stroke-width="18"
+          stroke-linecap="round"
+          stroke-linejoin="round" />
+  </g>
+</svg>
