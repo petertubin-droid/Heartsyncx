@@ -14,6 +14,7 @@ import LiveChatWidget from './components/LiveChatWidget';
 import SubscriptionPage from './components/SubscriptionPage';
 import ArticleBodyWithInserts from './components/ArticleBodyWithInserts';
 import OfflineReaderBanner from './components/OfflineReaderBanner';
+import { AdPlacement } from './components/AdPlacement';
 import { heartsync, getAuthors } from './store';
 import { Post, Category, Author, SiteSettings, Topic } from './types';
 import { HeartsyncLoader, LoadingProgressBar, HeartsyncSuspense, HeartsyncImage } from './components/LoadingSystem';
@@ -1503,6 +1504,13 @@ export default function App() {
           lang={lang}
           setLang={setLang}
         />
+      )}
+
+      {/* Global Header Banner Ad Placement (Google AdSense, Monetag, Adsterra) */}
+      {currentTab !== 'admin' && (
+        <div className="max-w-6xl mx-auto px-4 w-full">
+          <AdPlacement slot="header" />
+        </div>
       )}
 
       {/* Floating alert notification toast */}
@@ -4727,6 +4735,9 @@ export default function App() {
                         </>
                       )}
 
+                      {/* Right Sidebar Ad Slot (Google AdSense 300x250, Monetag, Adsterra Native) */}
+                      <AdPlacement slot="sidebar" className="mt-4" />
+
                     </aside>
                      )}
                   </div>
@@ -5657,7 +5668,11 @@ export default function App() {
 
       {/* Footer element */}
       {currentTab !== 'admin' && (
-        <Footer onNavigate={navigateTo} siteSettings={siteSettings} lang={lang} />
+        <>
+          <Footer onNavigate={navigateTo} siteSettings={siteSettings} lang={lang} />
+          {/* Sticky Mobile/Desktop Footer Ad Banner (AdSense, Monetag, Adsterra) */}
+          <AdPlacement slot="footer" />
+        </>
       )}
       </div>
 

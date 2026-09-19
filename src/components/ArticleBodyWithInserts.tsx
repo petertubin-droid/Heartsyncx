@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import { Brain, Heart, CheckCircle2, BookOpen, ArrowRight, Lightbulb, Compass, Share2 } from 'lucide-react';
 import { InArticleInsertsConfig, InArticleInsertItem } from '../types';
 import { preprocessMarkdownImages } from '../utils/markdownImage';
+import { AdPlacement } from './AdPlacement';
 
 interface ArticleBodyWithInsertsProps {
   content: string;
@@ -182,6 +183,12 @@ export default function ArticleBodyWithInserts({
     );
   }
 
+  const adInsertIndex = useMemo(() => {
+    if (blocks.length <= 1) return 0;
+    if (blocks.length <= 3) return 1;
+    return Math.floor(blocks.length / 2);
+  }, [blocks.length]);
+
   return (
     <div className={className}>
       {blocks.map((block, idx) => {
@@ -195,6 +202,11 @@ export default function ArticleBodyWithInserts({
             {matchingInserts && matchingInserts.map((insItem) => (
               <RenderInsertCard key={insItem.id} insert={insItem} />
             ))}
+
+            {/* Seamless In-Article Ad Placement (Google AdSense, Monetag, or Adsterra) */}
+            {idx === adInsertIndex && (
+              <AdPlacement slot="in_article" className="my-6" />
+            )}
           </React.Fragment>
         );
       })}

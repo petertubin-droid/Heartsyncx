@@ -271,6 +271,19 @@ export interface SiteSettings {
   site_description: string;
   adsense_client_id: string;
   adsense_active: boolean;
+  adsense_auto_script?: string;
+  monetag_active?: boolean;
+  monetag_zone_id?: string;
+  monetag_script_code?: string;
+  monetag_format?: string;
+  adsterra_active?: boolean;
+  adsterra_key_id?: string;
+  adsterra_script_code?: string;
+  adsterra_format?: string;
+  banner_header_enabled?: boolean;
+  banner_sidebar_enabled?: boolean;
+  banner_footer_enabled?: boolean;
+  banner_in_article_enabled?: boolean;
   newsletter_welcome_msg: string;
   ai_assistant_enabled: boolean;
   recaptcha_enabled: boolean;
@@ -738,5 +751,22 @@ export interface DigitalOrder {
   gateway: 'stripe' | 'paystack' | 'flutterwave' | 'paypal';
   createdAt: string;
 }
+
+export interface AdProviderConfig {
+  id: string;
+  name: string;
+  type: 'adsense' | 'monetag' | 'adsterra' | 'ezoic' | 'mediavine' | 'custom' | string;
+  pubId: string;
+  scriptCode: string;
+  slot: 'all' | 'header' | 'sidebar' | 'footer' | 'in_articles' | 'homepage' | string;
+  active: boolean;
+  cpmEstimate?: string;
+  lazyLoadDelay?: string;
+  geoTarget?: string;
+  isConsentCompliant?: boolean;
+  customSize?: string;
+  format?: string;
+}
+
 
 

@@ -3333,16 +3333,17 @@ async function loadStateFromSupabase(): Promise<any> {
       state.ad_providers = adProvidersRes.data.map((p: any) => ({
         id: p.id,
         name: p.name,
-        type: p.type || 'adsense',
-        pubId: p.pub_id || p.pubId || '',
-        slot: p.slot || 'sidebar_top',
-        active: p.active ?? true,
-        code: p.code || '',
-        cpmEstimate: p.cpm_estimate || p.cpmEstimate || '$12.50',
-        customSize: p.custom_size || p.customSize || 'Responsive',
-        lazyLoadDelay: p.lazy_load_delay || p.lazyLoadDelay || 'none',
-        geoTarget: p.geo_target || p.geoTarget || 'worldwide',
-        isConsentCompliant: p.is_consent_compliant ?? p.isConsentCompliant ?? true,
+        type: p.slug === 'monetag' ? 'monetag' : p.slug === 'adsterra' ? 'adsterra' : (p.slug || p.type || 'adsense'),
+        pubId: p.credentials?.zone_id || p.credentials?.key || p.credentials?.publisher_id || p.pub_id || p.pubId || '',
+        slot: p.settings?.slot || p.slot || 'all',
+        active: p.is_active ?? p.active ?? true,
+        code: p.credentials?.sdk_url || p.code || '',
+        scriptCode: p.credentials?.sdk_url || p.code || p.scriptCode || '',
+        cpmEstimate: p.settings?.cpm_estimate || p.cpm_estimate || p.cpmEstimate || (p.slug === 'monetag' ? '$16.80' : p.slug === 'adsterra' ? '$14.50' : '$14.10'),
+        customSize: p.settings?.custom_size || p.custom_size || p.customSize || 'Responsive',
+        lazyLoadDelay: p.settings?.lazy_load_delay || p.lazy_load_delay || p.lazyLoadDelay || 'none',
+        geoTarget: p.settings?.geo_target || p.geo_target || p.geoTarget || 'worldwide',
+        isConsentCompliant: p.settings?.is_consent_compliant ?? p.is_consent_compliant ?? true,
         created_at: p.created_at
       }));
     }
@@ -3525,10 +3526,29 @@ async function syncStateToSupabase(newState: any) {
     }
 
     if (newState.site_settings) {
-      await supabase.from('site_settings').upsert({
-        id: 'singleton',
-        ...newState.site_settings
-      });
+      try {
+        await supabase.from('site_settings').upsert({
+          id: 'singleton',
+          site_name: newState.site_settings.site_name || 'Heartsync',
+          ads_enabled: Boolean(newState.site_settings.adsense_active || newState.site_settings.monetag_active || newState.site_settings.adsterra_active),
+          adsense_publisher_id: newState.site_settings.adsense_client_id || '',
+          raw_settings: newState.site_settings,
+          ad_slots: {
+            adsense: { active: newState.site_settings.adsense_active, client_id: newState.site_settings.adsense_client_id },
+            monetag: { active: newState.site_settings.monetag_active, zone_id: newState.site_settings.monetag_zone_id, format: newState.site_settings.monetag_format },
+            adsterra: { active: newState.site_settings.adsterra_active, key_id: newState.site_settings.adsterra_key_id, format: newState.site_settings.adsterra_format },
+            banners: {
+              header: newState.site_settings.banner_header_enabled,
+              sidebar: newState.site_settings.banner_sidebar_enabled,
+              footer: newState.site_settings.banner_footer_enabled,
+              in_article: newState.site_settings.banner_in_article_enabled
+            }
+          },
+          updated_at: new Date().toISOString()
+        });
+      } catch (e: any) {
+        console.warn('Supabase site_settings sync warning:', e.message);
+      }
     }
 
     if (Array.isArray(newState.subscriptions) && newState.subscriptions.length > 0) {
@@ -3640,21 +3660,33 @@ async function syncStateToSupabase(newState: any) {
     if (Array.isArray(newState.ad_providers) && newState.ad_providers.length > 0) {
       try {
         await supabase.from('ad_providers').upsert(
-          newState.ad_providers.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            type: p.type || 'adsense',
-            pub_id: p.pubId || p.pub_id || '',
-            slot: p.slot || 'sidebar_top',
-            active: p.active ?? true,
-            code: p.code || '',
-            cpm_estimate: p.cpmEstimate || p.cpm_estimate || '$12.50',
-            custom_size: p.customSize || p.custom_size || 'Responsive',
-            lazy_load_delay: p.lazyLoadDelay || p.lazy_load_delay || 'none',
-            geo_target: p.geoTarget || p.geo_target || 'worldwide',
-            is_consent_compliant: p.isConsentCompliant ?? p.is_consent_compliant ?? true,
-            created_at: p.created_at || new Date().toISOString()
-          }))
+          newState.ad_providers.map((p: any) => {
+            const uuid = toDbUUID(p.id) || p.id;
+            const slug = p.type === 'monetag' ? 'monetag' : p.type === 'adsterra' ? 'adsterra' : (p.type || p.slug || 'adsense');
+            return {
+              id: uuid,
+              name: p.name || (slug === 'monetag' ? 'Monetag' : slug === 'adsterra' ? 'Adsterra' : 'Google AdSense'),
+              slug: slug,
+              provider_type: 'display',
+              is_active: p.active ?? true,
+              credentials: {
+                key: p.pubId || '',
+                zone_id: p.pubId || '',
+                sdk_url: p.scriptCode || p.code || '',
+                publisher_id: p.pubId || ''
+              },
+              settings: {
+                slot: p.slot || 'all',
+                cpm_estimate: p.cpmEstimate || '$12.50',
+                custom_size: p.customSize || 'Responsive',
+                lazy_load_delay: p.lazyLoadDelay || 'none',
+                geo_target: p.geoTarget || 'worldwide',
+                is_consent_compliant: p.isConsentCompliant ?? true,
+                format: p.format || (slug === 'monetag' ? 'multitag' : slug === 'adsterra' ? 'social_bar' : 'leaderboard')
+              },
+              updated_at: new Date().toISOString()
+            };
+          })
         );
       } catch (e: any) { console.warn('Supabase ad_providers sync warning:', e.message); }
     }

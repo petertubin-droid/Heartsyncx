@@ -138,6 +138,19 @@ const DEFAULT_SETTINGS: SiteSettings = {
   },
   adsense_client_id: 'ca-pub-3940256099942544',
   adsense_active: true,
+  adsense_auto_script: '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3940256099942544" crossorigin="anonymous"></script>',
+  monetag_active: true,
+  monetag_zone_id: '275352',
+  monetag_script_code: '<script src="https://alwingulla.com/88/tag.min.js" data-zone="275352" async data-cfasync="false"></script>',
+  monetag_format: 'multitag',
+  adsterra_active: true,
+  adsterra_key_id: '883921',
+  adsterra_script_code: '<script type="text/javascript" src="//www.highperformanceformat.com/883921/invoke.js"></script>',
+  adsterra_format: 'social_bar',
+  banner_header_enabled: true,
+  banner_sidebar_enabled: true,
+  banner_footer_enabled: true,
+  banner_in_article_enabled: true,
   newsletter_welcome_msg: 'Welcome to Heartsync. Our research-backed therapeutic insights and weekly guidance are on their way to your inbox.',
   ai_assistant_enabled: true,
   recaptcha_enabled: false,
@@ -1807,8 +1820,9 @@ export class HeartsyncStore {
       { id: 'rss-2', name: 'Psychology Today Relationship Feed', url: 'https://www.psychologytoday.com/us/feed/relationships', status: 'Active', lastSync: '2026-06-12 09:12' }
     ]);
     this.ad_providers = getLocalStorage<any[]>('hs_ad_providers', [
-      { id: 'prov-1', name: 'Google AdSense Programmatic', type: 'AdSense', status: 'Active', fillRate: '98.5%' },
-      { id: 'prov-2', name: 'Mediavine Premium Publisher', type: 'Direct', status: 'Active', fillRate: '95.2%' }
+      { id: 'ap-1', name: 'Google AdSense Auto Ad Network', type: 'adsense', pubId: 'ca-pub-3940256099942544', scriptCode: '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3940256099942544" crossorigin="anonymous"></script>', slot: 'all', active: true, cpmEstimate: '$14.10', lazyLoadDelay: 'none', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'Responsive (Fluid)' },
+      { id: 'ap-2', name: 'Monetag MultiTag & In-Page Push', type: 'monetag', pubId: '275352', scriptCode: '<script src="https://alwingulla.com/88/tag.min.js" data-zone="275352" async data-cfasync="false"></script>', slot: 'header', active: true, cpmEstimate: '$16.80', lazyLoadDelay: 'none', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'Responsive / MultiTag', format: 'multitag' },
+      { id: 'ap-3', name: 'Adsterra Social Bar & Banner Network', type: 'adsterra', pubId: '883921', scriptCode: '<script type="text/javascript" src="//www.highperformanceformat.com/883921/invoke.js"></script>', slot: 'sidebar', active: true, cpmEstimate: '$14.50', lazyLoadDelay: 'scroll_100', geoTarget: 'worldwide', isConsentCompliant: true, customSize: '300x250 Rectangle', format: 'social_bar' }
     ]);
     const defaultCampaigns = [
       { id: 'camp-1', name: 'Attachment Style Mastery Masterclass', url: 'https://wellnesscouples.com/courses/attachment-mastery', impressions: 0, clicks: 0, status: 'Active' },

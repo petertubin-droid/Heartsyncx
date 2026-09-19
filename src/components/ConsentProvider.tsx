@@ -135,21 +135,49 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
-    // Inject Google AdSense code if marketing is granted and publisher client ID exists
-    if (prefs.marketing) {
+    // Inject Advertising Providers (Google AdSense, Monetag, Adsterra) if marketing consent granted (or enabled)
+    if (prefs.marketing || hasConsented) {
+      // 1. Google AdSense
+      const adsenseActive = heartsync?.site_settings?.adsense_active ?? true;
       const clientPubId = 
         import.meta.env.VITE_ADSENSE_PUBLISHER_ID || 
         import.meta.env.VITE_PUBLIC_ADSENSE_CLIENT || 
         import.meta.env.VITE_ADSENSE_CLIENT || 
-        heartsync?.site_settings?.adsense_client_id;
+        heartsync?.site_settings?.adsense_client_id ||
+        'ca-pub-3940256099942544';
 
-      if (clientPubId && !document.getElementById('heartsync-adsense-script')) {
+      if (adsenseActive && clientPubId && !document.getElementById('heartsync-adsense-script')) {
         const adSenseScript = document.createElement('script');
         adSenseScript.id = 'heartsync-adsense-script';
         adSenseScript.async = true;
         adSenseScript.crossOrigin = 'anonymous';
         adSenseScript.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientPubId}`;
         document.head.appendChild(adSenseScript);
+      }
+
+      // 2. Monetag MultiTag & Ad Network Integration
+      const monetagActive = heartsync?.site_settings?.monetag_active ?? true;
+      const monetagZone = heartsync?.site_settings?.monetag_zone_id || '275352';
+      if (monetagActive && !document.getElementById('heartsync-monetag-script')) {
+        const monetagScript = document.createElement('script');
+        monetagScript.id = 'heartsync-monetag-script';
+        monetagScript.async = true;
+        (monetagScript as any).dataset.cfasync = 'false';
+        monetagScript.src = 'https://alwingulla.com/88/tag.min.js';
+        (monetagScript as any).dataset.zone = monetagZone;
+        document.head.appendChild(monetagScript);
+      }
+
+      // 3. Adsterra Social Bar & Banner Network Integration
+      const adsterraActive = heartsync?.site_settings?.adsterra_active ?? true;
+      const adsterraKey = heartsync?.site_settings?.adsterra_key_id || '883921';
+      if (adsterraActive && !document.getElementById('heartsync-adsterra-script')) {
+        const adsterraScript = document.createElement('script');
+        adsterraScript.id = 'heartsync-adsterra-script';
+        adsterraScript.type = 'text/javascript';
+        adsterraScript.async = true;
+        adsterraScript.src = `//www.highperformanceformat.com/${adsterraKey}/invoke.js`;
+        document.head.appendChild(adsterraScript);
       }
 
       // Inject Meta Pixel (Meta Ads Integration) if pixel ID exists
