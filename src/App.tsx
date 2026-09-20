@@ -4,6 +4,7 @@ import HeroSection from './components/HeroSection';
 import Footer from './components/Footer';
 import BlogCard from './components/BlogCard';
 import RelatedContentBlock from './components/RelatedContentBlock';
+import ArticleShareRow from './components/ArticleShareRow';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import RichTextEditor from './components/RichTextEditor';
 import AdminLogin from './components/AdminLogin';
@@ -17,6 +18,7 @@ import SubscriptionPage from './components/SubscriptionPage';
 import ArticleBodyWithInserts from './components/ArticleBodyWithInserts';
 import OfflineReaderBanner from './components/OfflineReaderBanner';
 import { AdPlacement } from './components/AdPlacement';
+import { AdNetworkScripts } from './components/AdNetworkScripts';
 import { heartsync, getAuthors } from './store';
 import { Post, Category, Author, SiteSettings, Topic } from './types';
 import { HeartsyncLoader, LoadingProgressBar, HeartsyncSuspense, HeartsyncImage } from './components/LoadingSystem';
@@ -31,7 +33,7 @@ import {
   Heart, BookOpen, MessageSquare, Copy, ArrowLeft, Send, 
   HelpCircle, AlertTriangle, User, Smile, PlusCircle, CheckCircle, 
   Trash2, ShieldAlert, BadgeInfo, BellRing, Bookmark, ChevronRight,
-  BookmarkX, Award, AlertCircle, RefreshCw, Mail, Settings, Twitter, Link as LinkIcon, Calendar, Clock,
+  BookmarkX, Award, AlertCircle, RefreshCw, Mail, Settings, Twitter, Facebook, Link as LinkIcon, Calendar, Clock,
   HeartCrack, Brain, Flag, CircleDot, Lock, Play, Tv, Users, TrendingUp, Printer, Volume2, Maximize2
 } from 'lucide-react';
 
@@ -3862,25 +3864,8 @@ export default function App() {
                                       )}
                                     </div>
 
-                                    {/* Share on Twitter/X */}
-                                    <a
-                                      href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(activeArticle.title)}&url=${encodeURIComponent(window.location.href)}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full hover:text-rose-500 hover:scale-110 transition-all text-zinc-650 dark:text-zinc-350 shadow-sm"
-                                      title="Share on Twitter"
-                                    >
-                                      <Twitter className="w-4.5 h-4.5" />
-                                    </a>
-
-                                    {/* Share by Mail */}
-                                    <a
-                                      href={`mailto:?subject=${encodeURIComponent(activeArticle.title)}&body=${encodeURIComponent(window.location.href)}`}
-                                      className="p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full hover:text-rose-500 hover:scale-110 transition-all text-zinc-650 dark:text-zinc-350 shadow-sm"
-                                      title="Share via Mail"
-                                    >
-                                      <Mail className="w-4.5 h-4.5" />
-                                    </a>
+                                    {/* Full social share row (X, Facebook, LinkedIn, WhatsApp, Reddit, Instagram, TikTok, email, native share) */}
+                                    <ArticleShareRow title={activeArticle.title} compact />
                                   </div>
                                 </>
                               )}
@@ -4724,21 +4709,33 @@ export default function App() {
                     </button>
 
                     <a
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex flex-col items-center gap-0.5"
+                    >
+                      <Facebook className="w-5 h-5" />
+                      <span className="text-[8px] uppercase tracking-wider">Share</span>
+                    </a>
+
+                    <a
                       href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(activeArticle.title)}&url=${encodeURIComponent(window.location.href)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex flex-col items-center gap-0.5"
                     >
                       <Twitter className="w-5 h-5" />
-                      <span className="text-[8px] uppercase tracking-wider">Tweet</span>
+                      <span className="text-[8px] uppercase tracking-wider">Post</span>
                     </a>
 
                     <a
-                      href={`mailto:?subject=${encodeURIComponent(activeArticle.title)}&body=${encodeURIComponent(window.location.href)}`}
+                      href={`https://wa.me/?text=${encodeURIComponent(`${activeArticle.title} ${window.location.href}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex flex-col items-center gap-0.5"
                     >
-                      <Mail className="w-5 h-5" />
-                      <span className="text-[8px] uppercase tracking-wider">Mail</span>
+                      <Send className="w-5 h-5" />
+                      <span className="text-[8px] uppercase tracking-wider">Send</span>
                     </a>
                   </div>
 
@@ -5633,6 +5630,9 @@ export default function App() {
       {currentTab !== 'admin' && (
         <>
           <Footer onNavigate={navigateTo} siteSettings={siteSettings} lang={lang} />
+          {/* Site-wide ad-network scripts (Monetag / Adsterra), consent-gated */}
+          <AdNetworkScripts />
+
           {/* Footer Ad Banner (Google AdSense) — never on admin/auth/error views */}
           {['admin', 'login', 'error', 'access-denied'].every((t) => t !== currentTab) && (
             <AdPlacement slot="footer" lazy />

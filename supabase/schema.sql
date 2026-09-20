@@ -1079,3 +1079,20 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_footer TE
 ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_homepage TEXT;
 ALTER TABLE public.site_settings 
 ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_article_bottom TEXT;
+
+-- ----------------------------------------------------------------------------
+-- AD NETWORK PROVIDER CONFIGURATION (Monetag / Adsterra)
+-- Site-wide snippets + per-slot Adsterra banner keys, admin-configurable.
+-- ----------------------------------------------------------------------------
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS monetag_script_code TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_key_id TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_key_header TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_key_sidebar TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_key_in_article TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_key_footer TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_key_homepage TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_key_article_bottom TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_popunder_script TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_social_bar_script TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_interstitial_script TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsterra_inpage_push_script TEXT;

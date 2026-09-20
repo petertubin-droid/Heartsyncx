@@ -5318,6 +5318,144 @@ export default function AdminConsole({
               {/* ADS Placements CRM */}
               {activePane === 'ads' && (
                 <div className="space-y-6">
+                  {/* Monetag provider settings — MultiTag covers OnClick Popunder, Push Notifications, In-Page Push and Vignette Banner */}
+                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4 font-sans text-xs">
+                    <h3 className="font-bold text-sm">Monetag MultiTag Settings</h3>
+                    <p className="text-[10px] text-zinc-500 leading-relaxed">
+                      Create a MultiTag zone in your Monetag dashboard and paste its code below. One tag serves all four Monetag formats:
+                      OnClick Popunder, Push Notifications, In-Page Push and Vignette Banner. (For Push Notifications over HTTPS, also
+                      host the sw.js file Monetag provides at your site root.) Scripts inject only after a visitor consents to marketing cookies.
+                    </p>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={siteSettings.monetag_active === true}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, monetag_active: e.target.checked })}
+                          className="cursor-pointer"
+                        />
+                        <span className="font-semibold">Monetag active</span>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">MultiTag Zone ID</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 275352"
+                          value={siteSettings.monetag_zone_id || ''}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, monetag_zone_id: e.target.value })}
+                          className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-mono text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Full MultiTag Snippet (from dashboard — overrides the zone-id loader)</label>
+                        <textarea
+                          rows={3}
+                          placeholder="&lt;script src=... data-zone=... async data-cfasync=false&gt;&lt;/script&gt;"
+                          value={siteSettings.monetag_script_code || ''}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, monetag_script_code: e.target.value })}
+                          className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-mono text-[10px]"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          heartsync.updateSettings({
+                            monetag_active: siteSettings.monetag_active,
+                            monetag_zone_id: siteSettings.monetag_zone_id,
+                            monetag_script_code: siteSettings.monetag_script_code
+                          });
+                          triggerToast('Monetag settings saved!');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-bold hover:bg-rose-600 transition-all"
+                      >
+                        Save Monetag Settings
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Adsterra provider settings — per-slot banner keys + site-wide format snippets */}
+                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4 font-sans text-xs">
+                    <h3 className="font-bold text-sm">Adsterra Settings</h3>
+                    <p className="text-[10px] text-zinc-500 leading-relaxed">
+                      Two integration paths. (1) Display/banner units: create a Native Banner or Banner unit per placement in your Adsterra
+                      dashboard and paste its key into the matching slot below — header renders 728x90, sidebar/in-article/homepage/article-bottom
+                      300x250, footer 468x60. (2) Site-wide formats (Popunder, Social Bar, Interstitial, In-Page Push): paste each format's full
+                      code from the dashboard into its snippet field. Everything injects only after marketing-cookie consent.
+                    </p>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={siteSettings.adsterra_active === true}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, adsterra_active: e.target.checked })}
+                          className="cursor-pointer"
+                        />
+                        <span className="font-semibold">Adsterra active</span>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Per-Slot Banner Keys</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {([
+                            ['adsterra_key_header', 'Header 728x90'],
+                            ['adsterra_key_sidebar', 'Sidebar 300x250'],
+                            ['adsterra_key_in_article', 'In-article 300x250'],
+                            ['adsterra_key_footer', 'Footer 468x60'],
+                            ['adsterra_key_homepage', 'Homepage 300x250'],
+                            ['adsterra_key_article_bottom', 'Article bottom 300x250']
+                          ] as const).map(([field, label]) => (
+                            <div key={field} className="space-y-0.5">
+                              <span className="text-[9px] text-zinc-400">{label}</span>
+                              <input
+                                type="text"
+                                value={(siteSettings as Record<string, string>)[field] || ''}
+                                onChange={(e) => setSiteSettings({ ...siteSettings, [field]: e.target.value })}
+                                className="w-full p-2 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 font-mono text-[11px]"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {([
+                        ['adsterra_popunder_script', 'Popunder code'],
+                        ['adsterra_social_bar_script', 'Social Bar code'],
+                        ['adsterra_interstitial_script', 'Interstitial code'],
+                        ['adsterra_inpage_push_script', 'In-Page Push code']
+                      ] as const).map(([field, label]) => (
+                        <div key={field} className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{label} (full snippet from dashboard)</label>
+                          <textarea
+                            rows={2}
+                            value={(siteSettings as Record<string, string>)[field] || ''}
+                            onChange={(e) => setSiteSettings({ ...siteSettings, [field]: e.target.value })}
+                            className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 font-mono text-[10px]"
+                          />
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          heartsync.updateSettings({
+                            adsterra_active: siteSettings.adsterra_active,
+                            adsterra_key_header: siteSettings.adsterra_key_header,
+                            adsterra_key_sidebar: siteSettings.adsterra_key_sidebar,
+                            adsterra_key_in_article: siteSettings.adsterra_key_in_article,
+                            adsterra_key_footer: siteSettings.adsterra_key_footer,
+                            adsterra_key_homepage: siteSettings.adsterra_key_homepage,
+                            adsterra_key_article_bottom: siteSettings.adsterra_key_article_bottom,
+                            adsterra_popunder_script: siteSettings.adsterra_popunder_script,
+                            adsterra_social_bar_script: siteSettings.adsterra_social_bar_script,
+                            adsterra_interstitial_script: siteSettings.adsterra_interstitial_script,
+                            adsterra_inpage_push_script: siteSettings.adsterra_inpage_push_script
+                          });
+                          triggerToast('Adsterra settings saved!');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-bold hover:bg-rose-600 transition-all"
+                      >
+                        Save Adsterra Settings
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Google AdSense client code options */}
                   <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4 font-sans text-xs">
                     <h3 className="font-bold text-sm">AdSense Layer Settings</h3>

@@ -15,19 +15,19 @@ declare global {
   }
 }
 
-const SLOT_DIMENSIONS: Record<AdPlacementProps['slot'], { minHeight: number; label: string }> = {
+type SlotFamily = AdPlacementProps['slot'];
+
+const SLOT_DIMENSIONS: Record<SlotFamily, { minHeight: number; label: string }> = {
   header: { minHeight: 90, label: 'Advertisement' },
   sidebar: { minHeight: 250, label: 'Advertisement' },
   in_article: { minHeight: 250, label: 'Advertisement' },
-  footer: { minHeight: 100, label: 'Advertisement' },
+  footer: { minHeight: 60, label: 'Advertisement' },
   homepage: { minHeight: 250, label: 'Advertisement' },
   article_bottom: { minHeight: 250, label: 'Advertisement' }
 };
 
-// Per-slot AdSense unit ids, configured by the admin in Monetization settings
-// (site_settings.adsense_slot_<slot>) or via VITE_ADSENSE_PUBLISHER_ID +
-// VITE_SLOT_* environment variables at build time.
-const SLOT_SETTINGS_FIELD: Record<AdPlacementProps['slot'], string> = {
+/** AdSense unit-id settings field + build-time env fallback, per slot. */
+const ADSENSE_FIELD: Record<SlotFamily, string> = {
   header: 'adsense_slot_header',
   sidebar: 'adsense_slot_sidebar',
   in_article: 'adsense_slot_in_article',
@@ -35,8 +35,7 @@ const SLOT_SETTINGS_FIELD: Record<AdPlacementProps['slot'], string> = {
   homepage: 'adsense_slot_homepage',
   article_bottom: 'adsense_slot_article_bottom'
 };
-
-const SLOT_ENV: Record<AdPlacementProps['slot'], string | undefined> = {
+const ADSENSE_ENV: Record<SlotFamily, string | undefined> = {
   header: import.meta.env.VITE_SLOT_HERO as string | undefined,
   sidebar: import.meta.env.VITE_SLOT_SIDEBAR as string | undefined,
   in_article: import.meta.env.VITE_SLOT_INLINE as string | undefined,
@@ -45,12 +44,31 @@ const SLOT_ENV: Record<AdPlacementProps['slot'], string | undefined> = {
   article_bottom: import.meta.env.VITE_SLOT_CONTENT as string | undefined
 };
 
+/**
+ * Adsterra display/banner format per placement (their documented native
+ * banner sizes: 728x90, 468x60, 300x250, 320x50, 160x300).
+ */
+const ADSTERRA_FORMAT: Record<SlotFamily, { format: string; width: number; height: number }> = {
+  header: { format: '728x90', width: 728, height: 90 },
+  sidebar: { format: '300x250', width: 300, height: 250 },
+  in_article: { format: '300x250', width: 300, height: 250 },
+  footer: { format: '468x60', width: 468, height: 60 },
+  homepage: { format: '300x250', width: 300, height: 250 },
+  article_bottom: { format: '300x250', width: 300, height: 250 }
+};
+
+function settings(): Record<string, unknown> {
+  return heartsync.site_settings as Record<string, unknown>;
+}
+
+function str(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : '';
+}
+
 function resolvePublisherId(): string | null {
-  const fromSettings = (heartsync.site_settings as Record<string, unknown>).adsense_client_id;
-  const candidate = (typeof fromSettings === 'string' && fromSettings.trim()) || (import.meta.env.VITE_ADSENSE_PUBLISHER_ID as string) || '';
-  const trimmed = candidate.trim();
-  if (!/^ca-pub-\d{10,}$/.test(trimmed)) return null; // honest absence until a real publisher id exists
-  return trimmed;
+  const candidate = str(settings().adsense_client_id) || (import.meta.env.VITE_ADSENSE_PUBLISHER_ID as string) || '';
+  if (!/^ca-pub-\d{10,}$/.test(candidate)) return null; // honest absence until a real publisher id exists
+  return candidate;
 }
 
 function ensureAdsenseLibrary(publisherId: string): void {
@@ -63,12 +81,35 @@ function ensureAdsenseLibrary(publisherId: string): void {
   document.head.appendChild(s);
 }
 
+/** Adsterra's documented native-banner snippet, isolated in a sandboxed iframe. */
+const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
+  const dims = ADSTERRA_FORMAT[slot];
+  const key = str(settings()[`adsterra_key_${slot}`]);
+  if (!/^[a-f0-9]{20,}$/i.test(key)) return null;
+  const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;display:flex;justify-content:center;align-items:flex-start;overflow:hidden}</style></head><body>
+<script type="text/javascript">
+	atOptions = { 'key' : '${key}', 'format' : '${dims.format}', 'height' : ${dims.height}, 'width' : ${dims.width}, 'params' : {} };
+</script>
+<script type="text/javascript" src="//www.highperformanceformat.com/${key}/invoke.js"></script>
+</body></html>`;
+  return (
+    <iframe
+      title="Advertisement"
+      srcDoc={srcDoc}
+      style={{ border: 0, width: '100%', maxWidth: dims.width, height: dims.height }}
+      scrolling="no"
+      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+    />
+  );
+};
+
 /**
- * A real, policy-honest AdSense display unit.
- * - Renders nothing at all until a genuine publisher id + slot id exist.
+ * A real, policy-honest display ad unit.
+ * Provider precedence per slot: Google AdSense → Adsterra banner → nothing.
+ * - Renders nothing at all until a genuine configuration exists.
  * - Honors the site's per-slot visibility toggles and the cookie consent
  *   state (ads load only after consent; marketing opt-out serves
- *   non-personalized ads).
+ *   non-personalized AdSense).
  * - Reserves the slot height so ads never cause layout shift.
  * - Always labelled "Advertisement"; never styled to mimic UI elements.
  */
@@ -104,32 +145,50 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
     return () => io.disconnect();
   }, [lazy, inView]);
 
-  // Visibility toggles (admin controls)
-  const toggleField: Record<string, string> = {
+  const toggleField: Partial<Record<SlotFamily, string>> = {
     header: 'banner_header_enabled',
     sidebar: 'banner_sidebar_enabled',
     footer: 'banner_footer_enabled',
     in_article: 'banner_in_article_enabled'
   };
-  const settings = heartsync.site_settings as Record<string, unknown>;
-  const toggle = toggleField[slot];
   void settingsVersion;
-  if (toggle && settings[toggle] === false) return null;
+  const toggle = toggleField[slot];
+  if (toggle && settings()[toggle] === false) return null;
 
   const publisherId = resolvePublisherId();
-  const slotId = ((settings[SLOT_SETTINGS_FIELD[slot]] as string) || SLOT_ENV[slot] || '').trim();
-  if (!publisherId || !/^\d{9,16}$/.test(slotId)) return null;
+  const adsenseSlotId = str(settings()[ADSENSE_FIELD[slot]]) || (ADSENSE_ENV[slot] || '').trim();
+  const adsterraKey = str(settings()[`adsterra_key_${slot}`]);
   if (!hasConsented) return null; // default-denied until the visitor consents
+  if (!publisherId || !/^\d{9,16}$/.test(adsenseSlotId)) {
+    // No AdSense config for this slot — try Adsterra banner
+    if (!adsterraKey) return null;
+    const dims = SLOT_DIMENSIONS[slot];
+    const fmt = ADSTERRA_FORMAT[slot];
+    return (
+      <div
+        ref={ref}
+        className={`flex flex-col items-center ${className}`}
+        style={{ minHeight: Math.max(dims.minHeight, fmt.height) }}
+        data-ad-slot-family={slot}
+        aria-label="Advertisement"
+      >
+        <span className="text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-600 select-none mb-1">{dims.label}</span>
+        {inView ? <AdsterraBanner slot={slot} /> : <div style={{ width: fmt.width, height: fmt.height }} />}
+      </div>
+    );
+  }
 
-  const marketingConsent = !!(preferences as unknown as Record<string, unknown> | undefined)?.marketing;
+  const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
 
   useEffect(() => {
     if (!inView || pushedRef.current) return;
     pushedRef.current = true;
-    ensureAdsenseLibrary(publisherId);
+    ensureAdsenseLibrary(publisherId!);
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push(
-        marketingConsent ? {} : { google_ad_client: publisherId, google_reactive_ad_format: 0, requestNonPersonalizedAds: 1 }
+        marketingConsent
+          ? {}
+          : { google_ad_client: publisherId, google_reactive_ad_format: 0, requestNonPersonalizedAds: 1 }
       );
     } catch {
       // AdSense library not ready yet; the unit will fill when it loads.
@@ -153,7 +212,7 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
         className="adsbygoogle"
         style={{ display: 'block', width: '100%', maxWidth: slot === 'sidebar' ? '300px' : '970px' }}
         data-ad-client={publisherId}
-        data-ad-slot={slotId}
+        data-ad-slot={adsenseSlotId}
         data-ad-format={slot === 'in_article' || slot === 'article_bottom' ? 'fluid' : 'auto'}
         {...(slot === 'in_article' || slot === 'article_bottom' ? { 'data-ad-layout': 'in-article' } : {})}
         data-full-width-responsive="true"
