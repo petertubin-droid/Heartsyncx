@@ -26,6 +26,9 @@ import { BREAKUPS_UNTANGLING } from './breakups-untangling';
 import { SELFLOVE_BOUNDARIES_GUILT } from './selflove-boundaries-guilt';
 import { SELFLOVE_REBUILD_SELF_TRUST } from './selflove-rebuild-self-trust';
 import { SELFLOVE_SOLITUDE_VS_LONELINESS } from './selflove-solitude-vs-loneliness';
+import { COMM_RITUALS_OF_CONNECTION } from './comm-rituals-of-connection';
+import { BREAKUPS_GRIEVING_SOMEONE_ALIVE } from './breakups-grieving-someone-alive';
+import { LOVE_LANGUAGES_HONESTLY } from './love-languages-honestly';
 
 // HeartSync long-form corpus — genuinely written editorial pieces, added over
 // time in batches. Word target per article: ~2000 words. Never filler.
@@ -56,7 +59,10 @@ export const HEARTSYNC_ARTICLES: Post[] = [
   ...BREAKUPS_UNTANGLING,
   ...SELFLOVE_BOUNDARIES_GUILT,
   ...SELFLOVE_REBUILD_SELF_TRUST,
-  ...SELFLOVE_SOLITUDE_VS_LONELINESS
+  ...SELFLOVE_SOLITUDE_VS_LONELINESS,
+  ...COMM_RITUALS_OF_CONNECTION,
+  ...BREAKUPS_GRIEVING_SOMEONE_ALIVE,
+  ...LOVE_LANGUAGES_HONESTLY
 ];
 
 // Crawler/sitemap-facing SEO projection of the in-code corpus. Kept lean (no
