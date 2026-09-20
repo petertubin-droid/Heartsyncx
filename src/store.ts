@@ -3628,7 +3628,7 @@ export class HeartsyncStore {
     this.saveState();
   }
 
-  public async registerNewUser(name: string, email: string, password?: string): Promise<{ success: boolean; user?: User; error?: string }> {
+  public async registerNewUser(name: string, email: string, password?: string): Promise<{ success: boolean; user?: User; error?: string; needsEmailConfirmation?: boolean }> {
     const normalizedEmail = email.trim().toLowerCase();
     
     if (!this.supabase) {
@@ -3661,15 +3661,100 @@ export class HeartsyncStore {
         created_at: new Date().toISOString()
       };
 
+      const needsEmailConfirmation = !data.session;
+
       if (data.session) {
-        this.current_user = returnedUser;
+        // Profile sync mirrors loginCustomUser so role/subscription state is real
+        try {
+          const syncRes = await fetch('/api/auth/sync-profile', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${data.session.access_token}`
+            },
+            body: JSON.stringify({
+              userId: data.user?.id,
+              email: normalizedEmail,
+              name: name.trim(),
+              avatarUrl: returnedUser.avatar_url
+            })
+          });
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            const profile = syncData.profile;
+            if (profile && !profile.is_suspended) {
+              this.current_user = {
+                ...returnedUser,
+                id: profile.id || returnedUser.id,
+                role: profile.role || 'reader',
+                name: profile.name || returnedUser.name,
+                avatar_url: profile.avatar_url || returnedUser.avatar_url,
+                bio: profile.bio || returnedUser.bio,
+                created_at: profile.created_at || returnedUser.created_at,
+                subscription_status: profile.role === 'premium' ? 'active' : 'none'
+              };
+            }
+          }
+        } catch (_) {
+          // Profile sync is best-effort; the auth listener will retry on the SIGNED_IN event
+        }
         this.saveState();
       }
 
       this.logAction('User Registered via Supabase Auth', normalizedEmail);
-      return { success: true, user: returnedUser };
+      return { success: true, user: returnedUser, needsEmailConfirmation };
     } catch (err: any) {
       return { success: false, error: err.message || 'Supabase SignUp failed.' };
+    }
+  }
+
+  /**
+   * Sends a password-reset email through Supabase Auth. Always reports
+   * success-shape behavior to the client so the flow never reveals whether
+   * an account exists for the given email (anti-enumeration).
+   */
+  public async requestPasswordReset(email: string): Promise<{ success: boolean; error?: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!this.supabase) {
+      return { success: false, error: 'Supabase client is not initialized in the application store.' };
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+    try {
+      const { error } = await this.supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      this.logAction('Password Reset Requested', normalizedEmail);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Password reset request failed.' };
+    }
+  }
+
+  /**
+   * Sets a new password for the signed-in (or recovery-session) user.
+   * Used by the password-reset flow after the user clicks the emailed link.
+   */
+  public async updateUserPassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.supabase) {
+      return { success: false, error: 'Supabase client is not initialized in the application store.' };
+    }
+    if (newPassword.length < 6) {
+      return { success: false, error: 'Your new password must be at least 6 characters long.' };
+    }
+    try {
+      const { error } = await this.supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      this.logAction('User Password Updated', this.current_user?.email || 'current session');
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Password update failed.' };
     }
   }
 

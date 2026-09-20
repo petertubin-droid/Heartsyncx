@@ -46,7 +46,7 @@ export default function Header({
 
   // Authentication Modal States
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -161,6 +161,44 @@ export default function Header({
     setAuthSubmitting(true);
 
     try {
+      if (authModalMode === 'reset') {
+        if (password.length < 6) {
+          setAuthError('Your new password must be at least 6 characters long.');
+          setAuthSubmitting(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setAuthError('The passwords you entered do not match.');
+          setAuthSubmitting(false);
+          return;
+        }
+        const res = await heartsync.updateUserPassword(password);
+        if (res.success) {
+          setAuthSuccess('Your password has been updated. You are signed in.');
+          setTimeout(() => {
+            setAuthModalOpen(false);
+            setAuthModalMode('login');
+            setPassword('');
+            setConfirmPassword('');
+          }, 1800);
+        } else {
+          setAuthError(res.error || 'Could not update your password. Please try again.');
+        }
+        setAuthSubmitting(false);
+        return;
+      }
+
+      if (authModalMode === 'forgot') {
+        const res = await heartsync.requestPasswordReset(email);
+        if (res.success) {
+          setAuthSuccess('If an account exists for that email, a reset link is on its way. Please check your inbox.');
+        } else {
+          setAuthError(res.error || 'Could not send the reset email. Please try again.');
+        }
+        setAuthSubmitting(false);
+        return;
+      }
+
       if (authModalMode === 'signup') {
         if (!name.trim()) {
           setAuthError('Please enter your full name.');
@@ -180,15 +218,25 @@ export default function Header({
 
         const res = await heartsync.registerNewUser(name, email, password);
         if (res.success) {
-          setAuthSuccess('Your account has been created successfully. Welcome to HEARTSYNC.');
-          setTimeout(() => {
-            setAuthModalOpen(false);
-            // Reset fields
-            setName('');
-            setEmail('');
-            setPassword('');
-            setConfirmPassword('');
-          }, 1500);
+          if (res.needsEmailConfirmation) {
+            // Supabase requires email confirmation before the session is issued
+            setAuthSuccess('Account created. Please check your inbox for a confirmation email to finish signing up.');
+            setTimeout(() => {
+              setAuthModalMode('login');
+              setPassword('');
+              setConfirmPassword('');
+            }, 2500);
+          } else {
+            setAuthSuccess('Your account has been created successfully. Welcome to HEARTSYNC.');
+            setTimeout(() => {
+              setAuthModalOpen(false);
+              // Reset fields
+              setName('');
+              setEmail('');
+              setPassword('');
+              setConfirmPassword('');
+            }, 1500);
+          }
         } else {
           setAuthError(res.error || 'Failed to create your account. Please try again.');
         }
@@ -295,6 +343,14 @@ export default function Header({
     });
 
     setSiteSettings({ ...heartsync.site_settings });
+
+    // Password-reset recovery link: Supabase returns the user to the site with
+    // a recovery session and a hash like #type=recovery — open the new-password form.
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+      setAuthModalMode('reset');
+      setAuthModalOpen(true);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
 
     const handleScroll = () => {
       const totalScroll = document.documentElement.scrollHeight - window.innerHeight;
@@ -833,12 +889,16 @@ export default function Header({
                     <Heart className="w-6 h-6 fill-current" />
                   </div>
                   <h3 className="font-serif font-black text-2xl text-zinc-900 dark:text-white leading-snug">
-                    {authModalMode === 'login' ? 'Welcome back' : 'Join HEARTSYNC'}
+                    {authModalMode === 'login' ? 'Welcome back' : authModalMode === 'signup' ? 'Join HEARTSYNC' : authModalMode === 'forgot' ? 'Reset your password' : 'Choose a new password'}
                   </h3>
                   <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 max-w-xs mx-auto">
                     {authModalMode === 'login' 
                       ? 'Sign in to access your saved guides, attachment charts, and personalized content.' 
-                      : 'Create an account to save guides, trace relationship scores, and connect with your partner.'}
+                      : authModalMode === 'signup'
+                      ? 'Create an account to save guides, trace relationship scores, and connect with your partner.'
+                      : authModalMode === 'forgot'
+                      ? 'Enter your email and we will send you a link to choose a new password.'
+                      : 'Pick a new password for your HEARTSYNC account.'}
                   </p>
                 </div>
 
@@ -940,7 +1000,8 @@ export default function Header({
                     </div>
                   </div>
 
-                  <div className="space-y-1">
+                  {authModalMode !== 'forgot' && (
+<div className="space-y-1">
                     <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Password</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500">
@@ -963,8 +1024,9 @@ export default function Header({
                       </button>
                     </div>
                   </div>
+                  )}
 
-                  {authModalMode === 'signup' && (
+                  {(authModalMode === 'signup' || authModalMode === 'reset') && (
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">Confirm password</label>
                       <div className="relative">
@@ -983,6 +1045,38 @@ export default function Header({
                     </div>
                   )}
 
+                  {authModalMode === 'login' && (
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthModalMode('forgot');
+                          setAuthError(null);
+                          setAuthSuccess(null);
+                        }}
+                        className="text-[10px] font-bold text-zinc-400 hover:text-[#CE2B5E] dark:text-zinc-500 dark:hover:text-[#CE2B5E] transition-colors cursor-pointer"
+                      >
+                        Forgot your password?
+                      </button>
+                    </div>
+                  )}
+
+                  {authModalMode === 'forgot' && (
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthModalMode('login');
+                          setAuthError(null);
+                          setAuthSuccess(null);
+                        }}
+                        className="text-[10px] font-bold text-zinc-400 hover:text-[#CE2B5E] dark:text-zinc-500 dark:hover:text-[#CE2B5E] transition-colors cursor-pointer"
+                      >
+                        Back to sign in
+                      </button>
+                    </div>
+                  )}
+
                   {/* Submit Button */}
                   <button
                     type="submit"
@@ -995,6 +1089,16 @@ export default function Header({
                       <>
                         <span>Sign in</span>
                         <LogIn className="w-3.5 h-3.5" />
+                      </>
+                    ) : authModalMode === 'forgot' ? (
+                      <>
+                        <span>Send reset link</span>
+                        <Mail className="w-3.5 h-3.5" />
+                      </>
+                    ) : authModalMode === 'reset' ? (
+                      <>
+                        <span>Save new password</span>
+                        <Lock className="w-3.5 h-3.5" />
                       </>
                     ) : (
                       <>
