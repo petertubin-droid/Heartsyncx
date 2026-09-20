@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { cleanConfigValue, isValidSupabaseConfig } from './lib/supabaseConfig';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig } from './lib/supabaseConfig';
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -942,7 +942,7 @@ export class HeartsyncStore {
 
     if (this.isValidSupabaseConfig(url, key)) {
       try {
-        this.supabase = createClient(url, key);
+        this.supabase = createSupabaseClient(url, key);
         this.activeSupabaseUrl = url;
         this.activeSupabaseKey = key;
         console.log('🔌 Supabase initialized successfully as primary database store. URL:', url);

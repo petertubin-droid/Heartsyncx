@@ -81,10 +81,18 @@ Post-migration verification (all checked live):
       is guarded on a non-empty ID. AdminConsole ad-provider/auto-script templates
       now use the admin-configured adsense_client_id dynamically; the stale
       hardcoded pub-7483921098483921 in code templates is gone.
-- [ ] Remove the hardcoded Supabase URL + anon key fallback in `src/store.ts`
-      (env-only configuration).
-- [ ] Unify Supabase client creation (store.ts, server getSupabaseClient,
-      getAdminDbClient, service-role) into one module.
+- [x] DONE (2026-09-20, commit 6c76e24 + today's audit): no hardcoded Supabase
+      URL/anon key anywhere in src/ (DEFAULT_SETTINGS uses empty strings; only a
+      UI input placeholder remains). Config is env-first, then server-supplied
+      site_settings via /api/state; the LocalStorage auto-migrate block is gone.
+- [x] DONE (2026-09-20): ALL client creation unified through
+      createSupabaseClient() in src/lib/supabaseConfig.ts (the shared
+      dependency-free config module) — store boot client, server
+      getSupabaseClient, adminAuthMiddleware verify client, getAdminDbClient,
+      getServiceRoleSupabase, and the subscription-mirror user-scoped client
+      (6 call sites). Same cleaning rules for every client; user-scoped
+      variants get the global Authorization header in one place. Verified with
+      a fresh vite build (chunk split unchanged) + suite 186/186.
 - [x] DONE (2026-09-20): dead code removed. The whole Cloud SQL path is gone:
       `getPgPool`/`getAdminPgPool`/`decoratePoolWithRetry`, the `pg` import and
       dependency (lockfile pruned), the 9 call-site `if (pool) {direct SQL} else

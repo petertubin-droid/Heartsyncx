@@ -3,6 +3,23 @@
 // Express server (server.ts). Keep this file dependency-free: it must load in
 // the browser bundle and in the Node server bundle.
 
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+/** Single factory for EVERY Supabase client in the app (client store + server).
+ *  Values are cleaned here; an optional authToken adds a global Authorization
+ *  header so user-scoped clients run under RLS session policies, never anon. */
+export function createSupabaseClient(
+  url: string | null | undefined,
+  key: string | null | undefined,
+  authToken?: string | null
+): SupabaseClient {
+  const u = cleanConfigValue(url);
+  const k = cleanConfigValue(key);
+  return createClient(u, k, authToken
+    ? { global: { headers: { Authorization: `Bearer ${authToken}` } } }
+    : undefined);
+}
+
 export function cleanConfigValue(val: string | null | undefined): string {
   if (!val) return '';
   let cleaned = val.trim();

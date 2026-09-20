@@ -5,13 +5,12 @@ import crypto from 'crypto';
 import { promises as dnsPromises } from 'dns';
 
 import { GoogleGenAI, Type } from '@google/genai';
-import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { getArticleSeoData } from './src/utils/seoArticleData';
 import { HEARTSYNC_ARTICLE_SEO } from './src/utils/data/articles';
-import { cleanConfigValue, isValidSupabaseConfig } from './src/lib/supabaseConfig';
+import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig } from './src/lib/supabaseConfig';
 import { Resend } from 'resend';
 
 // Load environmental parameters (both .env and .env.local)
@@ -2278,7 +2277,7 @@ function getSupabaseClient() {
   
   if (!supabaseClient || lastUsedSupabaseUrl !== trimmedUrl || lastUsedSupabaseKey !== trimmedKey) {
     try {
-      supabaseClient = createClient(trimmedUrl, trimmedKey);
+      supabaseClient = createSupabaseClient(trimmedUrl, trimmedKey);
       lastUsedSupabaseUrl = trimmedUrl;
       lastUsedSupabaseKey = trimmedKey;
       console.log('⚡ Server initialized/updated Supabase client dynamically. URL:', trimmedUrl);
@@ -2995,9 +2994,7 @@ async function adminAuthMiddleware(req: Request, res: Response, next: any) {
     }
     const envUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
     const envKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
-    const userClient = createClient(envUrl, envKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } }
-    });
+    const userClient = createSupabaseClient(envUrl, envKey, token);
     const { data: profile, error: profileErr } = await userClient
       .from('profiles')
       .select('role, is_suspended')
@@ -3029,7 +3026,7 @@ function getAdminDbClient(req: Request) {
     const envUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
     const envKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
     if (token && envUrl && envKey) {
-      return createClient(envUrl, envKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+      return createSupabaseClient(envUrl, envKey, token);
     }
   } catch (_) { /* fall through */ }
   return null;
@@ -4439,7 +4436,7 @@ function getServiceRoleSupabase() {
   const url = cleanConfigValue(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
   const key = cleanConfigValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!url || !key || !isValidSupabaseConfig(url, key)) return null;
-  return createClient(url, key);
+  return createSupabaseClient(url, key);
 }
 
 // Records a VERIFIED paid subscription + payment. Requires the service role key.
@@ -5002,7 +4999,7 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
     const syncUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
     const syncKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
     const userScopedClient = (syncUrl && syncKey && token)
-      ? createClient(syncUrl, syncKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
+      ? createSupabaseClient(syncUrl, syncKey, token)
       : null;
     if (userScopedClient) {
       const { error: profileMirrorErr } = await userScopedClient.from('profiles').upsert({
