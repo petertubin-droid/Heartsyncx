@@ -7,6 +7,7 @@ import RelatedContentBlock from './components/RelatedContentBlock';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import RichTextEditor from './components/RichTextEditor';
 import AdminLogin from './components/AdminLogin';
+import AiCopilot from './components/AiCopilot';
 import AdminConsole from './components/AdminConsole';
 import { CookieBanner } from './components/CookieBanner';
 import { useCookieConsent } from './components/useCookieConsent';
@@ -42,7 +43,7 @@ export default function App() {
   // Navigation loading state for premium progressive transitions
   const [isNavigating, setIsNavigating] = useState(false);
   // Navigation State with full routing support
-  const [currentTab, setCurrentTab] = useState<'home' | 'articles' | 'article' | 'categories' | 'category' | 'author' | 'search' | 'trending' | 'faq' | 'about' | 'contact' | 'privacy' | 'disclaimer' | 'terms' | 'cookies' | 'advertise' | 'newsletter' | 'error' | 'admin' | 'login' | 'access-denied' | 'subscription'>('home');
+  const [currentTab, setCurrentTab] = useState<'home' | 'articles' | 'article' | 'categories' | 'category' | 'author' | 'search' | 'trending' | 'faq' | 'about' | 'contact' | 'privacy' | 'disclaimer' | 'terms' | 'cookies' | 'advertise' | 'newsletter' | 'error' | 'admin' | 'login' | 'access-denied' | 'subscription' | 'ai_copilot' | 'lovevault'>('home');
   const [tabArg, setTabArg] = useState<string>(''); // Holds slugs/ID arguments
   const [frontendTheme, setFrontendTheme] = useState<'light' | 'dark'>(() => {
     try {
@@ -1277,6 +1278,10 @@ export default function App() {
       verifyAndSetTab('categories');
     } else if (firstSegment === 'subscription') {
       verifyAndSetTab('subscription');
+    } else if (firstSegment === 'ai-copilot') {
+      verifyAndSetTab('ai_copilot');
+    } else if (firstSegment === 'lovevault') {
+      verifyAndSetTab('lovevault');
     } else if (firstSegment === 'trending') {
       verifyAndSetTab('trending');
     } else if (firstSegment === 'faq') {
@@ -1419,6 +1424,8 @@ export default function App() {
     else if (tab === 'advertise') path = '/advertise';
     else if (tab === 'newsletter') path = '/newsletter';
     else if (tab === 'subscription') path = '/subscription';
+    else if (tab === 'ai_copilot') path = '/ai-copilot';
+    else if (tab === 'lovevault') path = '/lovevault';
     else if (tab === 'admin') path = '/admin';
     else if (tab === 'login') path = '/login';
     else if (tab === 'access-denied') path = '/access-denied';
@@ -5576,6 +5583,11 @@ export default function App() {
             {/* 17c. PREMIUM MEMBERSHIP SUBSCRIPTION PAGE */}
             {currentTab === 'subscription' && (
               <SubscriptionPage onNavigate={navigateTo} />
+            )}
+
+            {/* 17d. AI ADVICE ENGINE — the HeartSync Guide */}
+            {currentTab === 'ai_copilot' && (
+              <AiCopilot onNavigate={navigateTo} />
             )}
 
             {/* 18. ADMIN AUTHENTICATION — real sign-in gate */}

@@ -1574,6 +1574,110 @@ Make the output feel deeply empathetic, practical, modern, and human-written. In
 });
 
 // 1.25. Dynamic Article Summarizer
+// ============================================================================
+// AI ADVICE ENGINE — the reader-facing relational guide (HeartSync Copilot)
+// Public but rate-limited; degrades honestly when Gemini is not configured.
+// ============================================================================
+
+const adviceRateBuckets = new Map<string, { count: number; resetAt: number }>();
+const ADVICE_DAILY_LIMIT = 12;
+const CRISIS_KEYWORDS = [
+  'kill myself', 'end my life', 'suicide', 'suicidal', 'self harm', 'self-harm',
+  'want to die', 'hurt myself', 'abuse', 'abusive', 'beaten', 'hits me', 'hit me',
+  'raped', 'rape', 'stalked', 'stalking', 'threatening to kill'
+];
+
+function adviceRateCheck(ip: string): { ok: boolean; remaining: number } {
+  const now = Date.now();
+  const bucket = adviceRateBuckets.get(ip);
+  if (!bucket || now > bucket.resetAt) {
+    adviceRateBuckets.set(ip, { count: 1, resetAt: now + 24 * 60 * 60 * 1000 });
+    return { ok: true, remaining: ADVICE_DAILY_LIMIT - 1 };
+  }
+  bucket.count += 1;
+  return { ok: bucket.count <= ADVICE_DAILY_LIMIT, remaining: Math.max(0, ADVICE_DAILY_LIMIT - bucket.count) };
+}
+
+function detectCrisisRisk(message: string): boolean {
+  const lower = (message || '').toLowerCase();
+  return CRISIS_KEYWORDS.some((k) => lower.includes(k));
+}
+
+app.post('/api/advice/ask', async (req: Request, res: Response) => {
+  const ip = (req.headers['x-forwarded-for'] || req.ip || 'unknown') as string;
+  const rate = adviceRateCheck(String(ip));
+  if (!rate.ok) {
+    res.status(429).json({ error: 'Daily guidance limit reached. Your access resets within 24 hours.' });
+    return;
+  }
+
+  const { message, mode, history } = req.body || {};
+  const trimmed = (message || '').trim();
+  if (!trimmed || trimmed.length < 3) {
+    res.status(400).json({ error: 'Please describe your situation in a sentence or two.' });
+    return;
+  }
+  if (trimmed.length > 2000) {
+    res.status(400).json({ error: 'Please keep your question under 2000 characters.' });
+    return;
+  }
+
+  const ai = await getGeminiClient();
+  if (!ai) {
+    res.status(503).json({ error: 'The AI guide is not configured yet. It activates once the Gemini key is installed.' });
+    return;
+  }
+
+  const crisisRisk = detectCrisisRisk(trimmed);
+  const historyText = Array.isArray(history)
+    ? history
+        .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+        .slice(-6)
+        .map((m: any) => `${m.role === 'user' ? 'Reader' : 'Guide'}: ${m.content.slice(0, 800)}`)
+        .join('\n')
+    : '';
+
+  const systemPrompt = `You are the HeartSync Guide, a warm, evidence-informed relationship and emotional-wellness companion for a premium publishing platform (niches: love & relationships, dating & romance, communication & emotional connection, relationship problems & breakups, self-love & personal growth).
+
+Style rules:
+- Speak like a thoughtful human writer, never like a corporate bot. Vary your sentence rhythm.
+- Ground advice in well-established psychological concepts (attachment theory, Gottman-style repair work, boundaries, self-compassion, emotional regulation) WITHOUT clinical jargon walls or diagnosing anyone.
+- Be specific and practical: give concrete phrases the reader could actually say, small next steps, and one reflective question to close.
+- Keep answers between 180 and 350 words unless the situation clearly needs depth.
+- Never claim to be a licensed therapist. Never give medical or legal directives.
+- If the situation involves violence, coercion, or immediate danger, prioritize safety: clearly recommend contacting local emergency services or a domestic-violence hotline, and say plainly that the reader deserves immediate professional support.
+
+Recent conversation (if any):
+${historyText || '(new conversation)'}
+
+${mode === 'journal_prompt' ? 'The reader pressed "inspire me" on their private journal. Return ONLY one single journaling prompt (one or two sentences, no numbering, no explanation).' : 'Answer the reader\'s question below.'}`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: systemPrompt + '\n\nReader question: ' + trimmed,
+      config: {
+        temperature: 0.8,
+        maxOutputTokens: 1024
+      }
+    });
+    const text = (response?.text || '').trim();
+    if (!text) {
+      res.status(502).json({ error: 'The guide could not compose an answer. Please try rephrasing.' });
+      return;
+    }
+    res.json({
+      success: true,
+      answer: text,
+      crisisFlag: crisisRisk,
+      remainingToday: rate.remaining
+    });
+  } catch (err: any) {
+    console.warn('Advice engine failure:', err?.message);
+    res.status(502).json({ error: 'The guidance service is temporarily unavailable.' });
+  }
+});
+
 app.post('/api/gemini/summarize', async (req: Request, res: Response) => {
   const { title, content } = req.body;
   if (!title || !content) {
