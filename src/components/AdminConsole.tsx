@@ -15685,7 +15685,7 @@ export default function AdminConsole({
                             const updated = { ...siteSettings };
                             heartsync.updateSettings(updated);
                             try {
-                              fetch('/api/admin/settings', {
+                              adminFetch('/api/admin/settings', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(updated)

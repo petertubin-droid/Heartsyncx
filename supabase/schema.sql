@@ -681,13 +681,18 @@ CREATE TABLE IF NOT EXISTS public.integrations (
 );
 
 -- Integration Settings Table
+-- Code-accurate key/value integration settings store (matches /api/admin/integrations/*)
 CREATE TABLE IF NOT EXISTS public.integration_settings (
-  id TEXT PRIMARY KEY DEFAULT 'singleton',
-  webhooks_enabled BOOLEAN DEFAULT true,
-  zapier_key TEXT,
-  slack_webhook_url TEXT,
+  id TEXT PRIMARY KEY,
+  integration_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT,
+  is_sensitive BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_integration_settings_integration
+  ON public.integration_settings (integration_id);
 
 -- Integration Categories Table
 CREATE TABLE IF NOT EXISTS public.integration_categories (
@@ -698,11 +703,12 @@ CREATE TABLE IF NOT EXISTS public.integration_categories (
 
 -- Integration Logs Table
 CREATE TABLE IF NOT EXISTS public.integration_logs (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id TEXT PRIMARY KEY,
   integration_id TEXT,
-  event_type TEXT NOT NULL,
+  action TEXT,
   status TEXT DEFAULT 'success',
-  payload JSONB DEFAULT '{}'::jsonb,
+  details TEXT,
+  timestamp TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -1011,6 +1017,72 @@ GRANT UPDATE (full_name, avatar_url, bio, website) ON public.profiles TO authent
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users insert own settings" ON public.user_settings
   FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+
+-- ----------------------------------------------------------------------------
+-- SCHEMA DRIFT FIX: site_settings columns the server actually writes
+-- (ads sync + TTS settings singletons from /api/state and /api/admin/tts/save)
+-- ----------------------------------------------------------------------------
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS ads_enabled BOOLEAN DEFAULT false;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_publisher_id TEXT DEFAULT '';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS raw_settings JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS ad_slots JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_global_enabled BOOLEAN DEFAULT true;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_default_voice TEXT DEFAULT 'female';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_default_speed NUMERIC DEFAULT 1.0;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_player_position TEXT DEFAULT 'top';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_player_style TEXT DEFAULT 'button';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_voice_gender TEXT DEFAULT 'female';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_selected_voice TEXT DEFAULT 'Rachel';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_provider TEXT DEFAULT 'elevenlabs';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_selected_voice_id TEXT DEFAULT '';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_stability NUMERIC DEFAULT 0.55;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_similarity_boost NUMERIC DEFAULT 0.75;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_style NUMERIC DEFAULT 0.0;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_last_voice_sync TEXT DEFAULT '';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_default_pitch NUMERIC DEFAULT 1.0;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_default_volume NUMERIC DEFAULT 1.0;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_pronunciation_rules TEXT DEFAULT '';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tts_voice_cache JSONB DEFAULT '[]'::jsonb;
+
+-- ----------------------------------------------------------------------------
+-- ENGAGEMENT COUNTERS: anonymous readers may ONLY increment likes/views/reactions
+-- through this SECURITY DEFINER RPC — they have no direct UPDATE access to posts.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.increment_post_engagement(
+  p_post_id TEXT,
+  p_likes_delta INT DEFAULT 0,
+  p_views_delta INT DEFAULT 0,
+  p_reaction_key TEXT DEFAULT NULL
+)
+RETURNS SETOF public.posts
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_likes_delta < 0 OR p_likes_delta > 1 THEN
+    RAISE EXCEPTION 'invalid likes delta';
+  END IF;
+  IF p_views_delta < 0 OR p_views_delta > 100 THEN
+    RAISE EXCEPTION 'invalid views delta';
+  END IF;
+
+  RETURN QUERY UPDATE public.posts SET
+    likes = likes + p_likes_delta,
+    views = views + p_views_delta,
+    reactions = CASE
+      WHEN p_reaction_key IS NULL THEN reactions
+      ELSE jsonb_set(
+        COALESCE(reactions, '{"love":0,"insightful":0,"support":0,"warmth":0}'::jsonb),
+        ARRAY[p_reaction_key],
+        to_jsonb(COALESCE((COALESCE(reactions, '{}'::jsonb) ->> p_reaction_key)::int, 0) + 1),
+        true
+      )
+    END
+  WHERE id = p_post_id
+  RETURNING *;
+END;
+$$;
 
 -- ----------------------------------------------------------------------------
 -- SECURITY CLEANUP: API keys must NEVER live in site_settings (publicly readable).

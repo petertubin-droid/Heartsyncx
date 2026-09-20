@@ -323,9 +323,16 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
     setAiResponse('');
 
     try {
+      let draftToken = '';
+      try {
+        if (heartsync.supabase) {
+          const { data: { session } } = await heartsync.supabase.auth.getSession();
+          draftToken = session?.access_token || '';
+        }
+      } catch (_) { /* not signed in */ }
       const response = await fetch('/api/ai/draft', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(draftToken ? { Authorization: `Bearer ${draftToken}` } : {}) },
         body: JSON.stringify({
           prompt: aiPrompt,
           mode: aiMode,

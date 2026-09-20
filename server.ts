@@ -1668,6 +1668,50 @@ ${mode === 'journal_prompt' ? 'The reader pressed "inspire me" on their private 
   }
 });
 
+// AI CONTENT DRAFTING FOR THE RICH TEXT EDITOR (previously a missing endpoint)
+app.post('/api/ai/draft', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const { prompt, mode, context } = req.body;
+  if (!prompt || typeof prompt !== 'string') {
+    res.status(400).json({ error: 'A drafting prompt is required.' });
+    return;
+  }
+
+  const ai = await getGeminiClient();
+  if (!ai) {
+    res.status(503).json({ error: 'The AI drafting service is not configured. Add a Gemini API key on the server.' });
+    return;
+  }
+
+  try {
+    const finalPrompt = `You are an expert relationships and emotional-wellness writer for Heartsync.
+Drafting mode: ${mode || 'draft'}
+Writer instruction: "${prompt.trim()}"
+
+Existing article context (may be partial):
+<<CONTEXT>>
+${(typeof context === 'string' ? context : '').substring(0, 2000)}
+<</CONTEXT>>
+
+Return ONLY the new article content in clean Markdown. No preamble, no explanation.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: finalPrompt,
+      config: { temperature: 0.8, topP: 0.95 }
+    });
+
+    const text = (response.text || '').trim();
+    if (!text) {
+      res.status(502).json({ error: 'The drafting model returned an empty response.' });
+      return;
+    }
+    res.json({ success: true, text });
+  } catch (err: any) {
+    console.warn('AI draft generation failure:', err?.message || err);
+    res.status(502).json({ error: 'Draft generation failed: ' + (err?.message || 'unknown error') });
+  }
+});
+
 app.post('/api/gemini/summarize', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { title, content } = req.body;
   if (!title || !content) {
@@ -3210,7 +3254,7 @@ app.post('/api/admin/tts/save', adminAuthMiddleware, async (req: Request, res: R
     }
 
     // Persist all selected vocal configs dynamically to the singleton settings table in Supabase
-    const supabaseClient = getSupabaseClient();
+    const supabaseClient = getAdminDbClient(req) || getSupabaseClient();
     if (supabaseClient) {
       const dbPayload = {
         id: 'singleton',
@@ -3309,6 +3353,20 @@ async function adminAuthMiddleware(req: Request, res: Response, next: any) {
     console.warn('adminAuthMiddleware verification failure:', err);
     res.status(401).json({ error: 'Admin session verification failed.' });
   }
+}
+
+// Build a Supabase client scoped to the calling admin's own session so that
+// RLS admin policies (never anon policies) govern privileged server-side writes.
+function getAdminDbClient(req: Request) {
+  try {
+    const token = (req.headers.authorization || '').split(' ')[1];
+    const envUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
+    const envKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
+    if (token && envUrl && envKey) {
+      return createClient(envUrl, envKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+    }
+  } catch (_) { /* fall through */ }
+  return null;
 }
 
 let serverCacheState: any = null;
@@ -3599,8 +3657,8 @@ function fromDbUUID(dbId: any): string {
 }
 
 // Highly resilient synchronization layer to save state directly to Supabase database
-async function syncStateToSupabase(newState: any) {
-  const supabase = getSupabaseClient();
+async function syncStateToSupabase(newState: any, dbClient?: any) {
+  const supabase = dbClient || getSupabaseClient();
   if (!supabase) return;
 
   try {
@@ -3667,10 +3725,10 @@ async function syncStateToSupabase(newState: any) {
         newState.comments.map((cm: any) => ({
           id: cm.id,
           post_id: cm.post_id || cm.articleId,
-          author_name: cm.author_name || cm.authorName,
-          author_email: cm.author_email || cm.authorEmail || '',
+          author_name: cm.author_name || cm.user_name || cm.authorName || 'Anonymous Reader',
+          author_email: cm.author_email || cm.user_email || cm.authorEmail || '',
           content: cm.content,
-          status: cm.status || 'approved',
+          is_approved: cm.is_approved ?? (cm.status ? cm.status === 'approved' : true),
           created_at: cm.created_at || new Date().toISOString()
         }))
       );
@@ -4677,13 +4735,13 @@ async function _legacySqlSyncBypass() {
 */
 
 // Save state back securely (Always writes to Supabase & disk)
-async function saveServerCacheState(newState: any) {
+async function saveServerCacheState(newState: any, dbClient?: any) {
   serverCacheState = newState;
   stateETag = `w/etag-${Date.now()}`;
   lastModifiedDate = new Date();
   lastSupabaseFetchTime = Date.now();
-  
-  await syncStateToSupabase(newState);
+
+  await syncStateToSupabase(newState, dbClient);
   
   
 }
@@ -5244,20 +5302,27 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
 
     saveServerCacheState(serverCacheState);
 
-    // Mirror to Supabase REST tables if client is active
-    if (supabase) {
-      try {
-        await supabase.from('profiles').upsert(profileObj);
-        if (isAdmin) {
-          await supabase.from('admin_users').upsert({
-            id: userId,
-            email: cleanEmail,
-            role: 'admin',
-            is_active: true
-          });
-        }
-      } catch (_) {}
-    }
+    // Mirror to Supabase as the verified user (RLS own-row policies apply).
+    // Role is NEVER client-writable here; admin roles are managed exclusively
+    // by the setup wizard's service-role promotion.
+    try {
+      const syncUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
+      const syncKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
+      const userScopedClient = (syncUrl && syncKey && token)
+        ? createClient(syncUrl, syncKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
+        : null;
+      if (userScopedClient) {
+        const { error: profileMirrorErr } = await userScopedClient.from('profiles').upsert({
+          id: userId,
+          email: cleanEmail,
+          full_name: profileObj.full_name,
+          avatar_url: profileObj.avatar_url,
+          bio: profileObj.bio,
+          updated_at: profileObj.updated_at
+        });
+        if (profileMirrorErr) console.warn('Profile mirror upsert warning:', profileMirrorErr.message);
+      }
+    } catch (_) {}
 
     res.json({ success: true, profile: profileObj });
     return;
@@ -5530,7 +5595,8 @@ app.post('/api/state', adminAuthMiddleware, async (req: Request, res: Response) 
         };
       }
     }
-    await saveServerCacheState(newState);
+    // Route DB writes through the admin's own session so RLS admin policies apply
+    await saveServerCacheState(newState, getAdminDbClient(req));
     res.json({ success: true, message: 'State synchronized successfully with backend and database.' });
   } catch (err: any) {
     console.error('❌ Failed to synchronize state to database:', err);
@@ -5539,6 +5605,56 @@ app.post('/api/state', adminAuthMiddleware, async (req: Request, res: Response) 
       error: 'Database synchronization failed', 
       details: err.message || String(err) 
     });
+  }
+});
+
+// HOMEPAGE SETTINGS PERSISTENCE (previously called a missing endpoint)
+app.post('/api/admin/settings', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const settings = req.body;
+  if (!settings || typeof settings !== 'object') {
+    res.status(400).json({ error: 'A settings object is required.' });
+    return;
+  }
+  const sanitized = stripSecretFields(settings);
+  const dbClient = getAdminDbClient(req) || getSupabaseClient();
+  try {
+    const base = (serverCacheState && serverCacheState.site_settings) ? serverCacheState.site_settings : {};
+    const merged = { ...base, ...sanitized };
+    if (serverCacheState) {
+      serverCacheState.site_settings = merged;
+      stateETag = `w/etag-${Date.now()}`;
+      lastModifiedDate = new Date();
+    } else {
+      serverCacheState = { site_settings: merged };
+    }
+    if (dbClient) {
+      const { error: settingsErr } = await dbClient.from('site_settings').upsert({
+        id: 'singleton',
+        site_name: merged.site_name || 'Heartsync',
+        ads_enabled: Boolean(merged.adsense_active || merged.monetag_active || merged.adsterra_active),
+        adsense_publisher_id: merged.adsense_client_id || '',
+        raw_settings: merged,
+        ad_slots: {
+          adsense: { active: merged.adsense_active, client_id: merged.adsense_client_id },
+          monetag: { active: merged.monetag_active, zone_id: merged.monetag_zone_id, format: merged.monetag_format },
+          adsterra: { active: merged.adsterra_active, key_id: merged.adsterra_key_id, format: merged.adsterra_format },
+          banners: {
+            header: merged.banner_header_enabled,
+            sidebar: merged.banner_sidebar_enabled,
+            footer: merged.banner_footer_enabled,
+            in_article: merged.banner_in_article_enabled
+          }
+        },
+        updated_at: new Date().toISOString()
+      });
+      if (settingsErr) throw new Error(settingsErr.message);
+      res.json({ success: true, message: 'Homepage settings saved and synchronized to the database.' });
+    } else {
+      res.json({ success: true, message: 'Homepage settings saved to server state (database not configured).' });
+    }
+  } catch (err: any) {
+    console.error('Admin settings save error:', err);
+    res.status(500).json({ error: 'Failed to save settings: ' + (err.message || err) });
   }
 });
 
@@ -5900,7 +6016,7 @@ app.get('/api/admin/integrations', adminAuthMiddleware, async (req: Request, res
       });
       return;
     }
-    const supabase = getSupabaseClient();
+    const supabase = getAdminDbClient(req) || getSupabaseClient();
     if (supabase) {
       const [catsRes, intsRes, settingsRes, logsRes] = await Promise.all([
         supabase.from('integration_categories').select('*').order('id'),
@@ -5957,7 +6073,7 @@ app.post('/api/admin/integrations/toggle', adminAuthMiddleware, async (req: Requ
         [logId, integrationId, action, 'success', details]
       );
     } else {
-      const supabase = getSupabaseClient();
+      const supabase = getAdminDbClient(req) || getSupabaseClient();
       if (supabase) {
         const { data: nameData } = await supabase.from('integrations').select('name').eq('id', integrationId).maybeSingle();
         const intName = nameData?.name || integrationId;
@@ -6056,9 +6172,6 @@ app.post('/api/admin/integrations/save', adminAuthMiddleware, async (req: Reques
             if (pubKey && !pubKey.includes('•') && !pubKey.includes('●')) {
               extraApiKeys[`${provider}_publishable`] = pubKey;
             }
-            if (secKey && !secKey.includes('•') && !secKey.includes('●')) {
-              extraApiKeys[`${provider}_secret`] = secKey;
-            }
 
             await client.query(`
               UPDATE public.site_settings
@@ -6080,7 +6193,7 @@ app.post('/api/admin/integrations/save', adminAuthMiddleware, async (req: Reques
         [logId, integrationId, 'update_keys', 'success', `Configuration parameters updated for ${integrationId}.`]
       );
     } else {
-      const supabase = getSupabaseClient();
+      const supabase = getAdminDbClient(req) || getSupabaseClient();
       if (supabase) {
         const { data: existingRows } = await supabase.from('integration_settings').select('key, value').eq('integration_id', integrationId);
         const existingMap = new Map<string, string>();
@@ -6094,7 +6207,7 @@ app.post('/api/admin/integrations/save', adminAuthMiddleware, async (req: Reques
           const id = `${integrationId}_${key}`;
           const isSensitive = key.toLowerCase().includes('key') || key.toLowerCase().includes('secret') || key.toLowerCase().includes('token');
 
-          await supabase.from('integration_settings').upsert([{
+          const { error: upsertErr } = await supabase.from('integration_settings').upsert([{
             id,
             integration_id: integrationId,
             key,
@@ -6102,6 +6215,7 @@ app.post('/api/admin/integrations/save', adminAuthMiddleware, async (req: Reques
             is_sensitive: isSensitive,
             updated_at: new Date().toISOString()
           }]);
+          if (upsertErr) throw new Error(upsertErr.message);
         }
 
         if (integrationId === 'payments') {
@@ -6119,9 +6233,6 @@ app.post('/api/admin/integrations/save', adminAuthMiddleware, async (req: Reques
 
             if (pubKey && !pubKey.includes('•') && !pubKey.includes('●')) {
               extraApiKeys[`${provider}_publishable`] = pubKey;
-            }
-            if (secKey && !secKey.includes('•') && !secKey.includes('●')) {
-              extraApiKeys[`${provider}_secret`] = secKey;
             }
 
             await supabase.from('site_settings').update({
@@ -6176,7 +6287,7 @@ app.post('/api/admin/integrations/test', adminAuthMiddleware, async (req: Reques
         config[r.key] = r.value || '';
       }
     } else {
-      const supabase = getSupabaseClient();
+      const supabase = getAdminDbClient(req) || getSupabaseClient();
       if (supabase) {
         const { data: sRows } = await supabase.from('integration_settings').select('key, value').eq('integration_id', integrationId);
         (sRows || []).forEach((r: any) => config[r.key] = r.value || '');
@@ -6314,7 +6425,7 @@ app.post('/api/admin/integrations/test', adminAuthMiddleware, async (req: Reques
         [logId, integrationId, 'test_auth', success ? 'success' : 'failed', details]
       );
     } else {
-      const supabase = getSupabaseClient();
+      const supabase = getAdminDbClient(req) || getSupabaseClient();
       if (supabase) {
         const logId = 'log_' + Math.random().toString(36).substr(2, 9);
         await supabase.from('integration_logs').insert([{
@@ -6352,7 +6463,7 @@ app.post('/api/admin/integrations/logs/clear', adminAuthMiddleware, async (req: 
         [logId, null, 'clear_logs', 'success', 'All integration diagnostic logs have been cleared.']
       );
     } else {
-      const supabase = getSupabaseClient();
+      const supabase = getAdminDbClient(req) || getSupabaseClient();
       if (supabase) {
         await supabase.from('integration_logs').delete().neq('id', '');
         const logId = 'log_' + Math.random().toString(36).substr(2, 9);

@@ -2810,9 +2810,7 @@ export class HeartsyncStore {
     if (this.supabase) {
       try {
         const { error } = await this.supabase
-          .from('posts')
-          .update({ likes: newLikes, views: newViews })
-          .eq('id', id);
+          .rpc('increment_post_engagement', { p_post_id: id, p_likes_delta: 1, p_views_delta: 1 });
 
         if (error) {
           success = false;
@@ -2859,10 +2857,9 @@ export class HeartsyncStore {
     this.saveState();
 
     if (this.supabase) {
-      const match = this.posts.find(p => p.id === id);
-      if (match) {
-        this.supabase.from('posts').update({ reactions: match.reactions, views: match.views }).eq('id', id).then();
-      }
+      this.supabase.rpc('increment_post_engagement', { p_post_id: id, p_reaction_key: String(reaction), p_views_delta: 1 }).then(({ error }: any) => {
+        if (error) console.warn('Reaction persistence failed:', error.message);
+      });
     }
   }
 
@@ -2907,10 +2904,9 @@ export class HeartsyncStore {
     this.saveState();
 
     if (this.supabase) {
-      const match = this.posts.find(p => p.id === id);
-      if (match) {
-        this.supabase.from('posts').update({ views: match.views }).eq('id', id).then();
-      }
+      this.supabase.rpc('increment_post_engagement', { p_post_id: id, p_views_delta: 1 }).then(({ error }: any) => {
+        if (error) console.warn('View persistence failed:', error.message);
+      });
     }
   }
 
