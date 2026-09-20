@@ -2393,38 +2393,8 @@ export default function App() {
                         resolvedFeaturedPosts.push(otherPublished.shift());
                       }
                       
-                      const displayedList = (resolvedFeaturedPosts.length > 0 ? resolvedFeaturedPosts : [
-                        {
-                          id: 'placeholder-1',
-                          title: "There's No Word to Justify Cheating",
-                          excerpt: "Exploring the psychological schemas of unresolved childhood trauma that drive relationship betrayal loop cycles.",
-                          featured_image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=700",
-                          read_time: 5,
-                          author_id: '',
-                          category_id: '',
-                          slug: ""
-                        },
-                        {
-                          id: 'placeholder-2',
-                          title: "10 Signs They Are Losing Interest",
-                          excerpt: "Spotting micro-withdrawals of physical touch and conversation and learning how to establish warm co-regulation pathways.",
-                          featured_image: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=700",
-                          read_time: 6,
-                          author_id: '',
-                          category_id: '',
-                          slug: ""
-                        },
-                        {
-                          id: 'placeholder-3',
-                          title: "How to Rebuild Trust After Betrayal",
-                          excerpt: "The step-by-step roadmap for couples navigating vulnerability triggers and establishing secure attachment architectures.",
-                          featured_image: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=700",
-                          read_time: 7,
-                          author_id: '',
-                          category_id: '',
-                          slug: ""
-                        }
-                      ]).slice(0, featuredCount);
+                      // No fabricated fallback cards: show only real published articles.
+                      const displayedList = resolvedFeaturedPosts.slice(0, featuredCount);
  
                       return (
                         <section key={sec.id} className="space-y-8 py-10 border-t border-rose-100/10">
@@ -3147,48 +3117,8 @@ export default function App() {
                         resolvedTrendingPosts.push(remainingPublished.shift());
                       }
                       
-                      const displayedTrendingList = (resolvedTrendingPosts.length > 0 ? resolvedTrendingPosts : [
-                        {
-                          id: 'trend-placeholder-1',
-                          title: "Why Do Relationships Fall Apart?",
-                          featured_image: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=400",
-                          views: 12400,
-                          read_time: 7,
-                          category_id: 'relationship-advice',
-                          publish_date: '2026-06-25T08:00:00.000Z',
-                          slug: ""
-                        },
-                        {
-                          id: 'trend-placeholder-2',
-                          title: "7 Silent Signs of Emotional Neglect",
-                          featured_image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400",
-                          views: 9800,
-                          read_time: 6,
-                          category_id: 'emotional-wellness',
-                          publish_date: '2026-06-24T08:00:00.000Z',
-                          slug: ""
-                        },
-                        {
-                          id: 'trend-placeholder-3',
-                          title: "How to Stop Overthinking with Your Partner",
-                          featured_image: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=400",
-                          views: 8100,
-                          read_time: 5,
-                          category_id: 'communication',
-                          publish_date: '2026-06-23T08:00:00.000Z',
-                          slug: ""
-                        },
-                        {
-                          id: 'trend-placeholder-4',
-                          title: "Understanding Fear of Intimacy & Avoidance",
-                          featured_image: "https://images.unsplash.com/photo-1512485694743-9c9538b4e6e0?auto=format&fit=crop&q=80&w=400",
-                          views: 7500,
-                          read_time: 8,
-                          category_id: 'attachment-styles',
-                          publish_date: '2026-06-22T08:00:00.000Z',
-                          slug: ""
-                        }
-                      ]).slice(0, trendingCount);
+                      // No fabricated fallback cards: show only real published articles.
+                      const displayedTrendingList = resolvedTrendingPosts.slice(0, trendingCount);
  
                       return (
                         <section key={sec.id} className="space-y-8 py-10 border-t border-rose-100/10">

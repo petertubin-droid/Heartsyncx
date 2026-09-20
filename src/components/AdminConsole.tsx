@@ -399,7 +399,7 @@ export default function AdminConsole({
   });
 
   const [primaryProductionTarget, setPrimaryProductionTarget] = useState(() => {
-    return heartsync.getLocalStorage<string>('hs_dns_prod_target', typeof window !== 'undefined' ? window.location.origin : 'https://heartsync-836754107982.europe-west2.run.app');
+    return heartsync.getLocalStorage<string>('hs_dns_prod_target', typeof window !== 'undefined' ? window.location.origin : '');
   });
 
   const [httpsEnforcement, setHttpsEnforcement] = useState(() => {
@@ -444,7 +444,7 @@ export default function AdminConsole({
   });
 
   const [dnsLogs, setDnsLogs] = useState<string>(() => {
-    return '[System Initiated]: Edge secure DNS monitoring is fully initialized.\n[Active target mapping]: https://heartsync-836754107982.europe-west2.run.app connected.';
+    return '[Idle]: DNS diagnostics monitor ready. No target has been verified yet.';
   });
 
   // Upgraded custom DNS configurations states
@@ -623,10 +623,10 @@ export default function AdminConsole({
       category: 'Transactional Email Engine',
       iconType: 'mail',
       description: 'Delivers transactional welcome emails, password resets, and newsletter broadcasts.',
-      status: 'configured',
-      environment: 'live',
-      apiKey: 're_123456789_sec_991823',
-      senderEmail: 'newsletter@heartsync.app',
+      status: 'not_configured',
+      environment: 'sandbox',
+      apiKey: '',
+      senderEmail: '',
       updatedAt: '2026-07-28'
     },
     {
@@ -635,11 +635,11 @@ export default function AdminConsole({
       category: 'SaaS & Subscriptions Gateway',
       iconType: 'stripe',
       description: 'Processes memberships, recurring subscriptions, and digital e-book checkouts.',
-      status: 'configured',
-      environment: 'live',
-      publicKey: 'pk_live_51M0...X9z',
-      apiKey: 'sk_live_51M0...A8b',
-      webhookSecret: 'whsec_8912301928374',
+      status: 'not_configured',
+      environment: 'sandbox',
+      publicKey: '',
+      apiKey: '',
+      webhookSecret: '',
       updatedAt: '2026-07-28'
     },
     {
@@ -648,10 +648,10 @@ export default function AdminConsole({
       category: 'Neural Voice Synthesis',
       iconType: 'elevenlabs',
       description: 'Generates hyper-realistic article voice narrations and audio guides in real-time.',
-      status: 'configured',
-      environment: 'live',
-      apiKey: 'xi-api-key_7891238491203',
-      voiceId: '21m00Tcm4TlvDq8ikWAM',
+      status: 'not_configured',
+      environment: 'sandbox',
+      apiKey: '',
+      voiceId: '',
       updatedAt: '2026-07-25'
     },
     {
@@ -660,10 +660,10 @@ export default function AdminConsole({
       category: 'Traffic & Conversion Tracking',
       iconType: 'ga4',
       description: 'Monitors page views, session durations, conversion funnels, and reader retention.',
-      status: 'configured',
-      environment: 'live',
-      publicKey: 'G-HEARTSYNC26',
-      apiKey: 'sec_ga4_991203841029',
+      status: 'not_configured',
+      environment: 'sandbox',
+      publicKey: '',
+      apiKey: '',
       updatedAt: '2026-07-20'
     },
     {
@@ -672,11 +672,11 @@ export default function AdminConsole({
       category: 'Real-Time PostgreSQL Database',
       iconType: 'supabase',
       description: 'Stores post content, author bios, user roles, bookmarks, and comments.',
-      status: 'configured',
-      environment: 'live',
-      endpointUrl: 'https://ais-project.supabase.co',
-      publicKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-      apiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service_role',
+      status: 'not_configured',
+      environment: 'sandbox',
+      endpointUrl: '',
+      publicKey: '',
+      apiKey: '',
       updatedAt: '2026-07-29'
     },
     {
@@ -685,10 +685,10 @@ export default function AdminConsole({
       category: 'Anti-Bot Spam Defense',
       iconType: 'recaptcha',
       description: 'Protects newsletter subscription forms and comment sections against spam bots.',
-      status: 'configured',
-      environment: 'live',
-      publicKey: '6Ld_891023849102384',
-      apiKey: '6Ld_sec_77123901238',
+      status: 'not_configured',
+      environment: 'sandbox',
+      publicKey: '',
+      apiKey: '',
       scoreThreshold: '0.5',
       updatedAt: '2026-07-15'
     },
@@ -698,9 +698,9 @@ export default function AdminConsole({
       category: 'AI Content & Search Grounding',
       iconType: 'gemini',
       description: 'Powers smart article expansions, quiz auto-generation, and AI relationship coaching.',
-      status: 'configured',
-      environment: 'live',
-      apiKey: 'AIzaSy_9912038491023849102',
+      status: 'not_configured',
+      environment: 'sandbox',
+      apiKey: '',
       modelName: 'gemini-2.5-flash',
       updatedAt: '2026-07-29'
     }
@@ -14712,10 +14712,10 @@ export default function AdminConsole({
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-5 text-left">
                       <div className="space-y-1">
                         <span className="text-[9px] text-zinc-500 font-mono uppercase block">Active Production Deployment</span>
-                        <span className="text-xs font-bold text-zinc-200 block truncate" title="heartsync-836754107982.europe-west2.run.app">
-                          heartsync-836754107982...
+                        <span className="text-xs font-bold text-zinc-200 block truncate" title={primaryProductionTarget || "Not configured"}>
+                          {primaryProductionTarget?.replace(/^https?:\/\//, '').slice(0, 24) || 'Not configured'}
                         </span>
-                        <span className="text-[9px] text-emerald-400 font-mono block">Deploy VERIFIED (100% Green)</span>
+                        <span className="text-[9px] text-zinc-400 font-mono block">Deploy status unverified</span>
                       </div>
 
                       <div className="space-y-1">
@@ -14859,7 +14859,7 @@ export default function AdminConsole({
                         <div className="grid grid-cols-2 gap-2">
                           <button 
                             onClick={() => {
-                              window.open('https://heartsync-836754107982.europe-west2.run.app', '_blank');
+                              window.open(primaryProductionTarget || 'about:blank', '_blank');
                               triggerToast('Opening Live Web App...');
                             }}
                             className="py-2 px-1 text-center bg-zinc-50 dark:bg-zinc-850 hover:bg-rose-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-rose-200 text-zinc-700 dark:text-zinc-300 rounded-xl cursor-pointer font-bold select-none text-[9px] flex items-center justify-center gap-1"
@@ -14871,7 +14871,7 @@ export default function AdminConsole({
                           <button 
                             onClick={async () => {
                               try {
-                                await navigator.clipboard.writeText('https://heartsync-836754107982.europe-west2.run.app');
+                                await navigator.clipboard.writeText(primaryProductionTarget || '');
                                 triggerToast('Production URL saved to clipboard!');
                               } catch (_) {
                                 triggerToast('Clipboard write blocked in sandboxed container.');
@@ -14885,7 +14885,7 @@ export default function AdminConsole({
 
                           <button 
                             onClick={() => {
-                              setDnsLogs(prev => `[Verify Router - ${new Date().toLocaleTimeString()}]: Querying canonical mappings...\nTarget URL: https://heartsync-836754107982.europe-west2.run.app\nTesting SSL validity... Valid.\nHSTS header protection: Operational.\nStatus: Routing 100% Correct and Locked.\n` + prev);
+                              setDnsLogs(prev => `[Verify Router - ${new Date().toLocaleTimeString()}]: Querying canonical mappings...\nTarget URL: ${primaryProductionTarget || 'Not configured'}\nNote: external SSL/HSTS probes are not executed here; use /api/dns/diagnostics for real checks.\n` + prev);
                               triggerToast('Public routing verified!');
                             }}
                             className="py-2 px-1 text-center bg-zinc-50 dark:bg-zinc-850 hover:bg-rose-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-rose-200 text-zinc-700 dark:text-zinc-300 rounded-xl cursor-pointer font-bold select-none text-[9px] flex items-center justify-center gap-1"
@@ -15264,7 +15264,6 @@ export default function AdminConsole({
                                 }}
                                 className="w-full text-xs p-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-805 rounded-xl font-mono text-[10px]"
                               >
-                                <option value="https://heartsync-836754107982.europe-west2.run.app">https://heartsync-836754107982.europe-west2.run.app (Default europe-west2 Target Target)</option>
                                 <option value="https://wellnesscouples.com">https://wellnesscouples.com (Apex production Target)</option>
                                 <option value="https://www.wellnesscouples.com">https://www.wellnesscouples.com (WWW production Target)</option>
                               </select>
@@ -15298,7 +15297,7 @@ export default function AdminConsole({
                             <div className="flex items-center gap-3 pt-1">
                               <button 
                                 onClick={() => {
-                                  setDnsLogs(prev => `[AUTOMATIC ROLLBACK TRIGGERED - ${new Date().toLocaleTimeString()}]:\n- Restoring last stable DNS settings from snapshot record #20260608_stable.\n- Direct production domain bound safely to: https://heartsync-836754107982.europe-west2.run.app\n- Status: Bypassed conflict redirects. Live application restored and healthy.\n` + prev);
+                                  setDnsLogs(prev => `[AUTOMATIC ROLLBACK TRIGGERED - ${new Date().toLocaleTimeString()}]:\n- Restoring last stable DNS settings from snapshot record #20260608_stable.\n- Direct production domain bound safely to: ${primaryProductionTarget || 'Not configured'}\n- Status: local settings snapshot applied.\n` + prev);
                                   triggerToast('Last stable routing configuration rolled back!');
                                 }}
                                 className="w-full py-1.5 bg-[#CE2B5E] text-white hover:bg-rose-700 font-sans text-[10px] font-bold rounded-xl cursor-pointer border-none"

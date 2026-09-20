@@ -82,7 +82,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
     primary_cta_text: 'Subscribe',
     primary_cta_url: 'newsletter',
     secondary_cta_text: 'Relationship Tips',
-    secondary_cta_url: 'ai_copilot',
+    secondary_cta_url: 'articles',
     sticky: true,
     bg_color: '#ffffff',
     text_color: '#18181b',
@@ -108,10 +108,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
       { id: 'stat-2', label: 'essays', value: '0' },
       { id: 'stat-3', label: 'with care', value: 'Curated' }
     ],
-    testimonials: [
-      { id: 'test-1', name: 'Dr. Evelyn Carter', role: 'Relationship Advisor', text: 'Heartsync brings deep developmental research directly to everyday partners in beautiful, digestible form. Highly recommended.', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100' },
-      { id: 'test-2', name: 'James L.', role: 'Anxious-Avoidant Reader', text: 'The boundary lessons saved my relationship. Learning early attachment blueprints completely altered how I communicate.', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100' }
-    ],
+    testimonials: [],
     image_url: '',
     bg_image_url: '',
     video_url: '',
