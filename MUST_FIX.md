@@ -127,7 +127,11 @@ Post-migration verification (all checked live):
       new public GET /api/posts/:slug + store.ensureArticleContent, tested).
       REMAINING scope: consider projecting pages/comments columns and adding
       pagination to the remaining ~21 tables.
-- [ ] Split the 16k-line AdminConsole out of the reader bundle (lazy import).
+- [x] DONE (2026-09-20): AdminConsole split out of the reader bundle via
+      React.lazy + Suspense (own chunk, ~1.16 MB / 270 KB gzip) — it only
+      downloads when an admin opens the admin tab. Reader bundle dropped to
+      ~1.70 MB / 488 KB gzip. Verified in a real vite build (AdminConsole-*.js
+      emitted as a separate dynamic chunk).
 - [x] DONE (2026-09-20): double boot fetch eliminated. /api/state (fresh from
       Supabase with a 5s TTL) is the single boot fetch — initSupabaseConnection
       no longer fires a redundant full-table syncWithSupabase() on top of it.

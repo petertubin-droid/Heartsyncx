@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+
+// The 16k-line admin console is split out of the reader bundle — it only
+// downloads when an admin actually opens the admin tab.
+const AdminConsole = React.lazy(() => import('./components/AdminConsole'));
 import Header from './components/Header';
 import HeroSection from './components/HeroSection';
 import Footer from './components/Footer';
@@ -10,7 +14,6 @@ import RichTextEditor from './components/RichTextEditor';
 import AdminLogin from './components/AdminLogin';
 import AiCopilot from './components/AiCopilot';
 import LoveVault from './components/LoveVault';
-import AdminConsole from './components/AdminConsole';
 import { CookieBanner } from './components/CookieBanner';
 import { useCookieConsent } from './components/useCookieConsent';
 import LiveChatWidget from './components/LiveChatWidget';
@@ -5674,6 +5677,7 @@ export default function App() {
 
             {/* 18b. ADMIN CONSOLE PANES (admins only — gated in verifyAndSetTab) */}
             {(currentTab === 'admin' || currentTab === 'access-denied') && (
+              <React.Suspense fallback={<div className="min-h-screen" />}>
               <AdminConsole 
                 onNavigate={navigateTo} 
                 theme={adminTheme} 
@@ -5684,6 +5688,7 @@ export default function App() {
                 translatedCategories={translatedCategories}
                 translatedSiteSettings={translatedSiteSettings}
               />
+              </React.Suspense>
             )}
 
             </HeartsyncSuspense>
