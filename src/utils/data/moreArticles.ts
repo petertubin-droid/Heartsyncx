@@ -1,4 +1,5 @@
 import { Post, Category } from '../../types';
+import { HEARTSYNC_ARTICLES } from './articles/index';
 
 export const MORE_CATEGORIES: Category[] = [
   {
@@ -64,6 +65,8 @@ export const MORE_CATEGORIES: Category[] = [
 ];
 
 export const MORE_POSTS: Post[] = [
+  ...HEARTSYNC_ARTICLES,
+
   {
     id: 'post-1',
     title: 'The Art of Mindful Love: Cultivating Lasting Intimacy in Modern Relationships',
