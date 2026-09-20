@@ -55,7 +55,7 @@ export const AdNetworkScripts: React.FC = () => {
     : [];
 
   const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
-  const shouldInject = hasConsented && marketingConsent && (monetagSnippet || adsterraSnippets.length > 0);
+  const shouldInject = hasConsented && marketingConsent && (hasConsented) && (monetagSnippet || adsterraSnippets.length > 0);
 
   useEffect(() => {
     if (!shouldInject || injectedRef.current) return;
@@ -64,9 +64,14 @@ export const AdNetworkScripts: React.FC = () => {
     const inject = (html: string) => {
       try {
         const doc = new DOMParser().parseFromString(html, 'text/html');
-        doc.body.querySelectorAll('script').forEach((old) => {
+        // A bare <script src=...> snippet parses into the parsed doc's <head>
+        // (HTML parsing rules), so scan BOTH containers — body-only missed the
+        // single-script format that network dashboards emit most often.
+        const targets = [...doc.head.querySelectorAll('script'), ...doc.body.querySelectorAll('script')];
+        targets.forEach((old) => {
           const fresh = document.createElement('script');
           Array.from(old.attributes).forEach((a) => fresh.setAttribute(a.name, a.value));
+          fresh.setAttribute('data-heartsync-injected', 'ad-network-scripts');
           fresh.textContent = old.textContent;
           document.head.appendChild(fresh);
         });

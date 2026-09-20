@@ -5,6 +5,23 @@ import { Post } from '../types';
  * It dynamically expands articles with catchy, emotionally resonant, and highly educational prose (1000+ words total).
  * It incorporates polyvagal research, somatic connection worksheets, relational attachment science, and Gottman insights.
  */
+/**
+ * Universal closing module appended when a themed expansion still leaves the
+ * article under the 1000-word threshold. Provider-agnostic relationship
+ * integration guidance so every expanded post honors the same floor.
+ */
+const UNIVERSAL_INTEGRATION_MODULE = `
+
+---
+
+## Part V: Making It Real — A Gentle Integration Plan
+
+Reading about relational science is the easy part; the honest work begins when you close this article and re-enter the room where your actual life is happening. Insight that never touches behavior becomes trivia, so treat this final section as the bridge between understanding and lived change. Start smaller than your ambition suggests. If you take a single practice from this piece, rehearse it in a low-stakes moment — a casual morning conversation, a text about groceries — before you attempt it mid-conflict. Skills rehearsed in calm conditions become available under stress; skills attempted only in crisis collapse under pressure.
+
+Next, expect regression and do not interpret it as failure. Nervous systems and long-standing relational habits are shaped by years of repetition, and they do not reorganize in a single weekend. A useful rhythm is the weekly review: once a week, spend five private minutes asking what went well, where you slipped, and which single adjustment would make next week one percent kinder. Writing this down matters; a note you can reread outlives the mood that produced it.
+
+Finally, remember that connection is built in ordinary moments far more than in grand ones. The research on successful couples keeps returning to the same humble finding: consistent small turns toward each other, repeated over years, outperform occasional dramatic gestures. Let the ideas in this article become part of that quiet accumulation. Choose one practice, protect one small ritual, and offer one honest sentence this week. Then repeat. That is how attachment security, communication skill, and emotional intimacy are actually grown — deliberately, imperfectly, and together.`;
+
 export function expandArticleContent(post: Post): Post {
   const currentWordCount = post.content.split(/\s+/).length;
   if (currentWordCount >= 1000) {
@@ -362,6 +379,12 @@ By engaging in these conscious communication exercises, we move our relationship
     : `${titleHeader}${post.content}`;
 
   let enhancedContent = existingContentCleaned + emotionalExpanse;
+
+  // Guarantee the module's own contract: very short source posts must still
+  // clear the 1000-word search-indexing threshold after the theme module.
+  if (enhancedContent.split(/\s+/).length < 1000) {
+    enhancedContent += UNIVERSAL_INTEGRATION_MODULE;
+  }
 
   // We should make sure that the read_time also reflects the extended 1000+ words
   const finalWordCount = enhancedContent.split(/\s+/).length;

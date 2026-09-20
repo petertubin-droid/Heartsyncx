@@ -92,7 +92,7 @@ export function getArticleSeoData(slug: string, title: string): ArticleSeoAdditi
   }
 
   // 4. Conscious Communication & Boundaries
-  if (normSlug.includes('boundary') || normSlug.includes('communication') || normSlug.includes('fight') || normSlug.includes('conflict') || normTitle.includes('boundary') || normTitle.includes('listening')) {
+  if (normSlug.includes('boundary') || normSlug.includes('boundaries') || normSlug.includes('communication') || normSlug.includes('fight') || normSlug.includes('conflict') || normTitle.includes('boundar') || normTitle.includes('listening')) {
     return {
       faq: [
         {

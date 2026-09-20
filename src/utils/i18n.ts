@@ -246,7 +246,10 @@ export const translations: TranslationDictionary = {
 
 export function getTranslation(key: string, lang: Language = 'en'): string {
   if (translations[key]) {
-    return translations[key]['en'] || translations[key][lang] || key;
+    // Requested language wins; English is the fallback when that language has
+    // no entry for the key (the old order preferred English over the visitor's
+    // chosen language, so every non-English reader got English anyway).
+    return translations[key][lang] || translations[key]['en'] || key;
   }
   return key;
 }
@@ -271,7 +274,7 @@ export const getEnabledLanguages = (): Language[] => {
 
 export const setEnabledLanguages = (_langs: Language[]): void => {
   try {
-    heartsync.setLocalStorage('hs_enabled_languages', JSON.stringify(['en']));
+    heartsync.setLocalStorage('hs_enabled_languages', ['en']); // setLocalStorage stringifies internally — pre-stringifying double-encodes
   } catch (e) {}
 };
 

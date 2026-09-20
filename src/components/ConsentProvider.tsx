@@ -48,9 +48,9 @@ const getInitialPreferences = (): CookiePreferences => {
   if (typeof window === 'undefined') return defaults;
   try {
     const storedConsent = heartsync.getLocalStorage('heartsync_cookie_consent', null);
-    const storedPrefsStr = heartsync.getLocalStorage('heartsync_cookie_preferences', null);
-    if (storedPrefsStr) {
-      return JSON.parse(storedPrefsStr);
+    const storedPrefs = heartsync.getLocalStorage('heartsync_cookie_preferences', null);
+    if (storedPrefs && typeof storedPrefs === 'object' && 'necessary' in storedPrefs) {
+      return { ...defaults, ...(storedPrefs as object) } as CookiePreferences;
     } else if (storedConsent === 'accepted') {
       return { necessary: true, analytics: true, marketing: true, functional: true };
     }
@@ -135,16 +135,22 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
-    // Inject Advertising Providers (Google AdSense, Monetag, Adsterra) if marketing consent granted (or enabled)
-    if (prefs.marketing || hasConsented) {
+    // Advertising providers — consent-split, honest configuration only.
+    // AdSense may serve after ANY explicit consent choice because AdPlacement
+    // requests non-personalized ads (requestNonPersonalizedAds: 1) when
+    // marketing is denied (Google NPA policy). Monetag, Adsterra and Meta
+    // Pixel are personalization-only networks: they inject ONLY with
+    // explicit marketing consent. No demo/test publisher, zone or key IDs
+    // are ever injected — an unconfigured network injects nothing.
+    if (hasConsented) {
       // 1. Google AdSense
       const adsenseActive = heartsync?.site_settings?.adsense_active ?? true;
       const clientPubId = 
         import.meta.env.VITE_ADSENSE_PUBLISHER_ID || 
         import.meta.env.VITE_PUBLIC_ADSENSE_CLIENT || 
-        import.meta.env.VITE_ADSENSE_CLIENT || 
+        import.meta.env.VITE_ADSENSE_CLIENT ||
         heartsync?.site_settings?.adsense_client_id ||
-        'ca-pub-3940256099942544';
+        '';
 
       if (adsenseActive && clientPubId && !document.getElementById('heartsync-adsense-script')) {
         const adSenseScript = document.createElement('script');
@@ -156,22 +162,22 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       // 2. Monetag MultiTag & Ad Network Integration
-      const monetagActive = heartsync?.site_settings?.monetag_active ?? true;
-      const monetagZone = heartsync?.site_settings?.monetag_zone_id || '275352';
-      if (monetagActive && !document.getElementById('heartsync-monetag-script')) {
+      const monetagActive = heartsync?.site_settings?.monetag_active === true;
+      const monetagZone = heartsync?.site_settings?.monetag_zone_id || '';
+      if (prefs.marketing && monetagActive && monetagZone && !document.getElementById('heartsync-monetag-script')) {
         const monetagScript = document.createElement('script');
         monetagScript.id = 'heartsync-monetag-script';
         monetagScript.async = true;
         (monetagScript as any).dataset.cfasync = 'false';
-        monetagScript.src = 'https://alwingulla.com/88/tag.min.js';
+        monetagScript.src = `https://alwingulla.com/${monetagZone}/tag.min.js`;
         (monetagScript as any).dataset.zone = monetagZone;
         document.head.appendChild(monetagScript);
       }
 
       // 3. Adsterra Social Bar & Banner Network Integration
-      const adsterraActive = heartsync?.site_settings?.adsterra_active ?? true;
-      const adsterraKey = heartsync?.site_settings?.adsterra_key_id || '883921';
-      if (adsterraActive && !document.getElementById('heartsync-adsterra-script')) {
+      const adsterraActive = heartsync?.site_settings?.adsterra_active === true;
+      const adsterraKey = heartsync?.site_settings?.adsterra_key_id || '';
+      if (prefs.marketing && adsterraActive && adsterraKey && !document.getElementById('heartsync-adsterra-script')) {
         const adsterraScript = document.createElement('script');
         adsterraScript.id = 'heartsync-adsterra-script';
         adsterraScript.type = 'text/javascript';
@@ -182,7 +188,7 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       // Inject Meta Pixel (Meta Ads Integration) if pixel ID exists
       const metaPixelId = import.meta.env.VITE_META_PIXEL_ID || heartsync?.site_settings?.meta_pixel_id;
-      if (metaPixelId && !document.getElementById('heartsync-meta-pixel-script')) {
+      if (prefs.marketing && metaPixelId && !document.getElementById('heartsync-meta-pixel-script')) {
         const metaPixelScript = document.createElement('script');
         metaPixelScript.id = 'heartsync-meta-pixel-script';
         metaPixelScript.innerHTML = `
@@ -210,7 +216,7 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       functional: true,
     };
     heartsync.setLocalStorage('heartsync_cookie_consent', 'accepted');
-    heartsync.setLocalStorage('heartsync_cookie_preferences', JSON.stringify(fullPrefs));
+    heartsync.setLocalStorage('heartsync_cookie_preferences', fullPrefs); // setLocalStorage stringifies — passing a pre-stringified value double-encodes it and breaks reload restore
     document.cookie = "heartsync_cookie_consent=accepted; max-age=31536000; path=/; SameSite=Lax";
     
     setPreferences(fullPrefs);
@@ -228,7 +234,7 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       functional: false,
     };
     heartsync.setLocalStorage('heartsync_cookie_consent', 'rejected');
-    heartsync.setLocalStorage('heartsync_cookie_preferences', JSON.stringify(minPrefs));
+    heartsync.setLocalStorage('heartsync_cookie_preferences', minPrefs);
     document.cookie = "heartsync_cookie_consent=rejected; max-age=31536000; path=/; SameSite=Lax";
     
     setPreferences(minPrefs);
@@ -238,10 +244,10 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const savePreferences = (prefs: CookiePreferences) => {
-    heartsync.setLocalStorage('heartsync_cookie_consent', 'custom');
-    heartsync.setLocalStorage('heartsync_cookie_preferences', JSON.stringify(prefs));
-    
     const consentValue = prefs.analytics && prefs.marketing && prefs.functional ? 'accepted' : 'custom';
+    heartsync.setLocalStorage('heartsync_cookie_consent', consentValue);
+    heartsync.setLocalStorage('heartsync_cookie_preferences', prefs);
+    
     document.cookie = `heartsync_cookie_consent=${consentValue}; max-age=31536000; path=/; SameSite=Lax`;
     
     setPreferences(prefs);

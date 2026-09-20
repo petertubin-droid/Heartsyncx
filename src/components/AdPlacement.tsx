@@ -153,16 +153,40 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
   };
   void settingsVersion;
   const toggle = toggleField[slot];
-  if (toggle && settings()[toggle] === false) return null;
+  const slotHiddenByToggle = !!(toggle && settings()[toggle] === false);
 
   const publisherId = resolvePublisherId();
   const adsenseSlotId = str(settings()[ADSENSE_FIELD[slot]]) || (ADSENSE_ENV[slot] || '').trim();
   const adsterraKey = str(settings()[`adsterra_key_${slot}`]);
+  const adsenseConfigured = !!(publisherId && /^\d{9,16}$/.test(adsenseSlotId));
+  const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
+
+  // All hooks must run before any early return so the hook order stays
+  // stable across consent / toggle changes (conditional hooks corrupt
+  // React's hook index and crash re-renders).
+  useEffect(() => {
+    if (!inView || pushedRef.current || !hasConsented || slotHiddenByToggle || !adsenseConfigured) return;
+    pushedRef.current = true;
+    ensureAdsenseLibrary(publisherId!);
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push(
+        marketingConsent
+          ? {}
+          : { google_ad_client: publisherId, google_reactive_ad_format: 0, requestNonPersonalizedAds: 1 }
+      );
+    } catch {
+      // AdSense library not ready yet; the unit will fill when it loads.
+    }
+  }, [inView, publisherId, marketingConsent, hasConsented, slotHiddenByToggle, adsenseConfigured]);
+
+  if (slotHiddenByToggle) return null;
   if (!hasConsented) return null; // default-denied until the visitor consents
-  if (!publisherId || !/^\d{9,16}$/.test(adsenseSlotId)) {
+
+  const dims = SLOT_DIMENSIONS[slot];
+
+  if (!adsenseConfigured) {
     // No AdSense config for this slot — try Adsterra banner
     if (!adsterraKey) return null;
-    const dims = SLOT_DIMENSIONS[slot];
     const fmt = ADSTERRA_FORMAT[slot];
     return (
       <div
@@ -177,25 +201,6 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
       </div>
     );
   }
-
-  const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
-
-  useEffect(() => {
-    if (!inView || pushedRef.current) return;
-    pushedRef.current = true;
-    ensureAdsenseLibrary(publisherId!);
-    try {
-      (window.adsbygoogle = window.adsbygoogle || []).push(
-        marketingConsent
-          ? {}
-          : { google_ad_client: publisherId, google_reactive_ad_format: 0, requestNonPersonalizedAds: 1 }
-      );
-    } catch {
-      // AdSense library not ready yet; the unit will fill when it loads.
-    }
-  }, [inView, publisherId, marketingConsent]);
-
-  const dims = SLOT_DIMENSIONS[slot];
 
   return (
     <div
