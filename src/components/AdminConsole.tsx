@@ -1186,11 +1186,8 @@ export default function AdminConsole({
     if (heartsync.ad_providers && Array.isArray(heartsync.ad_providers) && heartsync.ad_providers.length > 0) {
       return heartsync.ad_providers;
     }
-    return [
-      { id: 'ap-1', name: 'Google AdSense Display Network', type: 'adsense', pubId: '', scriptCode: '', slot: 'all', active: false, cpmEstimate: '', lazyLoadDelay: 'none', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'Responsive (Fluid)' },
-      { id: 'ap-2', name: 'Monetag MultiTag Smart Placement', type: 'monetag', pubId: '275352', scriptCode: '<script src="https://alwingulla.com/88/tag.min.js" data-zone="275352" async data-cfasync="false"></script>', slot: 'header', active: true, cpmEstimate: '$16.80', lazyLoadDelay: 'none', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'MultiTag / Vignette', format: 'multitag' },
-      { id: 'ap-3', name: 'Adsterra Social Bar & Native', type: 'adsterra', pubId: '883921', scriptCode: '<script type="text/javascript" src="//www.highperformanceformat.com/883921/invoke.js"></script>', slot: 'sidebar', active: true, cpmEstimate: '$14.50', lazyLoadDelay: 'scroll_100', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'Social Bar / 300x250', format: 'social_bar' }
-    ];
+    // Honest absence: empty until real providers are configured in the console.
+    return [];
   });
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const [newProvName, setNewProvName] = useState('');

@@ -5457,6 +5457,7 @@ export default function App() {
                         <p>Heartsync follows a standard procedure of using log files. These files log visitors when they visit websites. All hosting companies do this and a part of hosting services' analytics. The information collected by log files include internet protocol (IP) addresses, browser type, Internet Service Provider (ISP), date and time stamp, referring/exit pages, and possibly the number of clicks.</p>
                         <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">Google DoubleClick DART Cookie</h3>
                         <p>Google is one of a third-party vendor on our site. It also uses cookies, known as DART cookies, to serve ads to our site visitors based upon their visit to our site and other sites on the internet.</p>
+<p>You may opt out of personalized advertising at any time via Google's Ads Settings (<a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer" className="underline text-rose-600">https://www.google.com/settings/ads</a>), and you can review how Google handles data for its advertising products at <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer" className="underline text-rose-600">Google's Advertising Policies page</a>. Your consent choice on our cookie banner additionally controls whether personalized or non-personalized ads are requested on this site.</p>
                       </>
                     );
                   }

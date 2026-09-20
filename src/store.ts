@@ -1851,11 +1851,10 @@ export class HeartsyncStore {
       { id: 'rss-1', name: 'Gottman Relationship Blog', url: 'https://www.gottman.com/feed/', status: 'Active', lastSync: '2026-06-10 14:32' },
       { id: 'rss-2', name: 'Psychology Today Relationship Feed', url: 'https://www.psychologytoday.com/us/feed/relationships', status: 'Active', lastSync: '2026-06-12 09:12' }
     ]);
-    this.ad_providers = getLocalStorage<any[]>('hs_ad_providers', [
-      { id: 'ap-1', name: 'Google AdSense Auto Ad Network', type: 'adsense', pubId: 'ca-pub-3940256099942544', scriptCode: '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3940256099942544" crossorigin="anonymous"></script>', slot: 'all', active: true, cpmEstimate: '$14.10', lazyLoadDelay: 'none', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'Responsive (Fluid)' },
-      { id: 'ap-2', name: 'Monetag MultiTag & In-Page Push', type: 'monetag', pubId: '275352', scriptCode: '<script src="https://alwingulla.com/88/tag.min.js" data-zone="275352" async data-cfasync="false"></script>', slot: 'header', active: true, cpmEstimate: '$16.80', lazyLoadDelay: 'none', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'Responsive / MultiTag', format: 'multitag' },
-      { id: 'ap-3', name: 'Adsterra Social Bar & Banner Network', type: 'adsterra', pubId: '883921', scriptCode: '<script type="text/javascript" src="//www.highperformanceformat.com/883921/invoke.js"></script>', slot: 'sidebar', active: true, cpmEstimate: '$14.50', lazyLoadDelay: 'scroll_100', geoTarget: 'worldwide', isConsentCompliant: true, customSize: '300x250 Rectangle', format: 'social_bar' }
-    ]);
+    // Honest absence: no provider is preconfigured. Admins add their own real
+    // publisher/zone/key credentials via the Admin Console — fake demo IDs must
+    // never ship (AdSense policy risk + misleading admin defaults).
+    this.ad_providers = getLocalStorage<any[]>('hs_ad_providers', []);
     const defaultCampaigns = [
       { id: 'camp-1', name: 'Attachment Style Mastery Masterclass', url: 'https://wellnesscouples.com/courses/attachment-mastery', impressions: 0, clicks: 0, status: 'Active' },
       { id: 'camp-2', name: 'Gottman Intimacy Deck Companion', url: 'https://wellnesscouples.com/resources/intimacy-cards', impressions: 0, clicks: 0, status: 'Active' },
