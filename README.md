@@ -2,7 +2,7 @@
 
 **Mindful insights for connected hearts.** A premium relationship, emotional-wellness, and dating-advice publishing platform: an editorial front end for readers, a full admin console for the team, and an Express API that serves both.
 
-> Honest platform, honest software. No fake counters, no mock integrations, no simulated statuses — features either work against real services or clearly report that they are not configured yet.
+> Honest platform, honest software. Features either work against real services or clearly report that they are not configured yet. Where a subsystem is intentionally still in-memory or simulated while we finish persisting it, we say so below — in this codebase, honesty means matching the docs to reality, not claiming perfection.
 
 ## Features
 
@@ -100,6 +100,36 @@ First-run setup: visit `/admin` and complete the first-admin registration wizard
 - Admin routes require a valid Supabase session JWT **and** an admin role in `profiles` — verified server-side on every request.
 - Payment records are written only by gateway-verified webhooks, never by client calls.
 - The service-role key belongs in server environment variables only. `site_settings` is readable by the public API, so it must never carry privileged keys.
+
+## Honest limitations (known, tracked, not hidden)
+
+These are real gaps still open on the roadmap (`MUST_FIX.md`), not surprises:
+
+- **GDPR audit log & DSR request store are in-memory** server arrays. They work
+  per-process, but a server restart clears them, and they are not yet persisted
+  to Supabase. GDPR export/purge endpoints record against this volatile store.
+- **Module "install"/toggle is a server-local registry.** The admin module
+  system registers state in memory; it does not apply real database migrations.
+- **Payments live-mode E2E is unverified.** Gateway webhooks are verified and
+  orders use signed download tokens in tests, but no live purchase test
+  webhook has been replayed against production.
+- The rate limiter trusts `x-forwarded-for` and is per-process (M-01), and the
+  CSP still requires `unsafe-inline`/`unsafe-eval` pending an ad-network
+  script-inventory decision (M-02).
+
+## Environment contract (secrets)
+
+All credentials are **environment-only**. There are no key fallbacks in code,
+and `site_settings` (served publicly by `/api/state`) never stores keys:
+
+- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — client + server connection
+  (server may also use `SUPABASE_URL` / `SUPABASE_ANON_KEY`).
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only, privileged writes (payments, admin
+  promotion). Never exposed to any client path.
+- `GEMINI_API_KEY`, `ELEVENLABS_API_KEY`, ad-network secrets, payment gateway
+  secrets — server environment only.
+- Historical keys found in `site_settings` are scrubbed by a SQL cleanup block
+  in `supabase/schema.sql`; the admin UI stores only non-secret configuration.
 
 ## License
 

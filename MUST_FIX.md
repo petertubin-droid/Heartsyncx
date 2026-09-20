@@ -162,10 +162,14 @@ Post-migration verification (all checked live):
 
 ## PHASE 7 — Documentation honesty
 
-- [ ] Update README/AGENTS docs: they claim "no fake integrations" while (until
-      Phases 2-3 land fully) the GDPR store is in-memory and module "migrations" are
-      simulated logs. Rewrite docs to match reality.
-- [ ] Document the env contract (keys are env-only; site_settings never stores keys).
+- [x] DONE (2026-09-20): README rewritten to match reality — the blanket
+      "no mock integrations" claim replaced with a precise honesty statement,
+      plus an explicit "Honest limitations" section (GDPR store in-memory,
+      module registry server-local, payments live-E2E unverified, M-01/M-02)
+      and an "Environment contract" section (all keys env-only, no code
+      fallbacks, site_settings never stores keys, schema.sql scrub block).
+      AGENTS.md rule 1 now names the two legacy in-memory stores instead of
+      implying everything is persisted.
 
 ## Known findings intentionally deferred (from the forensic audit)
 
