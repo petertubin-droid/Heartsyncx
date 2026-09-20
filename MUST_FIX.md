@@ -155,8 +155,16 @@ Post-migration verification (all checked live):
 
 ## PHASE 6 — SEO / PWA / a11y
 
-- [ ] Derive canonical/OG origin from the request host instead of hardcoding
-      `heartsyncxhub.vercel.app`; reconcile with `heartsync.app` used in emails.
+- [x] DONE (2026-09-20): canonical/OG URLs, robots.txt, sitemap.xml,
+      sitemap-images, and RSS all already derive from the request host at
+      runtime (no hardcoded heartsyncxhub.vercel.app in served responses).
+      Outbound-email links (footer CTA + unsubscribe) now flow through
+      getPublicSiteUrl() — env-driven (PUBLIC_SITE_URL), defaulting to
+      heartsync.app. The build-time sitemap fallback reads SITE_URL.
+      OWNER DECISION still open: the true canonical public domain
+      (heartsync.app vs heartsync.com vs the vercel URL) and the email
+      from-address (editorial@heartsync.com) should be settled and set as
+      PUBLIC_SITE_URL/SITE_URL in the Vercel env.
 - [ ] Accessibility pass: focus traps in modals/lightbox, form label audit, contrast.
 - [ ] Service worker cache-version bump process (currently manual `v2` constants).
 

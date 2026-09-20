@@ -692,6 +692,13 @@ const GDPR_DSR_REQUESTS_STORE: any[] = [
   }
 ];
 
+/** Public origin for outbound email links (footer CTA, unsubscribe).
+ *  Env-driven so staging/prod can differ; the canonical public domain is the
+ *  default. Runtime canonical/OG tags already derive from the request host. */
+function getPublicSiteUrl(): string {
+  return (process.env.PUBLIC_SITE_URL || 'https://heartsync.app').replace(/\/+$/, '');
+}
+
 const GDPR_AUDIT_LOG_STORE: any[] = [
   {
     id: 'glog-1',
@@ -5235,14 +5242,14 @@ async function sendResendWelcomeEmail(recipientEmail: string, source: string = '
     </ul>
 
     <div style="text-align: center; margin: 32px 0;">
-      <a href="https://heartsync.app" style="background-color: #e11d48; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 12px 28px; border-radius: 12px; display: inline-block;">Explore Latest Articles & Quizzes &rarr;</a>
+      <a href="${getPublicSiteUrl()}" style="background-color: #e11d48; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 12px 28px; border-radius: 12px; display: inline-block;">Explore Latest Articles & Quizzes &rarr;</a>
     </div>
 
     <hr style="border: none; border-top: 1px solid #f4f4f5; margin: 32px 0 16px 0;" />
     
     <div style="text-align: center; color: #a1a1aa; font-size: 11px; line-height: 1.5;">
       Sent with care by Heartsync • Delivered via Resend API<br/>
-      Joined source: <strong>${source}</strong> • <a href="https://heartsync.app" style="color: #e11d48; text-decoration: underline;">Unsubscribe anytime</a>
+      Joined source: <strong>${source}</strong> • <a href="${getPublicSiteUrl()}" style="color: #e11d48; text-decoration: underline;">Unsubscribe anytime</a>
     </div>
   </div>
   `;
@@ -5442,7 +5449,7 @@ app.post('/api/newsletter/send', adminAuthMiddleware, async (req: Request, res: 
     // Process placeholders
     const processedBody = body
       .replace(/\{\{subscriber_name\}\}/g, 'Valued Reader')
-      .replace(/\{\{unsubscribe_url\}\}/g, 'https://heartsync.app/unsubscribe');
+      .replace(/\{\{unsubscribe_url\}\}/g, `${getPublicSiteUrl()}/unsubscribe`);
 
     const resData = await clientObj.resend.emails.send({
       from: 'editorial@heartsync.com',
