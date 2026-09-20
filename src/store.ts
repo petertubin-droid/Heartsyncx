@@ -1220,22 +1220,9 @@ export class HeartsyncStore {
             price: Number(c.price) || 0
           }));
 
-          const VALID_RELATIONSHIP_SLUGS = [
-            'dating-tips',
-            'relationship-advice',
-            'communication',
-            'red-flags-toxic-relationships',
-            'breakups-healing',
-            'marriage-commitment',
-            'intimacy-romance',
-            'personal-growth',
-            'family-parenting',
-            'love-psychology'
-          ];
-
-          this.categories = mappedCats.filter(
-            c => c && c.slug && VALID_RELATIONSHIP_SLUGS.includes(c.slug.toLowerCase())
-          );
+          // The DB is the single source of truth for categories — no hardcoded
+          // slug whitelist (it silently hid every admin-created category).
+          this.categories = mappedCats.filter(c => c && c.slug);
         }
       } catch (catErr: any) {
         console.warn('Categories critical query warning:', catErr);

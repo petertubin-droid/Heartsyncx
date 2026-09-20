@@ -113,8 +113,12 @@ Post-migration verification (all checked live):
       for the last 2 unguarded CREATE POLICYs, and now reruns idempotently
       against the live DB. `user_settings` + `user_sessions` KEPT (server.ts
       account-merge writes both).
-- [ ] Category visibility: remove the hardcoded `VALID_RELATIONSHIP_SLUGS` whitelist in
-      `src/store.ts` or make it admin-configurable (it hides DB categories).
+- [x] DONE (2026-09-20): hardcoded `VALID_RELATIONSHIP_SLUGS` whitelist removed.
+      It was a live bug: none of the 8 real DB categories (emotional-wellness,
+      relationship-science, mindful-dating, self-growth, somatic-healing,
+      conscious-communication, secure-intimacy, inner-work) matched the
+      10 hardcoded slugs, so the client Supabase sync dropped EVERY category.
+      The DB is now the single source of truth for category visibility.
 
 ## PHASE 5 — Performance
 
