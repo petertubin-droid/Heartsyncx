@@ -8,6 +8,7 @@ import AnalyticsPanel from './components/AnalyticsPanel';
 import RichTextEditor from './components/RichTextEditor';
 import AdminLogin from './components/AdminLogin';
 import AiCopilot from './components/AiCopilot';
+import LoveVault from './components/LoveVault';
 import AdminConsole from './components/AdminConsole';
 import { CookieBanner } from './components/CookieBanner';
 import { useCookieConsent } from './components/useCookieConsent';
@@ -5588,6 +5589,11 @@ export default function App() {
             {/* 17d. AI ADVICE ENGINE — the HeartSync Guide */}
             {currentTab === 'ai_copilot' && (
               <AiCopilot onNavigate={navigateTo} />
+            )}
+
+            {/* 17e. LOVEVAULT — private vault, journal, boundary scripts */}
+            {currentTab === 'lovevault' && (
+              <LoveVault />
             )}
 
             {/* 18. ADMIN AUTHENTICATION — real sign-in gate */}

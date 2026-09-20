@@ -199,6 +199,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
       links: [
         { label: 'Help & FAQ', tab: 'faq' },
         { label: 'Advertise With Us', tab: 'advertise' },
+        { label: 'LoveVault', tab: 'lovevault' },
+        { label: 'AI Guide', tab: 'ai_copilot' },
         { label: 'About Heartsync', tab: 'about' }
       ],
       is_active: true
@@ -870,6 +872,24 @@ export class HeartsyncStore {
   public posts: Post[] = [];
   public categories: Category[] = [];
   public comments: Comment[] = [];
+
+  // LoveVault — private, user-scoped reader storage
+  public vaultItems: Array<{
+    id: string;
+    user_id: string;
+    kind: string;
+    title: string;
+    content: string;
+    created_at: string;
+  }> = [];
+  public journalEntries: Array<{
+    id: string;
+    user_id: string;
+    prompt: string | null;
+    content: string;
+    mood: string | null;
+    created_at: string;
+  }> = [];
   public ad_zones: AdZone[] = [];
   public subscribers: NewsletterSubscriber[] = [];
   public quizzes: Quiz[] = [];
@@ -2954,6 +2974,101 @@ export class HeartsyncStore {
   }
 
   // COOMENTS CRUD MODERATION
+  // ------------------- LOVEVAULT (private, user-scoped) -------------------
+
+  public async loadVaultData(): Promise<void> {
+    const userId = this.current_user?.id;
+    if (!userId || !this.supabase) return;
+    try {
+      const [vaultRes, journalRes] = await Promise.all([
+        this.supabase.from('love_vault_items').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        this.supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+      ]);
+      if (vaultRes.data) {
+        this.vaultItems = (vaultRes.data as any[]).map((v) => ({
+          id: v.id, user_id: v.user_id, kind: v.kind || 'memory',
+          title: v.title || '', content: v.content || '',
+          created_at: v.created_at || new Date().toISOString()
+        }));
+      }
+      if (journalRes.data) {
+        this.journalEntries = (journalRes.data as any[]).map((j) => ({
+          id: j.id, user_id: j.user_id, prompt: j.prompt ?? null,
+          content: j.content || '', mood: j.mood ?? null,
+          created_at: j.created_at || new Date().toISOString()
+        }));
+      }
+      this.onStateChangeCallbacks.forEach((cb) => cb());
+    } catch (err) {
+      console.warn('LoveVault data could not be loaded from the database yet.', err);
+    }
+  }
+
+  public addVaultItem(kind: string, title: string, content: string): void {
+    const userId = this.current_user?.id;
+    if (!userId) return;
+    const item = {
+      id: `vault-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      user_id: userId,
+      kind: kind || 'memory',
+      title: title || 'Untitled',
+      content: content || '',
+      created_at: new Date().toISOString()
+    };
+    this.vaultItems = [item, ...this.vaultItems];
+    this.saveState();
+    this.onStateChangeCallbacks.forEach((cb) => cb());
+    if (this.supabase) {
+      this.supabase.from('love_vault_items').insert([item]).then(({ error }) => {
+        if (error) console.warn('LoveVault item stored locally; database sync will retry later.', error.message);
+      });
+    }
+  }
+
+  public deleteVaultItem(id: string): void {
+    this.vaultItems = this.vaultItems.filter((v) => v.id !== id);
+    this.saveState();
+    this.onStateChangeCallbacks.forEach((cb) => cb());
+    if (this.supabase) {
+      this.supabase.from('love_vault_items').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('LoveVault delete did not reach the database yet.', error.message);
+      });
+    }
+  }
+
+  public addJournalEntry(prompt: string | null, content: string, mood: string | null): void {
+    const userId = this.current_user?.id;
+    if (!userId) return;
+    const entry = {
+      id: `journal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      user_id: userId,
+      prompt: prompt || null,
+      content: content || '',
+      mood: mood || null,
+      created_at: new Date().toISOString()
+    };
+    this.journalEntries = [entry, ...this.journalEntries];
+    this.saveState();
+    this.onStateChangeCallbacks.forEach((cb) => cb());
+    this.notifyToast('Journal entry saved to your private LoveVault.', 'success');
+    if (this.supabase) {
+      this.supabase.from('journal_entries').insert([entry]).then(({ error }) => {
+        if (error) console.warn('Journal entry stored locally; database sync will retry later.', error.message);
+      });
+    }
+  }
+
+  public deleteJournalEntry(id: string): void {
+    this.journalEntries = this.journalEntries.filter((j) => j.id !== id);
+    this.saveState();
+    this.onStateChangeCallbacks.forEach((cb) => cb());
+    if (this.supabase) {
+      this.supabase.from('journal_entries').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('Journal delete did not reach the database yet.', error.message);
+      });
+    }
+  }
+
   public addComment(postId: string, content: string, parentId?: string, authorName?: string, authorEmail?: string) {
     const name = authorName || this.current_user?.name || 'Anonymous Reader';
     const email = authorEmail || this.current_user?.email || 'reader@heartsync.com';

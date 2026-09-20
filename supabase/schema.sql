@@ -1032,3 +1032,38 @@ VALUES
   ('plan-pro', 'Pro Couple', 19, 'monthly', '["Full premium article library", "Unlimited Gottman quizzes", "AI Relationship Copilot"]'::jsonb),
   ('plan-vip', 'VIP Clinical Retreat', 49, 'monthly', '["1-on-1 therapist sessions", "Customized intimacy routines", "Priority support"]'::jsonb)
 ON CONFLICT (id) DO NOTHING;
+
+-- ----------------------------------------------------------------------------
+-- HEARTSYNC LOVEVAULT — private reader storage (vault items + journal entries)
+-- Own-row access only; admins do not read private vault data.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.love_vault_items (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  user_id TEXT NOT NULL,
+  kind TEXT DEFAULT 'memory',
+  title TEXT,
+  content TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.love_vault_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Owner full access love vault" ON public.love_vault_items;
+CREATE POLICY "Owner full access love vault" ON public.love_vault_items
+  FOR ALL
+  USING (auth.uid()::text = user_id)
+  WITH CHECK (auth.uid()::text = user_id);
+
+CREATE TABLE IF NOT EXISTS public.journal_entries (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  user_id TEXT NOT NULL,
+  prompt TEXT,
+  content TEXT NOT NULL,
+  mood TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Owner full access journal" ON public.journal_entries;
+CREATE POLICY "Owner full access journal" ON public.journal_entries
+  FOR ALL
+  USING (auth.uid()::text = user_id)
+  WITH CHECK (auth.uid()::text = user_id);
