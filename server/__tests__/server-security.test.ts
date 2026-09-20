@@ -150,6 +150,8 @@ const PROTECTED_ROUTES: Array<[string, string]> = [
   ['get', '/api/admin/modules'],
   ['post', '/api/admin/modules/install'],
   ['post', '/api/admin/modules/x/toggle'],
+  ['get', '/api/diagnostics/results'],
+  ['delete', '/api/diagnostics/results/req-1'],
   ['get', '/api/gdpr/audit-log'],
   ['get', '/api/gdpr/dsr-requests'],
   ['patch', '/api/gdpr/dsr-requests/req-1'],

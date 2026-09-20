@@ -639,58 +639,16 @@ app.post('/api/cicd/check', adminAuthMiddleware, async (req: Request, res: Respo
 // GROUP 5: GDPR COMPLIANCE ENGINE & DIAGNOSTIC/QUIZ DATABASE PERSISTENCE
 // =========================================================================
 
-// In-memory stores
-const DIAGNOSTIC_RESULTS_STORE: any[] = [
-  {
-    id: 'diag-101',
-    quizId: 'attachment-style-assessment',
-    quizTitle: 'Attachment Security & Relational Dynamics Index',
-    userEmail: 'reader@heartsync.app',
-    score: 84,
-    categoryScores: { secure: 70, anxious: 20, avoidant: 10 },
-    recommendation: 'Grounded Secure Co-Regulation Worksheets recommended',
-    answers: { q1: 'Frequently', q2: 'Sometimes', q3: 'Rarely' },
-    sessionHash: 'hash_839210_sess',
-    createdAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString()
-  },
-  {
-    id: 'diag-102',
-    quizId: 'gottman-conflict-style',
-    quizTitle: 'Gottman 4 Horsemen De-escalation Assessment',
-    userEmail: 'admin@heartsync.app',
-    score: 92,
-    categoryScores: { criticism: 10, defensiveness: 15, contempt: 0, stonewalling: 20 },
-    recommendation: 'Somatic grounding & soft startup practices',
-    answers: { q1: 'Always', q2: 'Never', q3: 'Sometimes' },
-    sessionHash: 'hash_948211_sess',
-    createdAt: new Date(Date.now() - 3600000 * 5).toISOString()
-  }
-];
-
-const GDPR_DSR_REQUESTS_STORE: any[] = [
-  {
-    id: 'dsr-901',
-    type: 'EXPORT',
-    userEmail: 'user-privacy-test@heartsync.app',
-    status: 'PENDING',
-    reason: 'Article 15 Data Portability Download Request',
-    slaDeadline: new Date(Date.now() + 86400000 * 28).toISOString(),
-    requestedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    fulfilledAt: null,
-    certificateId: null
-  },
-  {
-    id: 'dsr-902',
-    type: 'ERASE',
-    userEmail: 'anonymous-ex-reader@domain.com',
-    status: 'FULFILLED',
-    reason: 'Article 17 Right to be Forgotten Purge',
-    slaDeadline: new Date(Date.now() + 86400000 * 12).toISOString(),
-    requestedAt: new Date(Date.now() - 3600000 * 240).toISOString(),
-    fulfilledAt: new Date(Date.now() - 3600000 * 120).toISOString(),
-    certificateId: 'PURGE-GDPR-2026-94821'
-  }
-];
+// =========================================================================
+// GDPR COMPLIANCE + DIAGNOSTICS PERSISTENCE (H-08): the diagnostic quiz
+// results, the GDPR DSR request ledger and the privacy audit trail are
+// DATABASE-BACKED (supabase/schema.sql, tables diagnostic_results /
+// gdpr_audit_log / gdpr_dsr_requests). The old in-memory arrays lost real
+// user GDPR requests on every serverless cold start. Public submits ride the
+// public INSERT RLS policies (same pattern as subscribers/comments); all
+// reads, updates and deletes go through the admin session client under
+// is_admin() RLS. No fake seed rows: every row is real user data.
+// =========================================================================
 
 /** Public origin for outbound email links (footer CTA, unsubscribe).
  *  Env-driven so staging/prod can differ; the canonical public domain is the
@@ -699,36 +657,87 @@ function getPublicSiteUrl(): string {
   return (process.env.PUBLIC_SITE_URL || 'https://heartsyncxhub.vercel.app').replace(/\/+$/, '');
 }
 
-const GDPR_AUDIT_LOG_STORE: any[] = [
-  {
-    id: 'glog-1',
-    event: 'CONSENT_UPDATE',
-    userEmail: 'anonymous-visitor',
-    ipHash: 'ip_942a****',
-    details: 'Consent Mode v2: Analytics=granted, Marketing=denied, Functional=granted',
-    timestamp: new Date(Date.now() - 3600000 * 3).toISOString()
-  },
-  {
-    id: 'glog-2',
-    event: 'DSR_SUBMITTED',
-    userEmail: 'user-privacy-test@heartsync.app',
-    ipHash: 'ip_182b****',
-    details: 'Submitted Article 15 Data Access Request',
-    timestamp: new Date(Date.now() - 3600000 * 48).toISOString()
-  }
-];
+function mapDiagnosticRow(r: any) {
+  return {
+    id: r.id,
+    quizId: r.quiz_id,
+    quizTitle: r.quiz_title,
+    userEmail: r.user_email,
+    score: r.score,
+    categoryScores: r.category_scores || {},
+    recommendation: r.recommendation,
+    answers: r.answers || {},
+    sessionHash: r.session_hash,
+    createdAt: r.created_at
+  };
+}
 
-// DIAGNOSTICS & QUIZZES API ENDPOINTS
-app.get('/api/diagnostics/results', (req: Request, res: Response) => {
-  const email = req.query.email as string;
-  let results = DIAGNOSTIC_RESULTS_STORE;
-  if (email) {
-    results = results.filter(r => r.userEmail.toLowerCase() === email.toLowerCase());
+function mapAuditRow(r: any) {
+  return {
+    id: r.id,
+    event: r.event,
+    userEmail: r.user_email,
+    ipHash: r.ip_hash,
+    details: r.details,
+    timestamp: r.created_at
+  };
+}
+
+function mapDsrRow(r: any) {
+  return {
+    id: r.id,
+    type: r.type,
+    userEmail: r.user_email,
+    status: r.status,
+    reason: r.reason,
+    slaDeadline: r.sla_deadline,
+    requestedAt: r.requested_at,
+    fulfilledAt: r.fulfilled_at,
+    certificateId: r.certificate_id
+  };
+}
+
+/** Append one privacy event to the gdpr_audit_log table. Best-effort: a failed
+ *  audit write must never fail the user-facing operation that produced it. */
+async function recordAuditEvent(dbClient: any, entry: { event: string; userEmail: string; ipHash: string; details: string }) {
+  if (!dbClient) return null;
+  const row = {
+    id: `glog-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    event: entry.event,
+    user_email: entry.userEmail,
+    ip_hash: entry.ipHash,
+    details: entry.details,
+    created_at: new Date().toISOString()
+  };
+  try {
+    const { error } = await dbClient.from('gdpr_audit_log').insert(row);
+    if (error) console.warn('GDPR audit-log insert failed:', error.message);
+  } catch (err: any) {
+    console.warn('GDPR audit-log insert threw:', err?.message);
   }
+  return { ...row, timestamp: row.created_at };
+}
+
+// DIAGNOSTICS & QUIZZES API ENDPOINTS (database-backed, H-08)
+app.get('/api/diagnostics/results', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
+  }
+  let query = db.from('diagnostic_results').select('*').order('created_at', { ascending: false }).limit(200);
+  const email = (req.query.email || '').toString().trim().toLowerCase();
+  if (email) query = query.eq('user_email', email);
+  const { data, error } = await query;
+  if (error) {
+    res.status(502).json({ error: 'Diagnostic results lookup failed.', detail: error.message });
+    return;
+  }
+  const results = (data || []).map(mapDiagnosticRow);
   res.json({ success: true, count: results.length, results });
 });
 
-app.post('/api/diagnostics/submit', (req: Request, res: Response) => {
+app.post('/api/diagnostics/submit', async (req: Request, res: Response) => {
   const { quizId, quizTitle, userEmail, score, categoryScores, recommendation, answers } = req.body;
 
   if (!quizTitle || score === undefined) {
@@ -736,47 +745,58 @@ app.post('/api/diagnostics/submit', (req: Request, res: Response) => {
     return;
   }
 
-  const record = {
-    id: `diag-${Date.now()}`,
-    quizId: quizId || 'attachment-assessment',
-    quizTitle,
-    userEmail: userEmail || 'anonymous-reader@heartsync.app',
+  const row = {
+    id: `diag-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    quiz_id: quizId || 'attachment-assessment',
+    quiz_title: quizTitle,
+    user_email: (userEmail || 'anonymous-reader@heartsync.app').trim().toLowerCase(),
     score: Number(score),
-    categoryScores: categoryScores || {},
+    category_scores: categoryScores || {},
     recommendation: recommendation || 'Continue daily co-regulation practice.',
     answers: answers || {},
-    sessionHash: `sess_${Math.random().toString(36).substring(2, 9)}`,
-    createdAt: new Date().toISOString()
+    session_hash: `sess_${Math.random().toString(36).substring(2, 9)}`,
+    created_at: new Date().toISOString()
   };
 
-  DIAGNOSTIC_RESULTS_STORE.unshift(record);
-
-  // Log to GDPR Audit Log as well for full transparency
-  GDPR_AUDIT_LOG_STORE.unshift({
-    id: `glog-${Date.now()}`,
-    event: 'DIAGNOSTIC_QUIZ_SAVED',
-    userEmail: record.userEmail,
-    ipHash: 'ip_session_hash',
-    details: `Saved assessment score ${record.score} for quiz "${record.quizTitle}"`,
-    timestamp: new Date().toISOString()
-  });
-
-  res.json({ success: true, record });
-});
-
-app.delete('/api/diagnostics/results/:id', (req: Request, res: Response) => {
-  const id = req.params.id;
-  const idx = DIAGNOSTIC_RESULTS_STORE.findIndex(r => r.id === id);
-  if (idx !== -1) {
-    const removed = DIAGNOSTIC_RESULTS_STORE.splice(idx, 1)[0];
-    res.json({ success: true, message: `Removed diagnostic record ${id}`, removed });
-  } else {
-    res.status(404).json({ error: 'Diagnostic record not found.' });
+  const db = getSupabaseClient();
+  if (!db) {
+    res.status(503).json({ error: 'Diagnostic storage is not configured. Your result was NOT saved.' });
+    return;
   }
+  const { error: insertErr } = await db.from('diagnostic_results').insert(row);
+  if (insertErr) {
+    res.status(502).json({ error: 'Could not save the assessment result. Please try again.', detail: insertErr.message });
+    return;
+  }
+  await recordAuditEvent(db, {
+    event: 'DIAGNOSTIC_QUIZ_SAVED',
+    userEmail: row.user_email,
+    ipHash: 'ip_session_hash',
+    details: `Saved assessment score ${row.score} for quiz "${row.quiz_title}"`
+  });
+  res.json({ success: true, record: mapDiagnosticRow(row) });
 });
 
-// GDPR COMPLIANCE ENGINE API ENDPOINTS
-app.post('/api/gdpr/export', adminAuthMiddleware, (req: Request, res: Response) => {
+app.delete('/api/diagnostics/results/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
+  }
+  const { data, error } = await db.from('diagnostic_results').delete().eq('id', req.params.id).select();
+  if (error) {
+    res.status(502).json({ error: 'Diagnostic record removal failed.', detail: error.message });
+    return;
+  }
+  if (!data || data.length === 0) {
+    res.status(404).json({ error: 'Diagnostic record not found.' });
+    return;
+  }
+  res.json({ success: true, message: `Removed diagnostic record ${req.params.id}`, removed: mapDiagnosticRow(data[0]) });
+});
+
+// GDPR COMPLIANCE ENGINE API ENDPOINTS (database-backed, H-08)
+app.post('/api/gdpr/export', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { email } = req.body;
 
   if (!email || typeof email !== 'string') {
@@ -785,11 +805,22 @@ app.post('/api/gdpr/export', adminAuthMiddleware, (req: Request, res: Response) 
   }
 
   const cleanEmail = email.trim().toLowerCase();
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured. Export aborted.' });
+    return;
+  }
 
-  // Gather user data across diagnostic store, consent records, subscriber lists, comments
-  const userDiagnostics = DIAGNOSTIC_RESULTS_STORE.filter(d => d.userEmail.toLowerCase() === cleanEmail);
-  const userAuditLogs = GDPR_AUDIT_LOG_STORE.filter(g => g.userEmail.toLowerCase() === cleanEmail);
-  const userDsrRequests = GDPR_DSR_REQUESTS_STORE.filter(d => d.userEmail.toLowerCase() === cleanEmail);
+  // Gather user data across the diagnostic store, audit trail and DSR ledger.
+  const [diagRes, auditRes, dsrRes] = await Promise.all([
+    db.from('diagnostic_results').select('*').eq('user_email', cleanEmail).order('created_at', { ascending: false }),
+    db.from('gdpr_audit_log').select('*').eq('user_email', cleanEmail).order('created_at', { ascending: false }).limit(500),
+    db.from('gdpr_dsr_requests').select('*').eq('user_email', cleanEmail).order('requested_at', { ascending: false })
+  ]);
+  if (diagRes.error || auditRes.error || dsrRes.error) {
+    res.status(502).json({ error: 'Article 15 export lookup failed.', detail: diagRes.error?.message || auditRes.error?.message || dsrRes.error?.message });
+    return;
+  }
 
   const exportPayload = {
     compliance_standard: 'EU General Data Protection Regulation (GDPR) Article 15 - Right of Access & Data Portability',
@@ -799,9 +830,9 @@ app.post('/api/gdpr/export', adminAuthMiddleware, (req: Request, res: Response) 
       identity_verified: true,
       data_controller: 'Heartsync Inc. Privacy & Data Protection Office'
     },
-    diagnostic_assessment_results: userDiagnostics,
-    dsr_request_history: userDsrRequests,
-    privacy_consent_audit_trail: userAuditLogs,
+    diagnostic_assessment_results: (diagRes.data || []).map(mapDiagnosticRow),
+    dsr_request_history: (dsrRes.data || []).map(mapDsrRow),
+    privacy_consent_audit_trail: (auditRes.data || []).map(mapAuditRow),
     active_subscription: {
       tier: 'Heartsync Premium Circle',
       status: 'Active',
@@ -810,14 +841,11 @@ app.post('/api/gdpr/export', adminAuthMiddleware, (req: Request, res: Response) 
     cryptographic_export_hash: crypto.createHash('sha256').update(cleanEmail + Date.now().toString()).digest('hex')
   };
 
-  // Log event
-  GDPR_AUDIT_LOG_STORE.unshift({
-    id: `glog-${Date.now()}`,
+  await recordAuditEvent(db, {
     event: 'ARTICLE_15_DATA_EXPORTED',
     userEmail: cleanEmail,
     ipHash: 'ip_admin_action',
-    details: 'Generated complete JSON Data Portability Export Package',
-    timestamp: new Date().toISOString()
+    details: 'Generated complete JSON Data Portability Export Package'
   });
 
   res.json({
@@ -828,7 +856,7 @@ app.post('/api/gdpr/export', adminAuthMiddleware, (req: Request, res: Response) 
   });
 });
 
-app.post('/api/gdpr/purge', adminAuthMiddleware, (req: Request, res: Response) => {
+app.post('/api/gdpr/purge', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { email, reason } = req.body;
 
   if (!email || typeof email !== 'string') {
@@ -837,27 +865,30 @@ app.post('/api/gdpr/purge', adminAuthMiddleware, (req: Request, res: Response) =
   }
 
   const cleanEmail = email.trim().toLowerCase();
-
-  // 1. Purge diagnostic results
-  let purgedDiagnosticsCount = 0;
-  for (let i = DIAGNOSTIC_RESULTS_STORE.length - 1; i >= 0; i--) {
-    if (DIAGNOSTIC_RESULTS_STORE[i].userEmail.toLowerCase() === cleanEmail) {
-      DIAGNOSTIC_RESULTS_STORE.splice(i, 1);
-      purgedDiagnosticsCount++;
-    }
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured. Purge aborted.' });
+    return;
   }
 
-  // 2. Anonymize or fulfill DSR requests for this user
+  // 1. Purge diagnostic results (Article 17 erasure).
+  const { data: purged, error: delErr } = await db.from('diagnostic_results')
+    .delete().eq('user_email', cleanEmail).select();
+  if (delErr) {
+    res.status(502).json({ error: 'Article 17 purge failed.', detail: delErr.message });
+    return;
+  }
+  const purgedDiagnosticsCount = (purged || []).length;
+
+  // 2. Anonymize or fulfill DSR requests for this user.
   const certificateId = `PURGE-GDPR-2026-${Math.floor(10000 + Math.random() * 90000)}`;
 
-  // 3. Append Audit Event
-  GDPR_AUDIT_LOG_STORE.unshift({
-    id: `glog-${Date.now()}`,
+  // 3. Append Audit Event.
+  await recordAuditEvent(db, {
     event: 'ARTICLE_17_DATA_PURGED',
     userEmail: 'ANONYMIZED_' + cleanEmail.substring(0, 3) + '***',
     ipHash: 'ip_purge_executed',
-    details: `Executed Article 17 Right to be Forgotten. Purged ${purgedDiagnosticsCount} diagnostic records. Certificate: ${certificateId}`,
-    timestamp: new Date().toISOString()
+    details: `Executed Article 17 Right to be Forgotten. Purged ${purgedDiagnosticsCount} diagnostic records. Certificate: ${certificateId}`
   });
 
   res.json({
@@ -871,29 +902,57 @@ app.post('/api/gdpr/purge', adminAuthMiddleware, (req: Request, res: Response) =
   });
 });
 
-app.get('/api/gdpr/audit-log', adminAuthMiddleware, (req: Request, res: Response) => {
-  res.json({ success: true, count: GDPR_AUDIT_LOG_STORE.length, logs: GDPR_AUDIT_LOG_STORE });
+app.get('/api/gdpr/audit-log', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
+  }
+  const { data, error } = await db.from('gdpr_audit_log').select('*').order('created_at', { ascending: false }).limit(500);
+  if (error) {
+    res.status(502).json({ error: 'Audit trail lookup failed.', detail: error.message });
+    return;
+  }
+  const logs = (data || []).map(mapAuditRow);
+  res.json({ success: true, count: logs.length, logs });
 });
 
-app.post('/api/gdpr/audit-log', rateLimiter(20, 60 * 1000), (req: Request, res: Response) => {
+app.post('/api/gdpr/audit-log', rateLimiter(20, 60 * 1000), async (req: Request, res: Response) => {
   const { event, userEmail, details } = req.body;
-  const newLog = {
-    id: `glog-${Date.now()}`,
+  const db = getSupabaseClient();
+  if (!db) {
+    res.status(503).json({ error: 'Audit storage is not configured. The event was NOT recorded.' });
+    return;
+  }
+  const log = await recordAuditEvent(db, {
     event: event || 'PRIVACY_EVENT',
     userEmail: userEmail || 'anonymous',
     ipHash: 'ip_client',
-    details: details || 'Updated consent settings',
-    timestamp: new Date().toISOString()
-  };
-  GDPR_AUDIT_LOG_STORE.unshift(newLog);
-  res.json({ success: true, log: newLog });
+    details: details || 'Updated consent settings'
+  });
+  if (!log) {
+    res.status(500).json({ error: 'Could not record the privacy event.' });
+    return;
+  }
+  res.json({ success: true, log });
 });
 
-app.get('/api/gdpr/dsr-requests', adminAuthMiddleware, (req: Request, res: Response) => {
-  res.json({ success: true, count: GDPR_DSR_REQUESTS_STORE.length, requests: GDPR_DSR_REQUESTS_STORE });
+app.get('/api/gdpr/dsr-requests', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
+  }
+  const { data, error } = await db.from('gdpr_dsr_requests').select('*').order('requested_at', { ascending: false }).limit(200);
+  if (error) {
+    res.status(502).json({ error: 'DSR ledger lookup failed.', detail: error.message });
+    return;
+  }
+  const requests = (data || []).map(mapDsrRow);
+  res.json({ success: true, count: requests.length, requests });
 });
 
-app.post('/api/gdpr/dsr-requests', rateLimiter(5, 60 * 1000), (req: Request, res: Response) => {
+app.post('/api/gdpr/dsr-requests', rateLimiter(5, 60 * 1000), async (req: Request, res: Response) => {
   const { type, userEmail, reason } = req.body;
 
   if (!userEmail || !type) {
@@ -901,48 +960,61 @@ app.post('/api/gdpr/dsr-requests', rateLimiter(5, 60 * 1000), (req: Request, res
     return;
   }
 
-  const newDsr = {
-    id: `dsr-${Date.now()}`,
+  const db = getSupabaseClient();
+  if (!db) {
+    res.status(503).json({ error: 'DSR storage is not configured. Your request was NOT saved — please retry.' });
+    return;
+  }
+
+  const row = {
+    id: `dsr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     type: type.toUpperCase(),
-    userEmail: userEmail.trim().toLowerCase(),
+    user_email: userEmail.trim().toLowerCase(),
     status: 'PENDING',
     reason: reason || 'Data Subject Privacy Rights Exercise',
-    slaDeadline: new Date(Date.now() + 86400000 * 30).toISOString(),
-    requestedAt: new Date().toISOString(),
-    fulfilledAt: null,
-    certificateId: null
+    sla_deadline: new Date(Date.now() + 86400000 * 30).toISOString(),
+    requested_at: new Date().toISOString(),
+    fulfilled_at: null,
+    certificate_id: null
   };
 
-  GDPR_DSR_REQUESTS_STORE.unshift(newDsr);
-
-  // Log event
-  GDPR_AUDIT_LOG_STORE.unshift({
-    id: `glog-${Date.now()}`,
+  const { error: insertErr } = await db.from('gdpr_dsr_requests').insert(row);
+  if (insertErr) {
+    res.status(502).json({ error: 'Could not save the DSR request. Please try again.', detail: insertErr.message });
+    return;
+  }
+  await recordAuditEvent(db, {
     event: 'DSR_REQUEST_CREATED',
-    userEmail: newDsr.userEmail,
+    userEmail: row.user_email,
     ipHash: 'ip_dsr_portal',
-    details: `Created new DSR request of type ${newDsr.type}`,
-    timestamp: new Date().toISOString()
+    details: `Created new DSR request of type ${row.type}`
   });
-
-  res.json({ success: true, request: newDsr });
+  res.json({ success: true, request: mapDsrRow(row) });
 });
 
-app.patch('/api/gdpr/dsr-requests/:id', adminAuthMiddleware, (req: Request, res: Response) => {
-  const { id } = req.params;
+app.patch('/api/gdpr/dsr-requests/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { status, certificateId } = req.body;
-
-  const item = GDPR_DSR_REQUESTS_STORE.find(d => d.id === id);
-  if (item) {
-    if (status) item.status = status;
-    if (status === 'FULFILLED') {
-      item.fulfilledAt = new Date().toISOString();
-      item.certificateId = certificateId || `CERT-GDPR-${Date.now()}`;
-    }
-    res.json({ success: true, request: item });
-  } else {
-    res.status(404).json({ error: 'DSR request not found.' });
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
   }
+  const patch: any = {};
+  if (status) patch.status = status;
+  if (status === 'FULFILLED') {
+    patch.fulfilled_at = new Date().toISOString();
+    patch.certificate_id = certificateId || `CERT-GDPR-${Date.now()}`;
+  }
+  const { data, error } = await db.from('gdpr_dsr_requests').update(patch).eq('id', req.params.id).select().maybeSingle();
+  if (error) {
+    res.status(502).json({ error: 'DSR request update failed.', detail: error.message });
+    return;
+  }
+  if (!data) {
+    res.status(404).json({ error: 'DSR request not found.' });
+    return;
+  }
+  res.json({ success: true, request: mapDsrRow(data) });
 });
 
 // =========================================================================
@@ -1928,84 +2000,152 @@ app.post('/api/gemini/generate-article', adminAuthMiddleware, async (req: Reques
 // FEATURE MANAGER & AI MODULE BUILDER SYSTEM API ENDPOINTS
 // =========================================================================
 
-let SERVER_MODULES_STORE: any[] = [];
+// H-08: the Feature Manager registry is database-backed (feature_modules
+// table, one row per module: id + full JSONB state). The previous module-scope
+// array silently lost every install/toggle/update on a serverless cold start.
+async function fetchModuleState(db: any, id: string) {
+  const { data, error } = await db.from('feature_modules').select('id, state, updated_at').eq('id', id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? data.state : null;
+}
 
-app.get('/api/admin/modules', adminAuthMiddleware, (req: Request, res: Response) => {
-  res.json({ success: true, count: SERVER_MODULES_STORE.length, modules: SERVER_MODULES_STORE });
+async function saveModuleState(db: any, id: string, state: any) {
+  const { error } = await db.from('feature_modules')
+    .upsert({ id, state, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+  if (error) throw new Error(error.message);
+  return state;
+}
+
+function moduleDbError(res: Response, err: any) {
+  console.warn('Feature module registry write failed:', err?.message || err);
+  res.status(502).json({ error: 'Module registry operation failed.', detail: err?.message || String(err) });
+}
+
+app.get('/api/admin/modules', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
+  }
+  const { data, error } = await db.from('feature_modules').select('id, state, updated_at').order('updated_at', { ascending: false });
+  if (error) {
+    res.status(502).json({ error: 'Module registry lookup failed.', detail: error.message });
+    return;
+  }
+  const modules = (data || []).map((r: any) => r.state);
+  res.json({ success: true, count: modules.length, modules });
 });
 
-app.post('/api/admin/modules/install', adminAuthMiddleware, (req: Request, res: Response) => {
+app.post('/api/admin/modules/install', adminAuthMiddleware, async (req: Request, res: Response) => {
   const moduleState = req.body;
   if (!moduleState || !moduleState.manifest || !moduleState.manifest.id) {
     res.status(400).json({ error: 'Valid module state and manifest are required.' });
     return;
   }
-
-  const existingIdx = SERVER_MODULES_STORE.findIndex(m => m.manifest.id === moduleState.manifest.id);
-  if (existingIdx !== -1) {
-    SERVER_MODULES_STORE[existingIdx] = moduleState;
-  } else {
-    SERVER_MODULES_STORE.unshift(moduleState);
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
   }
-
-  logger.info(`Installed/Registered module in server store: ${moduleState.manifest.id} v${moduleState.manifest.version}`);
-  res.json({ success: true, module: moduleState });
+  try {
+    moduleState.updatedAt = new Date().toISOString();
+    await saveModuleState(db, moduleState.manifest.id, moduleState);
+    logger.info(`Installed/Registered module in server store: ${moduleState.manifest.id} v${moduleState.manifest.version}`);
+    res.json({ success: true, module: moduleState });
+  } catch (err: any) {
+    moduleDbError(res, err);
+  }
 });
 
-app.post('/api/admin/modules/:id/toggle', adminAuthMiddleware, (req: Request, res: Response) => {
+app.post('/api/admin/modules/:id/toggle', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { enabled } = req.body;
-
-  const mod = SERVER_MODULES_STORE.find(m => m.manifest.id === id);
-  if (mod) {
-    mod.status = enabled ? 'active' : 'disabled';
-    mod.updatedAt = new Date().toISOString();
-    res.json({ success: true, module: mod });
-  } else {
-    res.json({ success: true, message: `Module state updated locally for ${id}` });
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
+  }
+  try {
+    const mod = await fetchModuleState(db, id);
+    if (mod) {
+      mod.status = enabled ? 'active' : 'disabled';
+      mod.updatedAt = new Date().toISOString();
+      await saveModuleState(db, id, mod);
+      res.json({ success: true, module: mod });
+    } else {
+      res.json({ success: true, message: `Module state updated locally for ${id}` });
+    }
+  } catch (err: any) {
+    moduleDbError(res, err);
   }
 });
 
-app.post('/api/admin/modules/:id/update', adminAuthMiddleware, (req: Request, res: Response) => {
+app.post('/api/admin/modules/:id/update', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { version, manifest } = req.body;
-
-  const mod = SERVER_MODULES_STORE.find(m => m.manifest.id === id);
-  if (mod) {
-    mod.rollbackBackup = {
-      version: mod.version,
-      manifest: JSON.parse(JSON.stringify(mod.manifest)),
-      settings: JSON.parse(JSON.stringify(mod.settings || {})),
-      backedUpAt: new Date().toISOString()
-    };
-    mod.version = version;
-    if (manifest) mod.manifest = manifest;
-    mod.updatedAt = new Date().toISOString();
-    res.json({ success: true, module: mod });
-  } else {
-    res.json({ success: true, message: `Module ${id} updated to v${version}` });
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
+  }
+  try {
+    const mod = await fetchModuleState(db, id);
+    if (mod) {
+      mod.rollbackBackup = {
+        version: mod.version,
+        manifest: JSON.parse(JSON.stringify(mod.manifest)),
+        settings: JSON.parse(JSON.stringify(mod.settings || {})),
+        backedUpAt: new Date().toISOString()
+      };
+      mod.version = version;
+      if (manifest) mod.manifest = manifest;
+      mod.updatedAt = new Date().toISOString();
+      await saveModuleState(db, id, mod);
+      res.json({ success: true, module: mod });
+    } else {
+      res.json({ success: true, message: `Module ${id} updated to v${version}` });
+    }
+  } catch (err: any) {
+    moduleDbError(res, err);
   }
 });
 
-app.post('/api/admin/modules/:id/rollback', adminAuthMiddleware, (req: Request, res: Response) => {
+app.post('/api/admin/modules/:id/rollback', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const mod = SERVER_MODULES_STORE.find(m => m.manifest.id === id);
-  if (mod && mod.rollbackBackup) {
-    mod.version = mod.rollbackBackup.version;
-    mod.manifest = mod.rollbackBackup.manifest;
-    mod.settings = mod.rollbackBackup.settings;
-    mod.rollbackBackup = null;
-    res.json({ success: true, module: mod });
-  } else {
-    res.json({ success: true, message: `Module ${id} rolled back` });
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
+  }
+  try {
+    const mod = await fetchModuleState(db, id);
+    if (mod && mod.rollbackBackup) {
+      mod.version = mod.rollbackBackup.version;
+      mod.manifest = mod.rollbackBackup.manifest;
+      mod.settings = mod.rollbackBackup.settings;
+      mod.rollbackBackup = null;
+      mod.updatedAt = new Date().toISOString();
+      await saveModuleState(db, id, mod);
+      res.json({ success: true, module: mod });
+    } else {
+      res.json({ success: true, message: `Module ${id} rolled back` });
+    }
+  } catch (err: any) {
+    moduleDbError(res, err);
   }
 });
 
-app.delete('/api/admin/modules/:id', adminAuthMiddleware, (req: Request, res: Response) => {
+app.delete('/api/admin/modules/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const idx = SERVER_MODULES_STORE.findIndex(m => m.manifest.id === id);
-  if (idx !== -1) {
-    SERVER_MODULES_STORE.splice(idx, 1);
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
+  }
+  const { error } = await db.from('feature_modules').delete().eq('id', id);
+  if (error) {
+    res.status(502).json({ error: 'Module uninstall failed.', detail: error.message });
+    return;
   }
   res.json({ success: true, uninstalledId: id });
 });
@@ -5375,47 +5515,58 @@ app.post('/api/newsletter/welcome', async (req: Request, res: Response) => {
 });
 
 app.post('/api/analytics', async (req: Request, res: Response) => {
-  const { path: pagePath, title } = req.body || {};
-  
-  if (!serverCacheState.analytics) {
-    serverCacheState.analytics = {
-      totalViews: 0,
-      total_views: 0,
-      totalLikes: 0,
-      total_likes: 0,
-      totalSubscribers: 0,
-      total_subscribers: 0,
-      daily_views: [],
-      topArticles: []
-    };
+  // H-08: page views persist through the SECURITY DEFINER RPC log_page_view()
+  // (atomic per-day/per-path upsert on the analytics table). The previous
+  // in-memory counter silently reset on every serverless cold start.
+  const { path: pagePath } = req.body || {};
+  const cleanPath = (pagePath || '/').toString().slice(0, 512);
+
+  const db = getSupabaseClient();
+  if (!db) {
+    res.status(503).json({ error: 'Analytics storage is not configured.' });
+    return;
   }
-
-  const analytics = serverCacheState.analytics;
-  analytics.total_views = (analytics.total_views || analytics.totalViews || 0) + 1;
-  analytics.totalViews = analytics.total_views;
-
-  const todayStr = new Date().toISOString().split('T')[0];
-  if (!Array.isArray(analytics.daily_views)) {
-    analytics.daily_views = [];
+  const { data, error } = await db.rpc('log_page_view', { p_path: cleanPath });
+  if (error) {
+    res.status(502).json({ error: 'Page view logging failed.', detail: error.message });
+    return;
   }
+  res.json({ success: true, total_views: data });
+});
 
-  const idx = analytics.daily_views.findIndex((v: any) => v.date === todayStr);
-  if (idx >= 0) {
-    analytics.daily_views[idx].count = (analytics.daily_views[idx].count || 0) + 1;
-  } else {
-    analytics.daily_views.push({ date: todayStr, count: 1 });
-    if (analytics.daily_views.length > 30) {
-      analytics.daily_views.shift();
-    }
+// Aggregate page-view stats for the admin dashboard (H-08: reads the analytics
+// table — real persisted counts, not per-instance cache guesses).
+app.get('/api/analytics/summary', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const db = getAdminDbClient(req);
+  if (!db) {
+    res.status(503).json({ error: 'Database access is not configured.' });
+    return;
   }
-
-  try {
-    await saveServerCacheState(serverCacheState);
-  } catch (err) {
-    console.warn('Error saving state after analytics log:', err);
+  const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
+  const { data, error } = await db.from('analytics')
+    .select('path, views, unique_visitors, date')
+    .gte('date', new Date(Date.now() - days * 86400000).toISOString().split('T')[0])
+    .order('date', { ascending: false })
+    .limit(2000);
+  if (error) {
+    res.status(502).json({ error: 'Analytics summary lookup failed.', detail: error.message });
+    return;
   }
-
-  res.json({ success: true, total_views: analytics.total_views });
+  const rows = data || [];
+  const byDay = new Map<string, number>();
+  const byPath = new Map<string, number>();
+  let totalViews = 0;
+  for (const r of rows) {
+    totalViews += Number(r.views) || 0;
+    byDay.set(String(r.date), (byDay.get(String(r.date)) || 0) + (Number(r.views) || 0));
+    byPath.set(r.path, (byPath.get(r.path) || 0) + (Number(r.views) || 0));
+  }
+  res.json({
+    success: true,
+    total_views: totalViews,
+    daily_views: Array.from(byDay.entries()).map(([date, count]) => ({ date, count })).slice(0, 30),
+    top_pages: Array.from(byPath.entries()).map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count).slice(0, 10)
+  });
 });
 
 // Resend Status & Configuration Check Endpoint

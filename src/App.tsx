@@ -913,11 +913,23 @@ export default function App() {
 
   // Sync URL with site tab on mount & handle popstate browser back/forward buttons
   useEffect(() => {
+    // H-08: anonymous page-view beacon — persisted server-side via the
+    // log_page_view() RPC (fire-and-forget; failures are silent and safe).
+    const logPageView = (path: string) => {
+      fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path })
+      }).catch(() => {});
+    };
+    logPageView(window.location.pathname);
+
     // Initial sync
     syncUrlWithTab(window.location.pathname);
 
     // Watch popstate
     const handlePopState = () => {
+      logPageView(window.location.pathname);
       syncUrlWithTab(window.location.pathname);
     };
     window.addEventListener('popstate', handlePopState);

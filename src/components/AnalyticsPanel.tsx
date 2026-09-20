@@ -32,6 +32,31 @@ function CustomChartTooltip({ active, payload, label, prefix = '' }: CustomToolt
 
 export default function AnalyticsPanel() {
   const [analytics, setAnalytics] = useState(() => heartsync.getLiveAnalytics());
+  // H-08: real page-view counts from the analytics table (persisted via the
+  // log_page_view RPC). Falls back to the store summary when unavailable.
+  const [pageViewSummary, setPageViewSummary] = useState<{ daily_views: Array<{ date: string; count: number }>; total_views: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const authHeaders: Record<string, string> = {};
+        if (heartsync.supabase) {
+          try {
+            const { data: { session } } = await heartsync.supabase.auth.getSession();
+            if (session?.access_token) authHeaders['Authorization'] = `Bearer ${session.access_token}`;
+          } catch (_) {}
+        }
+        const r = await fetch('/api/analytics/summary', { headers: authHeaders });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!cancelled && j?.success && Array.isArray(j.daily_views) && j.daily_views.length > 0) {
+          setPageViewSummary({ daily_views: j.daily_views, total_views: Number(j.total_views) || 0 });
+        }
+      } catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [subscribers, setSubscribers] = useState(heartsync.subscribers);
   const [auditLogs, setAuditLogs] = useState(heartsync.audit_logs);
   const [adZones, setAdZones] = useState(heartsync.ad_zones);
@@ -53,11 +78,14 @@ export default function AnalyticsPanel() {
   }, []);
 
   const totalViews = heartsync.posts.reduce((acc, p) => acc + p.views, 0);
+  const dailyViews = pageViewSummary && pageViewSummary.daily_views.length > 0
+    ? pageViewSummary.daily_views
+    : analytics.daily_views;
   const totalLikes = heartsync.posts.reduce((acc, p) => acc + p.likes, 0);
   const totalSubscribers = subscribers.length + 142; // Seeded count fallback plus actual signups
 
   // AdSense Daily Earnings Trend calculation and coordinates
-  const dailyEarnings = analytics.daily_views.map((d, i) => {
+  const dailyEarnings = dailyViews.map((d, i) => {
     const viewsFactor = d.count * 0.0015;
     const clicksFactor = (d.count % 4 === 0 ? 0.45 : d.count % 7 === 0 ? 0.90 : 0);
     const amount = Number((viewsFactor + clicksFactor).toFixed(2));
@@ -65,7 +93,7 @@ export default function AnalyticsPanel() {
   });
 
   // SaaS Subscription Revenue Trend ($ / Day)
-  const dailySubscriptionRevenue = analytics.daily_views.map((d, i) => {
+  const dailySubscriptionRevenue = dailyViews.map((d, i) => {
     const dateStr = d.date;
     const actualSum = payments
       .filter(p => {
@@ -348,7 +376,7 @@ export default function AnalyticsPanel() {
             {/* Core Recharts views chart */}
             <div className="w-full bg-zinc-50/50 dark:bg-zinc-950/20 rounded-2xl p-2 sm:p-4 text-zinc-800 dark:text-zinc-200">
               <ResponsiveContainer width="100%" height={160}>
-                <AreaChart data={analytics.daily_views} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <AreaChart data={dailyViews} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradientRose" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.4}/>

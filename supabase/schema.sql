@@ -984,6 +984,116 @@ CREATE POLICY "Owner full access journal" ON public.journal_entries
   WITH CHECK (auth.uid()::text = user_id);
 
 -- ----------------------------------------------------------------------------
+-- GDPR COMPLIANCE + DIAGNOSTICS PERSISTENCE (H-08): the GDPR DSR request ledger,
+-- the privacy audit trail, and the diagnostic quiz results were in-memory
+-- arrays in server.ts — real user GDPR requests vanished on every serverless
+-- cold start. All three are now database-backed. Public inserts ride explicit
+-- public INSERT policies (same pattern as subscribers/comments); ALL admin
+-- management goes through is_admin() RLS policies. No anon SELECT ever.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.diagnostic_results (
+  id TEXT PRIMARY KEY,
+  quiz_id TEXT,
+  quiz_title TEXT NOT NULL,
+  user_email TEXT NOT NULL,
+  score INT,
+  category_scores JSONB DEFAULT '{}'::jsonb,
+  recommendation TEXT,
+  answers JSONB DEFAULT '{}'::jsonb,
+  session_hash TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.diagnostic_results ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.gdpr_audit_log (
+  id TEXT PRIMARY KEY,
+  event TEXT NOT NULL,
+  user_email TEXT,
+  ip_hash TEXT,
+  details TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.gdpr_audit_log ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.gdpr_dsr_requests (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  user_email TEXT NOT NULL,
+  status TEXT DEFAULT 'PENDING',
+  reason TEXT,
+  sla_deadline TIMESTAMPTZ,
+  requested_at TIMESTAMPTZ DEFAULT NOW(),
+  fulfilled_at TIMESTAMPTZ,
+  certificate_id TEXT
+);
+ALTER TABLE public.gdpr_dsr_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public insert diagnostic results" ON public.diagnostic_results;
+CREATE POLICY "Public insert diagnostic results" ON public.diagnostic_results
+  FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Public insert gdpr audit log" ON public.gdpr_audit_log;
+CREATE POLICY "Public insert gdpr audit log" ON public.gdpr_audit_log
+  FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Public insert gdpr dsr requests" ON public.gdpr_dsr_requests;
+CREATE POLICY "Public insert gdpr dsr requests" ON public.gdpr_dsr_requests
+  FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin full access diagnostic_results" ON public.diagnostic_results;
+CREATE POLICY "Admin full access diagnostic_results" ON public.diagnostic_results
+  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+DROP POLICY IF EXISTS "Admin full access gdpr_audit_log" ON public.gdpr_audit_log;
+CREATE POLICY "Admin full access gdpr_audit_log" ON public.gdpr_audit_log
+  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+DROP POLICY IF EXISTS "Admin full access gdpr_dsr_requests" ON public.gdpr_dsr_requests;
+CREATE POLICY "Admin full access gdpr_dsr_requests" ON public.gdpr_dsr_requests
+  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- ----------------------------------------------------------------------------
+-- H-08 COMPLETION: analytics page-view logging + feature-module registry.
+-- POST /api/analytics previously incremented an in-memory object whose sync
+-- silently dropped it — page views reset on every serverless cold start and
+-- the analytics table stayed empty. Views now go through the SECURITY DEFINER
+-- RPC log_page_view() (atomic UPSERT per day+path, anon-callable like
+-- increment_post_engagement). The admin Feature Manager registry moves from a
+-- module-scope array (lost on cold start) to the feature_modules table.
+-- ----------------------------------------------------------------------------
+CREATE UNIQUE INDEX IF NOT EXISTS analytics_date_path_key
+  ON public.analytics (date, path);
+
+CREATE OR REPLACE FUNCTION public.log_page_view(p_path TEXT)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_new_count INTEGER;
+BEGIN
+  IF p_path IS NULL OR length(trim(p_path)) = 0 OR length(p_path) > 512 THEN
+    RAISE EXCEPTION 'invalid path';
+  END IF;
+  INSERT INTO public.analytics (path, views, unique_visitors, date)
+  VALUES (p_path, 1, 1, CURRENT_DATE)
+  ON CONFLICT (date, path) DO UPDATE
+    SET views = public.analytics.views + 1
+  RETURNING views INTO v_new_count;
+  RETURN v_new_count;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.log_page_view(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.log_page_view(TEXT) TO anon, authenticated, service_role;
+
+CREATE TABLE IF NOT EXISTS public.feature_modules (
+  id TEXT PRIMARY KEY,
+  state JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.feature_modules ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admin full access feature_modules" ON public.feature_modules;
+CREATE POLICY "Admin full access feature_modules" ON public.feature_modules
+  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- ----------------------------------------------------------------------------
 -- ADSENSE SLOT CONFIGURATION (Monetization settings)
 -- Per-placement AdSense unit ids, editable in Admin → Monetization.
 -- ----------------------------------------------------------------------------

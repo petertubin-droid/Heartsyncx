@@ -45,11 +45,24 @@ Post-migration verification (all checked live):
       download RPC). The fake seed products and dead heartsync.app URLs are gone;
       the catalog starts empty. Pending: real signed storage URLs when products
       are created (file_url currently admin-supplied).
-- [ ] H-08: hosting model decision — the backend still assumes a long-lived process
-      (in-memory GDPR store, module store, analytics, rate limiter) but deploys as one
-      30s serverless function. Either move all in-memory stores to Supabase tables, or
-      deploy to a long-lived single-origin host as the README prescribes. Analytics
-      currently resets on every cold start (per-instance counters).
+- [x] H-08: DONE (2026-09-20) — decision: the serverless model wins; every durable
+      store now lives in Supabase, applied live to Hearty (pdtibsfasvicjptqirro) and
+      verified with smoke tests:
+      - GDPR engine: gdpr_audit_log / gdpr_dsr_requests / diagnostic_results tables
+        (RLS admin-gated, service-role writes) replace the three in-memory stores;
+        diagnostics GET/DELETE are now admin-only (was a public privacy hole).
+      - Page views: POST /api/analytics calls the SECURITY DEFINER RPC log_page_view()
+        (atomic per-day/per-path upsert; live-verified 1 -> 2). The old handler
+        incremented a cache object whose sync silently dropped it, so counts reset on
+        every cold start and the analytics table stayed empty. App.tsx now sends the
+        page-view beacon; AnalyticsPanel reads the new admin GET /api/analytics/summary.
+      - Feature Manager: feature_modules table (id + JSONB state) replaces the
+        module-scope SERVER_MODULES_STORE array; install/toggle/update/rollback/uninstall
+        all persist.
+      - Remaining in-memory state is intentionally per-instance and non-durable:
+        rate limiter + advice rate buckets (throttles, M-01 deferred), TTS cache and the
+        site-state read cache (caches with DB sync). Cold starts now lose nothing that
+        matters: user data, GDPR records, analytics and module installs all survive.
 
 ## PHASE 3 — Missing tests
 
