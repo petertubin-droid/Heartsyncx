@@ -6850,7 +6850,7 @@ async function handleDynamicHtml(req: Request, res: Response) {
   let seoTitle = 'Heartsync — Mindful Insights for Connected Hearts';
   let seoDesc = 'Explore scientific relationships advice, attachment style counseling blueprints, and evidence-based couples wellness resources.';
   let seoKeywords = 'heartsync, relationship advice, attachment styles, couples counseling, emotional wellness, somatic grounding';
-  let seoImage = 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=1200';
+  let seoImage = `${baseUrl}/og-image.png`;
   let canonicalUrl = `${baseUrl}${req.path}`;
   let lang = 'en';
 
@@ -6874,9 +6874,9 @@ async function handleDynamicHtml(req: Request, res: Response) {
     "url": baseUrl,
     "logo": {
       "@type": "ImageObject",
-      "url": "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=1200",
-      "width": 1200,
-      "height": 1200
+      "url": `${baseUrl}/icons/icon-512.png`,
+      "width": 512,
+      "height": 512
     },
     "description": "Evidence-based couples counseling guidelines and somatic trauma recovery resources.",
     "sameAs": [
