@@ -11,6 +11,9 @@ import { LOVE_THE_STORY_YOU_TELL } from './love-the-story-you-tell';
 import { COMM_THE_SAME_FIGHT_FOREVER } from './comm-the-same-fight-forever';
 import { DATING_GREEN_FLAGS } from './dating-green-flags';
 import { SELFLOVE_REST_IS_NOT_A_REWARD } from './selflove-rest-is-not-a-reward';
+import { COMM_LISTEN_DONT_FIX } from './comm-listen-dont-fix';
+import { COMM_ANATOMY_APOLOGY } from './comm-anatomy-apology';
+import { COMM_DIGITAL_TONE } from './comm-digital-tone';
 
 // HeartSync long-form corpus — genuinely written editorial pieces, added over
 // time in batches. Word target per article: ~2000 words. Never filler.
@@ -26,7 +29,10 @@ export const HEARTSYNC_ARTICLES: Post[] = [
   ...LOVE_THE_STORY_YOU_TELL,
   ...COMM_THE_SAME_FIGHT_FOREVER,
   ...DATING_GREEN_FLAGS,
-  ...SELFLOVE_REST_IS_NOT_A_REWARD
+  ...SELFLOVE_REST_IS_NOT_A_REWARD,
+  ...COMM_LISTEN_DONT_FIX,
+  ...COMM_ANATOMY_APOLOGY,
+  ...COMM_DIGITAL_TONE
 ];
 
 // Crawler/sitemap-facing SEO projection of the in-code corpus. Kept lean (no
