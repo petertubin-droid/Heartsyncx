@@ -3094,7 +3094,10 @@ async function loadStateFromSupabase(): Promise<any> {
       // via GET /api/posts/:slug — it no longer ships in the boot payload.
       queryWithTimeout(supabase.from('posts').select(POST_LIST_COLUMNS.join(',')).order('publish_date', { ascending: false })),
       queryWithTimeout(supabase.from('categories').select('*')),
-      queryWithTimeout(supabase.from('comments').select('*')),
+      // Public columns only — author_email is PII and never ships in the
+      // boot payload (RLS already restricts rows to approved comments for
+      // the anon-key server client).
+      queryWithTimeout(supabase.from('comments').select('id,post_id,author_name,content,is_approved,parent_id,created_at')),
       queryWithTimeout(supabase.from('profiles').select('id,full_name,avatar_url,bio,website,role,created_at,updated_at')),
       queryWithTimeout(supabase.from('pages').select('*')),
       queryWithTimeout(supabase.from('quizzes').select('*')),
@@ -3127,7 +3130,17 @@ async function loadStateFromSupabase(): Promise<any> {
       state.categories = categoriesRes.data;
     }
     if (!commentsRes.error && commentsRes.data) {
-      state.comments = commentsRes.data;
+      // Defense in depth: even if a future query shape widens, the public
+      // boot payload strips anything beyond these public comment columns.
+      state.comments = commentsRes.data.map((cm: any) => ({
+        id: cm.id,
+        post_id: cm.post_id,
+        author_name: cm.author_name,
+        content: cm.content,
+        is_approved: cm.is_approved,
+        parent_id: cm.parent_id,
+        created_at: cm.created_at
+      }));
     }
     if (!authorsRes.error && authorsRes.data) {
       state.authors = authorsRes.data.map((p: any) => ({
@@ -3396,15 +3409,22 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (Array.isArray(newState.comments) && newState.comments.length > 0) {
       await supabase.from('comments').upsert(
-        newState.comments.map((cm: any) => ({
-          id: cm.id,
-          post_id: cm.post_id || cm.articleId,
-          author_name: cm.author_name || cm.user_name || cm.authorName || 'Anonymous Reader',
-          author_email: cm.author_email || cm.user_email || cm.authorEmail || '',
-          content: cm.content,
-          is_approved: cm.is_approved ?? (cm.status ? cm.status === 'approved' : true),
-          created_at: cm.created_at || new Date().toISOString()
-        }))
+        newState.comments.map((cm: any) => {
+          const row: Record<string, unknown> = {
+            id: cm.id,
+            post_id: cm.post_id || cm.articleId,
+            author_name: cm.author_name || cm.user_name || cm.authorName || 'Anonymous Reader',
+            content: cm.content,
+            is_approved: cm.is_approved ?? (cm.status ? cm.status === 'approved' : true),
+            created_at: cm.created_at || new Date().toISOString()
+          };
+          // Upsert only the columns we carry — a boot-state comment (public
+          // projection) has no email, so leave the stored value untouched
+          // instead of overwriting it with an empty string.
+          const email = cm.author_email || cm.user_email || cm.authorEmail;
+          if (email) row.author_email = email;
+          return row;
+        })
       );
     }
 
@@ -5051,7 +5071,7 @@ app.get('/api/state', async (req: Request, res: Response) => {
   
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
-  // If we have a cached state that was updated within CACHE_TTL (5s), return it immediately
+  // If we have a cached state that was updated within CACHE_TTL (15s), return it immediately
   if (serverCacheState && (now - lastSupabaseFetchTime < CACHE_TTL)) {
     res.setHeader('ETag', stateETag);
     res.setHeader('Last-Modified', lastModifiedDate.toUTCString());

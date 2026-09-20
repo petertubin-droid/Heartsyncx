@@ -444,6 +444,28 @@ describe('schema contract', () => {
 // ===========================================================================
 // Public per-article endpoint (projected boot state counterpart)
 // ===========================================================================
+describe('GET /api/state comment PII boundary', () => {
+  it('never ships comment author_email in the public boot payload', { timeout: 30000 }, async () => {
+    // The mock returns rows verbatim; the server must strip PII itself.
+    supabase.state.tables['comments'] = [{
+      id: 'c1', post_id: 'post-1', author_name: 'Rita', author_email: 'rita@example.com',
+      content: 'Loved this', is_approved: true, parent_id: null,
+      created_at: new Date().toISOString()
+    }];
+    // The server caches /api/state for 15s (CACHE_TTL) — wait past it so the
+    // fresh fetch sees the seeded comment row.
+    await new Promise((r) => setTimeout(r, 15500));
+    const res = await req('GET', '/api/state');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.comments)).toBe(true);
+    expect(body.comments.length).toBeGreaterThan(0);
+    const leaked = body.comments.filter((c: any) => 'author_email' in c);
+    expect(leaked).toEqual([]);
+    expect(body.comments[0].content).toBe('Loved this');
+  });
+});
+
 describe('GET /api/posts/:slug (public article body)', () => {
   it('serves the full published article to anonymous callers', async () => {
     supabase.state.tables['posts'] = [{
