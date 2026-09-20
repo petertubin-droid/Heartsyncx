@@ -300,7 +300,7 @@ function UniversalImageFieldSelector({
                   : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'
               }`}
             >
-              <img src={item.url} alt={item.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" referrerPolicy="no-referrer" />
+              <img src={item.url} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" referrerPolicy="no-referrer" />
               <div className="absolute inset-x-0 bottom-0 bg-black/60 p-1 text-[8px] font-sans text-white truncate leading-none">
                 {item.name}
               </div>
@@ -2880,14 +2880,14 @@ export default function AdminConsole({
         <div className="p-4 border-t border-zinc-100 dark:border-zinc-850 space-y-3">
           {!sidebarCollapsed ? (
             <div className="bg-zinc-50 dark:bg-zinc-950 p-2.5 rounded-2xl border border-zinc-100 dark:border-zinc-850 flex items-center gap-2.5">
-              <img src={currentUser?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} className="w-8 h-8 rounded-full border" />
+              <img alt="" src={currentUser?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} className="w-8 h-8 rounded-full border" />
               <div className="truncate flex-1">
                 <h4 className="font-bold text-xs truncate leading-tight">{currentUser?.name || 'Administrator'}</h4>
                 <span className="text-[10px] text-zinc-400 dark:text-zinc-500 select-none block capitalize mt-0.5">{currentUser?.role || 'Admin'}</span>
               </div>
             </div>
           ) : (
-            <img src={currentUser?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} className="w-8 h-8 rounded-full border mx-auto cursor-help" title={currentUser?.name} />
+            <img alt="" src={currentUser?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} className="w-8 h-8 rounded-full border mx-auto cursor-help" title={currentUser?.name} />
           )}
 
           <button 
@@ -3704,7 +3704,7 @@ export default function AdminConsole({
                                 />
                               </td>
                               <td className="p-4 flex gap-3.5 items-center">
-                                <img src={post.featured_image} className="w-12 h-12 object-cover rounded-xl border border-zinc-100 dark:border-zinc-800" />
+                                <img alt={post.title} src={post.featured_image} className="w-12 h-12 object-cover rounded-xl border border-zinc-100 dark:border-zinc-800" />
                                 <div className="max-w-xs truncate">
                                   <div className="flex items-center gap-1.5 mb-1">
                                     <h4 className="font-bold text-zinc-800 dark:text-zinc-200 truncate pr-2">{post.title}</h4>
@@ -3824,7 +3824,7 @@ export default function AdminConsole({
                           </button>
                         </div>
                         {catImg ? (
-                          <img src={catImg} className="h-16 w-full object-cover rounded-lg border mt-1.5" />
+                          <img alt="" src={catImg} className="h-16 w-full object-cover rounded-lg border mt-1.5" />
                         ) : null}
                       </div>
 
@@ -4196,7 +4196,7 @@ export default function AdminConsole({
                           }}
                           className="aspect-square bg-zinc-50 dark:bg-zinc-955 border border-zinc-200 dark:border-zinc-805 rounded-2xl overflow-hidden relative group cursor-pointer shadow-xs transition-all hover:border-rose-355"
                         >
-                          <img src={item.url} className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-350" alt={item.altText || 'media item'} referrerPolicy="no-referrer" />
+                          <img src={item.url} className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-350" alt="" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
                             <div className="p-2 bg-white/95 dark:bg-zinc-900/95 rounded-full shadow-lg text-rose-550 transform scale-90 group-hover:scale-100 transition-all duration-300">
                               <Sliders className="w-4 h-4" />
@@ -4520,7 +4520,7 @@ export default function AdminConsole({
                     {comments.map(com => (
                       <div key={com.id} className="p-4 bg-zinc-50 dark:bg-zinc-950/20 rounded-2xl border border-zinc-100 dark:border-zinc-850 flex justify-between items-start gap-4">
                         <div className="flex gap-3">
-                          <img src={com.user_avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150'} className="w-10 h-10 object-cover rounded-full border" />
+                          <img alt="" src={com.user_avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150'} className="w-10 h-10 object-cover rounded-full border" />
                           <div className="space-y-1">
                             <div className="flex items-center gap-1.5">
                               <h4 className="font-bold text-xs">{com.user_name}</h4>
@@ -6349,7 +6349,7 @@ export default function AdminConsole({
                             const filename = item.fileName;
                             return (
                               <div key={idx} className="p-3 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-850 rounded-2xl flex items-center gap-3">
-                                <img src={url || undefined} className="w-12 h-12 object-cover rounded-xl border border-zinc-200 dark:border-zinc-850" />
+                                <img alt="" src={url || undefined} className="w-12 h-12 object-cover rounded-xl border border-zinc-200 dark:border-zinc-850" />
                                 <div className="flex-1 truncate">
                                   <h5 className="font-bold truncate leading-snug">{filename}</h5>
                                   <span className="text-[9px] font-mono text-emerald-500 dark:text-emerald-400 flex items-center gap-1">
@@ -9655,7 +9655,7 @@ export default function AdminConsole({
 
                           <div className="flex gap-4 items-center">
                             <div className="flex flex-col items-center justify-center p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shrink-0 min-w-[70px] gap-1">
-                              <img 
+                              <img alt="Site logo" 
                                 src={brandLogo} 
                                 className="w-10 h-10 rounded-lg object-cover border border-zinc-100 dark:border-zinc-800 bg-zinc-50"
                                 onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100' }} 
@@ -9713,7 +9713,7 @@ export default function AdminConsole({
                           <div className="p-4 bg-white dark:bg-zinc-900 w-full rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col gap-3">
                             <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
                               <div className="flex items-center gap-2 font-bold text-[13px] text-zinc-900 dark:text-white" style={{ fontFamily: brandFont }}>
-                                <img src={brandLogo || '/logo.svg'} className="w-6 h-6 rounded-lg object-cover border" onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }} />
+                                <img alt="Site logo" src={brandLogo || '/logo.svg'} className="w-6 h-6 rounded-lg object-cover border" onError={(e) => { (e.target as HTMLImageElement).src = '/logo.svg' }} />
                                 <span>{siteSettings.site_name || 'Heartsync'}</span>
                               </div>
                               <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-850 text-zinc-500">Header</span>
@@ -13406,7 +13406,7 @@ export default function AdminConsole({
                                     return (
                                       <tr key={user.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-950/10 transition-colors">
                                         <td className="p-3 flex items-center gap-2.5">
-                                          <img
+                                          <img alt=""
                                             src={user.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150'}
                                             className="w-7 h-7 rounded-full object-cover border border-zinc-200"
                                             referrerPolicy="no-referrer"
@@ -13492,7 +13492,7 @@ export default function AdminConsole({
                             
                             {/* Inner Layout Header */}
                             <div className="flex gap-3 items-start">
-                              <img src={staffMember.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150'} className="w-12 h-12 rounded-full border border-zinc-200 dark:border-zinc-700 shrink-0 object-cover" referrerPolicy="no-referrer" />
+                              <img alt="" src={staffMember.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150'} className="w-12 h-12 rounded-full border border-zinc-200 dark:border-zinc-700 shrink-0 object-cover" referrerPolicy="no-referrer" />
                               <div className="space-y-1">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <h4 className="font-bold text-zinc-850 dark:text-white text-xs">{staffMember.name}</h4>
@@ -13855,8 +13855,7 @@ export default function AdminConsole({
                                 {author.social_links?.twitter && (
                                   <a
                                     href={author.social_links.twitter}
-                                    target="_blank"
-                                    rel="noreferrer"
+                                    target="_blank" rel="noopener noreferrer"
                                     className="text-[10px] text-zinc-400 hover:text-rose-500 font-mono"
                                   >
                                     Twitter
@@ -13865,8 +13864,7 @@ export default function AdminConsole({
                                 {author.social_links?.linkedin && (
                                   <a
                                     href={author.social_links.linkedin}
-                                    target="_blank"
-                                    rel="noreferrer"
+                                    target="_blank" rel="noopener noreferrer"
                                     className="text-[10px] text-zinc-400 hover:text-rose-500 font-mono"
                                   >
                                     LinkedIn

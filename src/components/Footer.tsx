@@ -165,8 +165,7 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
                 {facebookUrl && (
                   <a 
                     href={facebookUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                    target="_blank" rel="noopener noreferrer"
                     className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-900/50 hover:bg-rose-500 hover:text-white hover:border-transparent text-zinc-400 border border-zinc-800/80 transition-all cursor-pointer shadow-xs md:w-9 md:h-9"
                     title="Follow on Facebook"
                   >
@@ -176,8 +175,7 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
                 {twitterUrl && (
                   <a 
                     href={twitterUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                    target="_blank" rel="noopener noreferrer"
                     className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-900/50 hover:bg-rose-500 hover:text-white hover:border-transparent text-zinc-400 border border-zinc-800/80 transition-all cursor-pointer shadow-xs md:w-9 md:h-9"
                     title="Follow on Twitter / X"
                   >
@@ -187,8 +185,7 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
                 {instagramUrl && (
                   <a 
                     href={instagramUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                    target="_blank" rel="noopener noreferrer"
                     className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-900/50 hover:bg-rose-500 hover:text-white hover:border-transparent text-zinc-400 border border-zinc-800/80 transition-all cursor-pointer shadow-xs md:w-9 md:h-9"
                     title="Follow on Instagram"
                   >
@@ -198,8 +195,7 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
                 {linkedinUrl && (
                   <a 
                     href={linkedinUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                    target="_blank" rel="noopener noreferrer"
                     className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-900/50 hover:bg-rose-500 hover:text-white hover:border-transparent text-zinc-400 border border-zinc-800/80 transition-all cursor-pointer shadow-xs md:w-9 md:h-9"
                     title="Connect on LinkedIn"
                   >
@@ -209,8 +205,7 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
                 {youtubeUrl && (
                   <a 
                     href={youtubeUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                    target="_blank" rel="noopener noreferrer"
                     className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-900/50 hover:bg-rose-500 hover:text-white hover:border-transparent text-zinc-400 border border-zinc-800/80 transition-all cursor-pointer shadow-xs md:w-9 md:h-9"
                     title="Subscribe on YouTube"
                   >

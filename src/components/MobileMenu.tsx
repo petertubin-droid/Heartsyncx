@@ -314,8 +314,7 @@ export default function MobileMenu({
                 {facebookUrl && (
                   <a
                     href={facebookUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    target="_blank" rel="noopener noreferrer"
                     className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 hover:scale-105 active:scale-95 transition-all bg-white dark:bg-zinc-900 min-w-[40px] min-h-[40px] flex items-center justify-center"
                     title="Facebook"
                   >
@@ -325,8 +324,7 @@ export default function MobileMenu({
                 {instagramUrl && (
                   <a
                     href={instagramUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    target="_blank" rel="noopener noreferrer"
                     className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 hover:scale-105 active:scale-95 transition-all bg-white dark:bg-zinc-900 min-w-[40px] min-h-[40px] flex items-center justify-center"
                     title="Instagram"
                   >
@@ -336,8 +334,7 @@ export default function MobileMenu({
                 {twitterUrl && (
                   <a
                     href={twitterUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    target="_blank" rel="noopener noreferrer"
                     className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 hover:scale-105 active:scale-95 transition-all bg-white dark:bg-zinc-900 min-w-[40px] min-h-[40px] flex items-center justify-center"
                     title="Twitter"
                   >

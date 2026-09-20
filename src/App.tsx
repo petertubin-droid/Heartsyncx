@@ -5278,7 +5278,7 @@ export default function App() {
                       <h1 className="font-serif font-extrabold text-3xl text-zinc-900 dark:text-white text-center">About Heartsync</h1>
                       <p className="text-xs text-zinc-400 text-center uppercase tracking-wider font-mono">Exploring human connectivity since 2026</p>
                       
-                      <img 
+                      <img alt="" 
                         src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200" 
                         className="w-full max-h-64 object-cover rounded-3xl" 
                       />
