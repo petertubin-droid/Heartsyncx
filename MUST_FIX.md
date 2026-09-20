@@ -130,18 +130,23 @@ Post-migration verification (all checked live):
 
 ## PHASE 5 — Performance
 
-- [ ] GET /api/state: full article bodies are GONE from the boot payload
-      (posts now projected to list columns; body fetched per-article via the
-      new public GET /api/posts/:slug + store.ensureArticleContent, tested).
-      REMAINING scope: consider projecting pages/comments columns and adding
-      pagination to the remaining ~21 tables.
+- [x] DONE (2026-09-20): boot payload fully projected. Posts ship list-only
+      (per-article body via public GET /api/posts/:slug + ensureArticleContent);
+      subscribers ship (email, source, subscribed_at) only; comments ship public
+      columns only — author_email (PII) is projected out at the query AND
+      stripped at state assembly (defense in depth, regression-tested), and
+      the admin state-sync upsert omits the column when absent so stored
+      emails can never be blanked. pages.content stays by design (reader tabs
+      render it directly; table is bounded ~16 rows). audit_logs/payments
+      remain capped. Remaining ~20 tables are small config/domain tables —
+      pagination deferred until any of them grows unbounded.
 - [x] DONE (2026-09-20): AdminConsole split out of the reader bundle via
       React.lazy + Suspense (own chunk, ~1.16 MB / 270 KB gzip) — it only
       downloads when an admin opens the admin tab. Reader bundle dropped to
       ~1.70 MB / 488 KB gzip. Verified in a real vite build (AdminConsole-*.js
       emitted as a separate dynamic chunk).
 - [x] DONE (2026-09-20): double boot fetch eliminated. /api/state (fresh from
-      Supabase with a 5s TTL) is the single boot fetch — initSupabaseConnection
+      Supabase with a 15s TTL) is the single boot fetch — initSupabaseConnection
       no longer fires a redundant full-table syncWithSupabase() on top of it.
       syncWithSupabase stays for explicit re-syncs (admin login refresh).
       Bonus: realtime postgres-change events (which arrive in bursts) now
