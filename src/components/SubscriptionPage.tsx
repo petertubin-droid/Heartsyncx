@@ -41,6 +41,7 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
   // FAQ Expand state
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [isSuccessOverlayOpen, setIsSuccessOverlayOpen] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleStoreUpdate = () => {
@@ -148,20 +149,46 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
     if (!selectedPlan || !user) return;
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const chargeAmt = billingCycle === 'yearly' ? (selectedPlan.price_yearly || (selectedPlan.price_monthly * 10)) : selectedPlan.price_monthly;
-      heartsync.createPremiumUserSubscription(
-        user.id, 
-        selectedPlan.id, 
-        billingCycle, 
-        checkoutGateway, 
-        chargeAmt
-      );
-      setShowCheckout(false);
-      setIsSuccessOverlayOpen(true);
-    }, 1500);
+    setCheckoutError(null);
+    fetch('/api/subscriptions/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        planId: selectedPlan.id,
+        billingCycle,
+        gateway: checkoutGateway,
+        userId: user.id,
+        email: user.email
+      })
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+          return;
+        }
+        setLoading(false);
+        setCheckoutError(data.error || 'Payments are not live yet. Please check back soon.');
+      })
+      .catch(() => {
+        setLoading(false);
+        setCheckoutError('Could not reach the payment service. Please try again.');
+      });
   };
+
+  // Payment gateway return: show the success overlay after a real gateway redirect
+  useEffect(() => {
+    if (plans.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      const returnedPlan = plans.find(p => p.id === params.get('planId'));
+      if (returnedPlan) {
+        setSelectedPlan(returnedPlan);
+        setIsSuccessOverlayOpen(true);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, [plans]);
 
   const activeSubscribedPlanName = subscription ? (plans.find(p => p.id === subscription.plan_id)?.name || 'Legacy Membership') : null;
 
@@ -663,6 +690,12 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
               </div>
 
               <form onSubmit={handleProcessCheckout} className="space-y-3.5">
+                {checkoutError && (
+                  <div className="mt-3 flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{checkoutError}</p>
+                  </div>
+                )}
                 {checkoutGateway === 'stripe' ? (
                   <>
                     <div>

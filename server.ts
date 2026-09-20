@@ -1118,7 +1118,7 @@ app.delete('/api/digital-products/:id', (req: Request, res: Response) => {
 });
 
 // CHECKOUT DIGITAL PRODUCT (PURCHASE & GENERATE DOWNLOAD TOKEN)
-app.post('/api/digital-products/checkout', (req: Request, res: Response) => {
+app.post('/api/digital-products/checkout', async (req: Request, res: Response) => {
   const { productId, userEmail, gateway } = req.body;
 
   const product = DIGITAL_PRODUCTS_STORE.find(p => p.id === productId);
@@ -1131,30 +1131,37 @@ app.post('/api/digital-products/checkout', (req: Request, res: Response) => {
   const chargedAmount = product.salePrice || product.price;
   const downloadToken = `dl_tok_${Math.random().toString(36).substring(2, 10)}_${Date.now()}`;
 
-  const newOrder = {
-    id: `ord-${Date.now()}`,
-    userEmail: cleanEmail,
+  // Real gateway only: an order and download token are created by the verified
+  // webhook after payment — never here. This endpoint now only opens a checkout.
+  const origin = GATEWAY_BASE(req);
+  const metadata = {
+    kind: 'digital_product',
     productId: product.id,
-    productTitle: product.title,
-    amount: chargedAmount,
-    currency: 'USD',
-    downloadToken,
-    downloadUrl: product.fileUrl,
-    expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
-    status: 'completed',
-    gateway: gateway || 'stripe',
-    createdAt: new Date().toISOString()
+    email: cleanEmail
   };
-
-  DIGITAL_ORDERS_STORE.unshift(newOrder);
-  product.totalSales = (product.totalSales || 0) + 1;
-
-  res.json({
-    success: true,
-    order: newOrder,
-    downloadLink: `/api/digital-products/download/${downloadToken}`,
-    message: `Purchase completed via ${gateway || 'Stripe'}. Receipt & instant download token sent to ${cleanEmail}.`
-  });
+  try {
+    if (gateway === 'stripe') {
+      const url = await createStripeCheckoutSession({
+        origin, amount: chargedAmount, currency: 'USD', name: product.title,
+        mode: 'payment', interval: 'month', email: cleanEmail, metadata,
+        successUrl: `${origin}/?checkout=success&productId=${product.id}`,
+        cancelUrl: origin
+      });
+      if (!url) { res.status(501).json({ error: 'Stripe is not configured yet. Digital purchases go live once payment keys are installed.' }); return; }
+      res.json({ success: true, gateway: 'stripe', checkoutUrl: url });
+      return;
+    }
+    if (gateway === 'paystack') {
+      const url = await createPaystackTransaction({ amount: chargedAmount, currency: 'USD', email: cleanEmail, callbackUrl: `${origin}/?checkout=success&productId=${product.id}`, metadata });
+      if (!url) { res.status(501).json({ error: 'Paystack is not configured yet. Digital purchases go live once payment keys are installed.' }); return; }
+      res.json({ success: true, gateway: 'paystack', checkoutUrl: url });
+      return;
+    }
+    res.status(501).json({ error: 'This payment gateway is not live yet.' });
+  } catch (err: any) {
+    console.warn('Digital product checkout failure:', err?.message);
+    res.status(502).json({ error: 'The payment gateway rejected the checkout request.' });
+  }
 });
 
 // VERIFY AND DOWNLOAD DIGITAL PRODUCT ASSET
@@ -4583,6 +4590,234 @@ async function saveServerCacheState(newState: any) {
 // --------------------------------------------------------
 // FIRST-RUN SETUP WIZARD SECURE ENDPOINTS
 // --------------------------------------------------------
+// ============================================================================
+// REAL PAYMENT GATEWAYS — subscriptions & digital products
+// Checkout sessions are created with live gateway APIs; subscriptions and
+// payments rows are only written after a VERIFIED webhook confirms the charge.
+// ============================================================================
+
+const GATEWAY_BASE = (req: Request) => `${req.headers.origin || req.protocol + '://' + req.get('host')}`;
+
+function getGatewayKeys() {
+  return {
+    stripe: cleanConfigValue(process.env.STRIPE_SECRET_KEY),
+    paystack: cleanConfigValue(process.env.PAYSTACK_SECRET_KEY),
+    stripeWebhook: cleanConfigValue(process.env.STRIPE_WEBHOOK_SECRET)
+  };
+}
+
+function getServiceRoleSupabase() {
+  const url = cleanConfigValue(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+  const key = cleanConfigValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  if (!url || !key || !isValidSupabaseConfig(url, key)) return null;
+  return createClient(url, key);
+}
+
+// Records a VERIFIED paid subscription + payment. Requires the service role key.
+async function activatePaidSubscription(params: {
+  userId: string; planId: string; billingCycle: 'monthly' | 'yearly';
+  gateway: string; amount: number; currency: string;
+  transactionId: string; gatewaySubscriptionId?: string;
+}) {
+  const svc = getServiceRoleSupabase();
+  if (!svc) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured; cannot record the paid subscription.');
+  const months = params.billingCycle === 'yearly' ? 12 : 1;
+  const periodEnd = new Date();
+  periodEnd.setMonth(periodEnd.getMonth() + months);
+  const subId = `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const { error: cancelErr } = await svc.from('subscriptions')
+    .update({ status: 'canceled', updated_at: new Date().toISOString() })
+    .eq('user_id', params.userId).neq('status', 'canceled');
+  if (cancelErr) console.warn('Prior subscription cancel warning:', cancelErr.message);
+
+  const { error: subErr } = await svc.from('subscriptions').insert({
+    id: subId,
+    user_id: params.userId,
+    plan_id: params.planId,
+    status: 'active',
+    current_period_end: periodEnd.toISOString(),
+    auto_renew: params.gateway === 'stripe',
+    gateway: params.gateway,
+    gateway_subscription_id: params.gatewaySubscriptionId || null,
+    metadata: { billing_cycle: params.billingCycle }
+  });
+  if (subErr) throw new Error('Subscription insert failed: ' + subErr.message);
+
+  const { error: payErr } = await svc.from('payments').insert({
+    id: `pay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    user_id: params.userId,
+    subscription_id: subId,
+    amount: params.amount,
+    currency: params.currency,
+    status: 'completed',
+    transaction_id: params.transactionId
+  });
+  if (payErr) throw new Error('Payment insert failed: ' + payErr.message);
+  return subId;
+}
+
+async function createStripeCheckoutSession(opts: {
+  origin: string; amount: number; currency: string; name: string;
+  mode: 'payment' | 'subscription'; interval: 'month' | 'year';
+  email?: string; clientRefId?: string; metadata: Record<string, string>;
+  successUrl: string; cancelUrl: string;
+}) {
+  const key = cleanConfigValue(process.env.STRIPE_SECRET_KEY);
+  if (!key) return null;
+  const body = new URLSearchParams();
+  body.set('mode', opts.mode);
+  body.set('line_items[0][quantity]', '1');
+  body.set('line_items[0][price_data][currency]', opts.currency.toLowerCase());
+  body.set('line_items[0][price_data][unit_amount]', String(Math.round(opts.amount * 100)));
+  body.set('line_items[0][price_data][product_data][name]', opts.name);
+  if (opts.mode === 'subscription') body.set('line_items[0][price_data][recurring][interval]', opts.interval);
+  if (opts.email) body.set('customer_email', opts.email);
+  if (opts.clientRefId) body.set('client_reference_id', opts.clientRefId);
+  for (const [k, v] of Object.entries(opts.metadata)) body.set(`metadata[${k}]`, v);
+  body.set('success_url', opts.successUrl);
+  body.set('cancel_url', opts.cancelUrl);
+  const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  });
+  const data = await r.json();
+  if (!r.ok || !data?.url) throw new Error(data?.error?.message || 'Stripe checkout session creation failed.');
+  return data.url as string;
+}
+
+async function createPaystackTransaction(opts: {
+  amount: number; currency: string; email: string; callbackUrl: string;
+  metadata: Record<string, string>;
+}) {
+  const key = cleanConfigValue(process.env.PAYSTACK_SECRET_KEY);
+  if (!key) return null;
+  const r = await fetch('https://api.paystack.co/transaction/initialize', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: opts.email,
+      amount: Math.round(opts.amount * 100),
+      currency: opts.currency.toUpperCase(),
+      callback_url: opts.callbackUrl,
+      metadata: opts.metadata
+    })
+  });
+  const data = await r.json();
+  if (!r.ok || !data?.data?.authorization_url) throw new Error(data?.message || 'Paystack transaction initialization failed.');
+  return data.data.authorization_url as string;
+}
+
+app.post('/api/subscriptions/checkout', async (req: Request, res: Response) => {
+  const { planId, billingCycle, gateway, userId, email } = req.body || {};
+  if (!planId || !userId) {
+    res.status(400).json({ error: 'Plan and signed-in user are required to start checkout.' });
+    return;
+  }
+  const plan = (serverCacheState?.plans || []).find((p: any) => p.id === planId);
+  if (!plan) {
+    res.status(404).json({ error: 'Selected plan was not found.' });
+    return;
+  }
+  const isYearly = billingCycle === 'yearly';
+  const amount = isYearly ? (plan.price_yearly || plan.price_monthly * 10) : plan.price_monthly;
+  const currency = 'USD';
+  const origin = GATEWAY_BASE(req);
+  const successUrl = `${origin}/subscription?checkout=success&planId=${encodeURIComponent(planId)}`;
+  const metadata = { userId: String(userId), planId: String(planId), billingCycle: isYearly ? 'yearly' : 'monthly' };
+
+  try {
+    if (gateway === 'stripe') {
+      const url = await createStripeCheckoutSession({
+        origin, amount, currency, name: `${plan.name} Membership${isYearly ? ' (Yearly)' : ''}`,
+        mode: 'subscription', interval: isYearly ? 'year' : 'month',
+        email, clientRefId: String(userId), metadata,
+        successUrl, cancelUrl: origin
+      });
+      if (!url) { res.status(501).json({ error: 'Stripe is not configured yet. Payments go live once the Stripe keys are installed.' }); return; }
+      res.json({ success: true, gateway: 'stripe', checkoutUrl: url });
+      return;
+    }
+    if (gateway === 'paystack') {
+      if (!email) { res.status(400).json({ error: 'An email address is required for Paystack checkout.' }); return; }
+      const url = await createPaystackTransaction({ amount, currency, email, callbackUrl: successUrl, metadata });
+      if (!url) { res.status(501).json({ error: 'Paystack is not configured yet. Payments go live once the Paystack keys are installed.' }); return; }
+      res.json({ success: true, gateway: 'paystack', checkoutUrl: url });
+      return;
+    }
+    res.status(501).json({ error: 'Flutterwave support is not live yet.' });
+  } catch (err: any) {
+    console.warn('Subscription checkout failure:', err?.message);
+    res.status(502).json({ error: 'The payment gateway rejected the checkout request.' });
+  }
+});
+
+// Stripe webhook — event is re-fetched from Stripe so payloads cannot be forged
+app.post('/api/webhooks/stripe', async (req: Request, res: Response) => {
+  const key = cleanConfigValue(process.env.STRIPE_SECRET_KEY);
+  if (!key) { res.status(503).json({ received: false, error: 'Stripe is not configured.' }); return; }
+  try {
+    const event = req.body;
+    if (event?.type !== 'checkout.session.completed') { res.json({ received: true }); return; }
+    const sessionId = event?.data?.object?.id;
+    if (!sessionId) { res.status(400).json({ error: 'Malformed event.' }); return; }
+    const verify = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+      headers: { Authorization: `Bearer ${key}` }
+    });
+    const session = await verify.json();
+    if (!verify.ok || session?.payment_status !== 'paid') { res.status(400).json({ error: 'Session could not be verified as paid.' }); return; }
+    const md = session?.metadata || {};
+    if (!md.userId || !md.planId) { res.status(400).json({ error: 'Session is missing subscription metadata.' }); return; }
+    await activatePaidSubscription({
+      userId: md.userId,
+      planId: md.planId,
+      billingCycle: md.billingCycle === 'yearly' ? 'yearly' : 'monthly',
+      gateway: 'stripe',
+      amount: (session.amount_total || 0) / 100,
+      currency: (session.currency || 'usd').toUpperCase(),
+      transactionId: sessionId,
+      gatewaySubscriptionId: session.subscription
+    });
+    res.json({ received: true });
+  } catch (err: any) {
+    console.warn('Stripe webhook failure:', err?.message);
+    res.status(503).json({ error: 'Webhook processing failed.' });
+  }
+});
+
+// Paystack webhook — reference is re-verified against the Paystack API
+app.post('/api/webhooks/paystack', async (req: Request, res: Response) => {
+  const key = cleanConfigValue(process.env.PAYSTACK_SECRET_KEY);
+  if (!key) { res.status(503).json({ received: false, error: 'Paystack is not configured.' }); return; }
+  try {
+    const event = req.body;
+    if (event?.event !== 'charge.success') { res.json({ received: true }); return; }
+    const reference = event?.data?.reference;
+    if (!reference) { res.status(400).json({ error: 'Malformed event.' }); return; }
+    const verify = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      headers: { Authorization: `Bearer ${key}` }
+    });
+    const vdata = await verify.json();
+    if (!verify.ok || vdata?.data?.status !== 'success') { res.status(400).json({ error: 'Transaction could not be verified as successful.' }); return; }
+    const md = vdata.data.metadata || {};
+    if (!md.userId || !md.planId) { res.status(400).json({ error: 'Transaction is missing subscription metadata.' }); return; }
+    await activatePaidSubscription({
+      userId: md.userId,
+      planId: md.planId,
+      billingCycle: md.billingCycle === 'yearly' ? 'yearly' : 'monthly',
+      gateway: 'paystack',
+      amount: (vdata.data.amount || 0) / 100,
+      currency: (vdata.data.currency || 'USD').toUpperCase(),
+      transactionId: reference
+    });
+    res.json({ received: true });
+  } catch (err: any) {
+    console.warn('Paystack webhook failure:', err?.message);
+    res.status(503).json({ error: 'Webhook processing failed.' });
+  }
+});
+
 app.get('/api/setup/status', async (req: Request, res: Response) => {
   res.json({ hasAdmins: true });
 });

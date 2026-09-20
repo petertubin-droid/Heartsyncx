@@ -1275,6 +1275,8 @@ export default function App() {
       verifyAndSetTab('articles');
     } else if (firstSegment === 'categories') {
       verifyAndSetTab('categories');
+    } else if (firstSegment === 'subscription') {
+      verifyAndSetTab('subscription');
     } else if (firstSegment === 'trending') {
       verifyAndSetTab('trending');
     } else if (firstSegment === 'faq') {
@@ -1416,6 +1418,7 @@ export default function App() {
     else if (tab === 'cookies') path = '/cookies';
     else if (tab === 'advertise') path = '/advertise';
     else if (tab === 'newsletter') path = '/newsletter';
+    else if (tab === 'subscription') path = '/subscription';
     else if (tab === 'admin') path = '/admin';
     else if (tab === 'login') path = '/login';
     else if (tab === 'access-denied') path = '/access-denied';
