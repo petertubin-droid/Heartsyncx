@@ -472,8 +472,9 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
               {authMode === 'signup' && (
                 <form onSubmit={handleRegister} className="space-y-3.5 text-xs">
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Full name</label>
+                    <label htmlFor="hs-sub-name" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Full name</label>
                     <input
+                      id="hs-sub-name"
                       type="text"
                       required
                       placeholder="Jane Doe"
@@ -483,8 +484,9 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Email address</label>
+                    <label htmlFor="hs-sub-email" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Email address</label>
                     <input
+                      id="hs-sub-email"
                       type="email"
                       required
                       placeholder="you@domain.com"
@@ -494,8 +496,9 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Password</label>
+                    <label htmlFor="hs-sub-pass" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Password</label>
                     <input
+                      id="hs-sub-pass"
                       type="password"
                       required
                       placeholder="••••••••"
@@ -530,8 +533,9 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
               {authMode === 'signin' && (
                 <form onSubmit={handleLogin} className="space-y-3.5 text-xs">
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Email address</label>
+                    <label htmlFor="hs-sub-email-2" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Email address</label>
                     <input
+                      id="hs-sub-email-2"
                       type="email"
                       required
                       placeholder="you@domain.com"
@@ -542,7 +546,7 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                   </div>
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Password</label>
+                      <label htmlFor="hs-sub-pass-2" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">Password</label>
                       <button 
                         type="button" 
                         onClick={() => setAuthMode('forgot')}
@@ -552,6 +556,7 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                       </button>
                     </div>
                     <input
+                      id="hs-sub-pass-2"
                       type="password"
                       required
                       placeholder="••••••••"
@@ -589,8 +594,9 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                     Enter your email address and we will send you a secure link to reset your password.
                   </p>
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Email address</label>
+                    <label htmlFor="hs-sub-email-3" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Email address</label>
                     <input
+                      id="hs-sub-email-3"
                       type="email"
                       required
                       placeholder="you@domain.com"
@@ -699,8 +705,9 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                 {checkoutGateway === 'stripe' ? (
                   <>
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-550 dark:text-zinc-450 mb-1">Card number</label>
+                      <label htmlFor="hs-sub-card" className="block text-[10px] font-bold text-zinc-550 dark:text-zinc-450 mb-1">Card number</label>
                       <input
+                      id="hs-sub-card"
                         type="text"
                         required
                         value={cardNo}
@@ -710,8 +717,9 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-zinc-550 dark:text-zinc-450 mb-1">Expiry date</label>
+                        <label htmlFor="hs-sub-expiry" className="block text-[10px] font-bold text-zinc-550 dark:text-zinc-450 mb-1">Expiry date</label>
                         <input
+                      id="hs-sub-expiry"
                           type="text"
                           required
                           value={expiry}
@@ -720,8 +728,9 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-zinc-550 dark:text-zinc-450 mb-1">CVC</label>
+                        <label htmlFor="hs-sub-cvc" className="block text-[10px] font-bold text-zinc-550 dark:text-zinc-450 mb-1">CVC</label>
                         <input
+                      id="hs-sub-cvc"
                           type="text"
                           required
                           value={cvc}
@@ -733,8 +742,9 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                   </>
                 ) : (
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-550 dark:text-zinc-450 mb-1">Mobile number</label>
+                    <label htmlFor="hs-sub-phone" className="block text-[10px] font-bold text-zinc-550 dark:text-zinc-450 mb-1">Mobile number</label>
                     <input
+                      id="hs-sub-phone"
                       type="text"
                       required
                       placeholder="+234 81 2345 6789"

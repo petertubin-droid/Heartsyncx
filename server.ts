@@ -696,7 +696,7 @@ const GDPR_DSR_REQUESTS_STORE: any[] = [
  *  Env-driven so staging/prod can differ; the canonical public domain is the
  *  default. Runtime canonical/OG tags already derive from the request host. */
 function getPublicSiteUrl(): string {
-  return (process.env.PUBLIC_SITE_URL || 'https://heartsync.app').replace(/\/+$/, '');
+  return (process.env.PUBLIC_SITE_URL || 'https://heartsyncxhub.vercel.app').replace(/\/+$/, '');
 }
 
 const GDPR_AUDIT_LOG_STORE: any[] = [

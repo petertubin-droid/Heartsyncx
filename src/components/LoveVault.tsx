@@ -118,6 +118,7 @@ export default function LoveVault() {
         <form onSubmit={handleAuth} className="mt-7 space-y-3 text-left">
           {authMode === 'signup' && (
             <input
+              aria-label="Your name"
               value={authName}
               onChange={(e) => setAuthName(e.target.value)}
               placeholder="Your name"
@@ -127,6 +128,7 @@ export default function LoveVault() {
           <input
             type="email"
             required
+            aria-label="Email address"
             value={authEmail}
             onChange={(e) => setAuthEmail(e.target.value)}
             placeholder="Email address"
@@ -136,6 +138,7 @@ export default function LoveVault() {
             type="password"
             required
             minLength={6}
+            aria-label="Password"
             value={authPassword}
             onChange={(e) => setAuthPassword(e.target.value)}
             placeholder="Password (min. 6 characters)"
@@ -217,12 +220,14 @@ export default function LoveVault() {
               ))}
             </div>
             <input
+              aria-label="Memory title"
               value={vTitle}
               onChange={(e) => setVTitle(e.target.value)}
               placeholder="Title (e.g. The day we first said it)"
               className="w-full mb-2 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 dark:focus:ring-rose-800"
             />
             <textarea
+              aria-label="Memory text"
               value={vContent}
               onChange={(e) => setVContent(e.target.value)}
               placeholder="Write it in your own words…"
@@ -290,6 +295,7 @@ export default function LoveVault() {
               <p className="text-sm text-rose-700 dark:text-rose-300 leading-relaxed">{jPrompt}</p>
             </div>
             <textarea
+              aria-label="Journal entry"
               value={jContent}
               onChange={(e) => setJContent(e.target.value)}
               placeholder="Write freely. Nobody reads this but you."

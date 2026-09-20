@@ -14,6 +14,7 @@ import RichTextEditor from './components/RichTextEditor';
 import AdminLogin from './components/AdminLogin';
 import AiCopilot from './components/AiCopilot';
 import LoveVault from './components/LoveVault';
+import ImageLightbox from './components/ImageLightbox';
 import { CookieBanner } from './components/CookieBanner';
 import { useCookieConsent } from './components/useCookieConsent';
 import LiveChatWidget from './components/LiveChatWidget';
@@ -3372,6 +3373,7 @@ export default function App() {
                                   <input 
                                     type="email" 
                                     required
+                                    aria-label="Email address for newsletter subscription"
                                     placeholder="name@domain.com"
                                     value={homeNewsletterEmail}
                                     onChange={(e) => setHomeNewsletterEmail(e.target.value)}
@@ -4172,10 +4174,11 @@ export default function App() {
 
                                     <form onSubmit={handleArticlePurchaseSubmit} className="space-y-3">
                                       <div className="space-y-1">
-                                        <span className="text-[9px] uppercase font-mono text-zinc-450 block">Your Receipt Email</span>
+                                        <label htmlFor="hs-pay-1" className="text-[9px] uppercase font-mono text-zinc-450 block">Your Receipt Email</label>
                                         <input
                                           type="email"
                                           required
+                                          id="hs-pay-1"
                                           value={payEmail}
                                           onChange={(e) => setPayEmail(e.target.value)}
                                           placeholder="you@domain.com"
@@ -4184,8 +4187,9 @@ export default function App() {
                                       </div>
 
                                       <div className="space-y-1">
-                                        <span className="text-[9px] uppercase font-mono text-zinc-450 block">Card Number</span>
+                                        <label htmlFor="hs-pay-2" className="text-[9px] uppercase font-mono text-zinc-450 block">Card Number</label>
                                         <input
+                                          id="hs-pay-2"
                                           type="text"
                                           value={payCardNum}
                                           onChange={(e) => setPayCardNum(e.target.value)}
@@ -4196,7 +4200,8 @@ export default function App() {
 
                                       <div className="grid grid-cols-2 gap-2">
                                         <div className="space-y-1">
-                                          <span className="text-[9px] uppercase font-mono text-zinc-450 block">Expiry</span>
+                                          <label htmlFor="hs-pay-3" className="text-[9px] uppercase font-mono text-zinc-450 block">Expiry</label>
+                                          id="hs-pay-3"
                                           <input
                                             type="text"
                                             value={payExpiry}
@@ -4206,7 +4211,8 @@ export default function App() {
                                           />
                                         </div>
                                         <div className="space-y-1">
-                                          <span className="text-[9px] uppercase font-mono text-zinc-450 block">CVV</span>
+                                          id="hs-pay-4"
+                                          <label htmlFor="hs-pay-4" className="text-[9px] uppercase font-mono text-zinc-450 block">CVV</label>
                                           <input
                                             type="password"
                                             value={payCvc}
@@ -4313,6 +4319,7 @@ export default function App() {
                                 required
                                 value={newsletterEmail}
                                 onChange={(e) => setNewsletterEmail(e.target.value)}
+                                aria-label="Email address for newsletter subscription"
                                 placeholder="name@domain.com"
                                 className="flex-1 p-2.5 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 text-xs font-sans outline-none text-zinc-800 dark:text-zinc-200 focus:border-rose-300 focus:ring-1 focus:ring-rose-300"
                               />
@@ -4564,6 +4571,7 @@ export default function App() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 animate-fade-in">
                               <input 
                                 type="text" 
+                                aria-label="Display name (optional)"
                                 placeholder="My Display Name (Optional)" 
                                 value={commentAuthorName}
                                 onChange={(e) => setCommentAuthorName(e.target.value)}
@@ -4571,6 +4579,7 @@ export default function App() {
                               />
                               <input 
                                 type="email" 
+                                aria-label="Email address (kept private, never published)"
                                 placeholder="My Email (Secure, unpublished)" 
                                 value={commentAuthorEmail}
                                 onChange={(e) => setCommentAuthorEmail(e.target.value)}
@@ -4579,6 +4588,7 @@ export default function App() {
                             </div>
                             <textarea 
                               rows={3}
+                              aria-label="Your reflection statement"
                               placeholder="Share your personal reflection, diagnostic perspective, or warm question respectfully..."
                               value={commentInput}
                               onChange={(e) => setCommentInput(e.target.value)}
@@ -5016,7 +5026,8 @@ export default function App() {
 
                               <form onSubmit={handleCatPurchaseSubmit} className="space-y-3">
                                 <div className="space-y-1">
-                                  <span className="text-[9px] uppercase font-mono text-zinc-450 block">Your Receipt Email</span>
+                                  id="hs-pay-5"
+                                  <label htmlFor="hs-pay-5" className="text-[9px] uppercase font-mono text-zinc-450 block">Your Receipt Email</label>
                                   <input
                                     type="email"
                                     required
@@ -5027,29 +5038,32 @@ export default function App() {
                                   />
                                 </div>
 
+                                id="hs-pay-6"
                                 <div className="grid grid-cols-2 gap-2">
                                   <div className="col-span-2 space-y-1">
-                                    <span className="text-[9px] uppercase font-mono text-zinc-450 block">Card Number</span>
+                                    <label htmlFor="hs-pay-6" className="text-[9px] uppercase font-mono text-zinc-450 block">Card Number</label>
                                     <input
                                       type="text"
                                       value={payCardNum}
                                       onChange={(e) => setPayCardNum(e.target.value)}
                                       placeholder="4242 4242 4242 4242"
                                       className="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-[1px] focus:outline-rose-500"
+                                    id="hs-pay-7"
                                     />
                                   </div>
                                   <div className="space-y-1">
-                                    <span className="text-[9px] uppercase font-mono text-zinc-450 block">Expiry</span>
+                                    <label htmlFor="hs-pay-7" className="text-[9px] uppercase font-mono text-zinc-450 block">Expiry</label>
                                     <input
                                       type="text"
                                       value={payExpiry}
                                       onChange={(e) => setPayExpiry(e.target.value)}
                                       placeholder="MM/YY"
+                                      id="hs-pay-8"
                                       className="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-[1px] focus:outline-rose-500 text-center"
                                     />
                                   </div>
                                   <div className="space-y-1">
-                                    <span className="text-[9px] uppercase font-mono text-zinc-450 block">CVV</span>
+                                    <label htmlFor="hs-pay-8" className="text-[9px] uppercase font-mono text-zinc-450 block">CVV</label>
                                     <input
                                       type="password"
                                       value={payCvc}
@@ -5406,16 +5420,16 @@ export default function App() {
                     className="space-y-3.5 text-xs"
                   >
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-zinc-400">Vulnerable Name</label>
-                      <input type="text" required className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none" />
+                      <label htmlFor="hs-req-name" className="text-[10px] uppercase font-bold text-zinc-400">Vulnerable Name</label>
+                      <input id="hs-req-name" type="text" required className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-zinc-400">Secure Email Address</label>
-                      <input type="email" required className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none" />
+                      <label htmlFor="hs-req-email" className="text-[10px] uppercase font-bold text-zinc-400">Secure Email Address</label>
+                      <input id="hs-req-email" type="email" required className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-800 dark:text-zinc-100 outline-none" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-zinc-400">Statement Query</label>
-                      <textarea rows={4} required className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl resize-none text-zinc-800 dark:text-zinc-100 outline-none" placeholder="Is there a specific relationship topic, dating tip, or wellness essay idea you'd like to share with us?" />
+                      <label htmlFor="hs-req-query" className="text-[10px] uppercase font-bold text-zinc-400">Statement Query</label>
+                      <textarea id="hs-req-query" rows={4} required className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl resize-none text-zinc-800 dark:text-zinc-100 outline-none" placeholder="Is there a specific relationship topic, dating tip, or wellness essay idea you'd like to share with us?" />
                     </div>
                     <button 
                       type="submit"
@@ -5899,6 +5913,9 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Accessible article image lightbox (Esc closes, focus trapped) */}
+      <ImageLightbox image={lightboxImage} onClose={() => setLightboxImage(null)} />
 
     </div>
   );

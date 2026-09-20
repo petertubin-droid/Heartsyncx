@@ -164,13 +164,31 @@ Post-migration verification (all checked live):
       sitemap-images, and RSS all already derive from the request host at
       runtime (no hardcoded heartsyncxhub.vercel.app in served responses).
       Outbound-email links (footer CTA + unsubscribe) now flow through
-      getPublicSiteUrl() — env-driven (PUBLIC_SITE_URL), defaulting to
-      heartsync.app. The build-time sitemap fallback reads SITE_URL.
-      OWNER DECISION still open: the true canonical public domain
-      (heartsync.app vs heartsync.com vs the vercel URL) and the email
-      from-address (editorial@heartsync.com) should be settled and set as
-      PUBLIC_SITE_URL/SITE_URL in the Vercel env.
-- [ ] Accessibility pass: focus traps in modals/lightbox, form label audit, contrast.
+      getPublicSiteUrl() — env-driven (PUBLIC_SITE_URL). OWNER DECISION
+      SETTLED (2026-09-20): the canonical public domain is
+      https://heartsyncxhub.vercel.app (owner-confirmed) — the
+      getPublicSiteUrl() default now matches, as does the sitemap fallback.
+      Recommended (not required): still set PUBLIC_SITE_URL/SITE_URL in the
+      Vercel env so preview deploys stay consistent. Email from-address
+      (editorial@heartsync.com) still open.
+- [x] DONE (2026-09-20): accessibility pass. New src/utils/a11y.ts implements the
+      WAI-ARIA dialog pattern (Escape closes, Tab/Shift+Tab trapped, focus lands
+      inside on open, focus restored to the invoker on close) via a shared
+      useDialogA11y hook. Applied to: the article image lightbox (NEW
+      ImageLightbox.tsx — the lightboxImage state existed since the original
+      build but nothing ever rendered it, so clicking article images did
+      nothing despite the zoom cursor) and the CookieBanner preferences modal
+      (previously aria-modal without Escape/trap; MobileMenu already had its
+      own). Form label audit: all 28 reader-facing inputs now have accessible
+      names — purchase forms got real <label htmlFor> associations (span
+      pseudo-labels), comment/newsletter/LiveChat/LoveVault inputs got
+      aria-labels, SubscriptionPage got id+htmlFor pairs for its 10 inputs.
+      Contrast: 15 previously-UNDEFINED theme color steps (zinc-450 used 53x,
+      zinc-550 18x, zinc-750 23x, zinc-905 4x, plus 11 single-use typos) were
+      silently resolving to inherited colors — all defined now; zinc-450 maps
+      to zinc-500 (not 400) because zinc-400 on white is ~2.9:1 and fails WCAG
+      AA for the small caption text using it. 5 new tests (lightbox dialog
+      contract + cookie-modal Escape). Suite 192/192, tsc clean.
 - [x] DONE (2026-09-20): SW cache versions are stamped automatically at build
       time. public/sw.js carries a __SW_VERSION__ placeholder; new
       scripts/stamp-sw-version.mjs (wired into the npm build chain before the

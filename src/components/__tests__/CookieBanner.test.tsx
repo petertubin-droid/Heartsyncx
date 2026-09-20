@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import { ConsentProvider } from '../ConsentProvider';
 import { CookieBanner } from '../CookieBanner';
 import { heartsync } from '../../store';
@@ -59,6 +59,14 @@ describe('CookieBanner (GDPR consent UI)', () => {
     heartsync.setLocalStorage('heartsync_cookie_preferences', { necessary: true, analytics: false, marketing: false, functional: false });
     renderBanner();
     expect(document.querySelector(BANNER)).toBeNull();
+  });
+
+  it('closes the preferences modal with Escape (WAI-ARIA dialog behavior)', async () => {
+    renderBanner();
+    act(() => { screen.getByRole('button', { name: /customize cookie options/i }).click(); });
+    await waitFor(() => expect(screen.getAllByRole('dialog').length).toBeGreaterThan(1));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('heading', { name: /cookie preferences/i })).toBeNull());
   });
 
   it('opens the preferences modal and saves a custom analytics-only split', async () => {

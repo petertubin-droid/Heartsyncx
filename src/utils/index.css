@@ -22,6 +22,25 @@
   --color-zinc-355: var(--color-zinc-400);
   --color-zinc-405: var(--color-zinc-400);
   --color-zinc-455: var(--color-zinc-400);
+  /* Previously-undefined alias steps: classes like text-zinc-450 were
+     silently resolving to the INHERITED color because the theme step
+     didn't exist. Defined to their nearest real step, except 450 which
+     maps to zinc-500 (not 400): zinc-400 on white is ~2.9:1 and fails
+     WCAG AA for the small form-caption text that uses this alias. */
+  --color-zinc-105: var(--color-zinc-100);
+  --color-zinc-110: var(--color-zinc-100);
+  --color-zinc-202: var(--color-zinc-200);
+  --color-zinc-305: var(--color-zinc-300);
+  --color-zinc-395: var(--color-zinc-400);
+  --color-zinc-445: var(--color-zinc-400);
+  --color-zinc-450: var(--color-zinc-500);
+  --color-zinc-505: var(--color-zinc-500);
+  --color-zinc-550: var(--color-zinc-500);
+  --color-zinc-750: var(--color-zinc-700);
+  --color-zinc-755: var(--color-zinc-700);
+  --color-zinc-808: var(--color-zinc-800);
+  --color-zinc-880: var(--color-zinc-800);
+  --color-zinc-905: var(--color-zinc-900);
   --color-zinc-600: #52525b;
   --color-zinc-605: var(--color-zinc-600);
   --color-zinc-650: var(--color-zinc-600);

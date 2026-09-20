@@ -364,6 +364,7 @@ export default function LiveChatWidget() {
                   <form onSubmit={handleOfflineSubmit} className="space-y-2">
                     <input 
                       type="text" 
+                      aria-label="Your name"
                       placeholder="Your Name" 
                       required
                       value={offlineName}
@@ -372,6 +373,7 @@ export default function LiveChatWidget() {
                     />
                     <input 
                       type="email" 
+                      aria-label="Your email address"
                       placeholder="Your Email" 
                       required
                       value={offlineEmail}
@@ -379,6 +381,7 @@ export default function LiveChatWidget() {
                       className="w-full text-xs px-3 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 text-zinc-800 dark:text-white"
                     />
                     <textarea 
+                      aria-label="Your message"
                       placeholder="Describe what we can help with..." 
                       required
                       rows={3}
@@ -433,6 +436,7 @@ export default function LiveChatWidget() {
                 <Paperclip size={18} />
               </button>
               <input 
+                aria-label="Attach an image"
                 type="file" 
                 ref={fileInputRef} 
                 onChange={handleFileChange}
@@ -452,6 +456,7 @@ export default function LiveChatWidget() {
               <div className="flex-1 relative flex items-center">
                 <input 
                   type="text" 
+                  aria-label="Type your message"
                   value={inputText}
                   maxLength={500}
                   onChange={e => setInputText(e.target.value)}

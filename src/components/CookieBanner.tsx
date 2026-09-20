@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCookieConsent } from './useCookieConsent';
+import { useDialogA11y } from '../utils/a11y';
 import { Settings, SlidersHorizontal, Cookie, Lock, Check, X } from 'lucide-react';
 
 interface CookieBannerProps {
@@ -18,6 +19,8 @@ export const CookieBanner: React.FC<CookieBannerProps> = ({ onLearnMore }) => {
   } = useCookieConsent();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // WAI-ARIA dialog behavior: Escape closes, Tab trapped, focus restored.
+  const dialogRef = useDialogA11y(isModalOpen, () => setIsModalOpen(false));
 
   // Modal local toggle states
   const [analyticsEnabled, setAnalyticsEnabled] = useState(preferences.analytics);
@@ -195,6 +198,7 @@ export const CookieBanner: React.FC<CookieBannerProps> = ({ onLearnMore }) => {
 
             {/* Modal Body */}
             <motion.div
+              ref={dialogRef}
               role="dialog"
               aria-modal="true"
               aria-labelledby="heartsync-modal-title"
