@@ -10,7 +10,7 @@
   ],
   "functions": {
     "api/index.ts": {
-      "includeFiles": ["dist/index.html", "api/index.html"],
+      "includeFiles": "{dist/index.html,api/index.html}",
       "memory": 1024,
       "maxDuration": 30
     }
