@@ -11,6 +11,7 @@ import jwt from 'jsonwebtoken';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { getArticleSeoData } from './src/utils/seoArticleData';
 import { HEARTSYNC_ARTICLE_SEO } from './src/utils/data/articles';
+import { cleanConfigValue, isValidSupabaseConfig } from './src/lib/supabaseConfig';
 import { Resend } from 'resend';
 
 // Load environmental parameters (both .env and .env.local)
@@ -2243,51 +2244,6 @@ const DEFAULT_ELEVENLABS_VOICES = [
 ];
 
 // Lazy-loaded Supabase client on the server side
-function cleanConfigValue(val: string | null | undefined): string {
-  if (!val) return '';
-  let cleaned = val.trim();
-  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-    cleaned = cleaned.substring(1, cleaned.length - 1).trim();
-  }
-  if (cleaned.startsWith("'") && cleaned.endsWith("'")) {
-    cleaned = cleaned.substring(1, cleaned.length - 1).trim();
-  }
-  if (cleaned.includes('.')) {
-    const parts = cleaned.split('.');
-    if (parts.length > 3) {
-      cleaned = parts.slice(0, 3).join('.');
-    }
-  }
-  return cleaned;
-}
-
-function isValidSupabaseConfig(url: string | null | undefined, key: string | null | undefined): boolean {
-  const u = cleanConfigValue(url).toLowerCase();
-  const k = cleanConfigValue(key);
-  if (u === '' || k === '') return false;
-  if (
-    u.includes('your-project') || 
-    u.includes('your_supabase_url') || 
-    u.includes('your-supabase-url') || 
-    u.includes('your_project') || 
-    u.includes('placeholder') ||
-    u.includes('example.com') ||
-    u.includes('jvjzrfcbwkwgtjuwhuyj')
-  ) {
-    return false;
-  }
-  if (
-    k.includes('your_anon_key') || 
-    k.includes('your-supabase-anon-key') || 
-    k.includes('your_anon') ||
-    k.includes('placeholder')
-  ) {
-    return false;
-  }
-  if (!u.startsWith('http://') && !u.startsWith('https://')) return false;
-  return true;
-}
-
 
 
 

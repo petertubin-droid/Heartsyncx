@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { cleanConfigValue, isValidSupabaseConfig } from './lib/supabaseConfig';
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -266,8 +267,11 @@ const DEFAULT_SETTINGS: SiteSettings = {
   tts_style: 0.0,
   tts_last_voice_sync: '',
   gemini_api_key: '',
-  supabase_url: 'https://pdtibsfasvicjptqirro.supabase.co',
-  supabase_key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkdGlic2Zhc3ZpY2pwdHFpcnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NzgzNjEsImV4cCI6MjEwMDE1NDM2MX0.LN56TGL-Po780S91EO4cKSWKOKl-QlVOJiG_b_LHawo',
+  // Runtime config only — no hardcoded fallbacks. Values arrive from the
+  // VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY build env or from the server's
+  // /api/state site_settings payload.
+  supabase_url: '',
+  supabase_key: '',
   recaptcha_site_key: '',
   extra_api_keys: [],
 
@@ -473,52 +477,12 @@ const DEFAULT_AUTHORS: Author[] = [];
 
 const DEFAULT_PAGES: Page[] = [];
 
-const cleanConfigValue = (val: string | null | undefined): string => {
-  if (!val) return '';
-  let cleaned = val.trim();
-  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-    cleaned = cleaned.substring(1, cleaned.length - 1).trim();
-  }
-  if (cleaned.startsWith("'") && cleaned.endsWith("'")) {
-    cleaned = cleaned.substring(1, cleaned.length - 1).trim();
-  }
-  if (cleaned.includes('.')) {
-    const parts = cleaned.split('.');
-    if (parts.length > 3) {
-      cleaned = parts.slice(0, 3).join('.');
-    }
-  }
-  return cleaned;
-};
-
 const isSupabaseConfiguredGlobally = (): boolean => {
   try {
     const envUrl = cleanConfigValue(import.meta.env.VITE_SUPABASE_URL || '');
     const envKey = cleanConfigValue(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
-    
-    const isValid = (u: string, k: string) => {
-      const urlLower = cleanConfigValue(u).toLowerCase();
-      const keyClean = cleanConfigValue(k);
-      if (urlLower === '' || keyClean === '') return false;
-      if (
-        urlLower.includes('your-project') || 
-        urlLower.includes('your_supabase_url') || 
-        urlLower.includes('your-supabase-url') || 
-        urlLower.includes('your_project') || 
-        urlLower.includes('placeholder') ||
-        urlLower.includes('example.com') ||
-        urlLower.includes('jvjzrfcbwkwgtjuwhuyj')
-      ) return false;
-      if (
-        keyClean.includes('your_anon_key') || 
-        keyClean.includes('your-supabase-anon-key') || 
-        keyClean.includes('your_anon') ||
-        keyClean.includes('placeholder')
-      ) return false;
-      return urlLower.startsWith('http://') || urlLower.startsWith('https://');
-    };
 
-    if (isValid(envUrl, envKey)) {
+    if (isValidSupabaseConfig(envUrl, envKey)) {
       return true;
     }
 
@@ -529,7 +493,7 @@ const isSupabaseConfiguredGlobally = (): boolean => {
     }
     const url = cleanConfigValue(storedSettings?.supabase_url || '');
     const key = cleanConfigValue(storedSettings?.supabase_key || '');
-    return isValid(url, key);
+    return isValidSupabaseConfig(url, key);
   } catch {
     return false;
   }
@@ -957,30 +921,7 @@ export class HeartsyncStore {
   }
 
   private isValidSupabaseConfig(url: string | null | undefined, key: string | null | undefined): boolean {
-    const u = cleanConfigValue(url).toLowerCase();
-    const k = cleanConfigValue(key);
-    if (u === '' || k === '') return false;
-    if (
-      u.includes('your-project') || 
-      u.includes('your_supabase_url') || 
-      u.includes('your-supabase-url') || 
-      u.includes('your_project') || 
-      u.includes('placeholder') ||
-      u.includes('example.com') ||
-      u.includes('jvjzrfcbwkwgtjuwhuyj')
-    ) {
-      return false;
-    }
-    if (
-      k.includes('your_anon_key') || 
-      k.includes('your-supabase-anon-key') || 
-      k.includes('your_anon') ||
-      k.includes('placeholder')
-    ) {
-      return false;
-    }
-    if (!u.startsWith('http://') && !u.startsWith('https://')) return false;
-    return true;
+    return isValidSupabaseConfig(url, key);
   }
 
   public initSupabaseConnection() {
@@ -1727,17 +1668,6 @@ export class HeartsyncStore {
     this.quizzes = [];
     this.site_settings = DEFAULT_SETTINGS;
     
-    // Auto-migrate outdated Supabase URL / key cached in client-side LocalStorage
-    const currentUrl = (this.site_settings.supabase_url || '').trim();
-    const currentKey = (this.site_settings.supabase_key || '').trim();
-    const targetUrl = 'https://pdtibsfasvicjptqirro.supabase.co';
-    const targetKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkdGlic2Zhc3ZpYpwdHFpcnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NzgzNjEsImV4cCI6MjEwMDE1NDM2MX0.LN56TGL-Po780S91EO4cKSWKOKl-QlVOJiG_b_LHawo';
-    
-    if (currentUrl !== targetUrl || currentKey !== targetKey) {
-      this.site_settings.supabase_url = targetUrl;
-      this.site_settings.supabase_key = targetKey;
-      console.log('🔄 LocalStorage cached Supabase credentials auto-migrated to the new active server endpoint.');
-    }
 
     this.pn_settings = {};
     if (this.site_settings.homepage_categories_columns_mobile === undefined) {
