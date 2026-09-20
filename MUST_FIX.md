@@ -122,8 +122,11 @@ Post-migration verification (all checked live):
 
 ## PHASE 5 — Performance
 
-- [ ] `GET /api/state` loads ~22 tables incl. full article bodies; add field
-      projection / pagination.
+- [ ] GET /api/state: full article bodies are GONE from the boot payload
+      (posts now projected to list columns; body fetched per-article via the
+      new public GET /api/posts/:slug + store.ensureArticleContent, tested).
+      REMAINING scope: consider projecting pages/comments columns and adding
+      pagination to the remaining ~21 tables.
 - [ ] Split the 16k-line AdminConsole out of the reader bundle (lazy import).
 - [x] DONE (2026-09-20): double boot fetch eliminated. /api/state (fresh from
       Supabase with a 5s TTL) is the single boot fetch — initSupabaseConnection
@@ -131,7 +134,12 @@ Post-migration verification (all checked live):
       syncWithSupabase stays for explicit re-syncs (admin login refresh).
       Bonus: realtime postgres-change events (which arrive in bursts) now
       debounced to one trailing /api/state refresh instead of one per event.
-- [ ] `posts.select('*')` in list views — project only list columns.
+- [x] DONE (2026-09-20): posts projected to list columns everywhere — the
+      server boot state (POST_LIST_COLUMNS), the client store's direct sync,
+      and all existing list consumers (sitemap/RSS) were already projected.
+      Per-article bodies load lazily via GET /api/posts/:slug (public,
+      published-only) + store.ensureArticleContent; reader open and the admin
+      quiz-generator flow both enrich on demand. 3 new route tests.
 
 ## PHASE 6 — SEO / PWA / a11y
 

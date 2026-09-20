@@ -1259,6 +1259,12 @@ export default function App() {
       if (match) {
         setActiveArticle(match);
         heartsync.recordView(match.id);
+        // Full body ships per-article (not in the boot payload) — enrich lazily.
+        if (!match.content) {
+          heartsync.ensureArticleContent(match).then(enriched => {
+            if (enriched) setActiveArticle(enriched);
+          });
+        }
       } else {
         window.history.replaceState(null, '', '/404');
         setCurrentTab('error');

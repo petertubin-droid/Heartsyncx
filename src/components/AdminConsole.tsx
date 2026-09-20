@@ -4944,13 +4944,14 @@ export default function AdminConsole({
                               try {
                                 const selectedPost = posts.find(p => p.id === autoGenArticleId);
                                 if (!selectedPost) throw new Error('No article selected');
+                                await heartsync.ensureArticleContent(selectedPost);
 
                                 const response = await adminFetch('/api/gemini/generate-quiz', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({
                                     title: selectedPost.title,
-                                    content: selectedPost.content
+                                    content: heartsync.posts.find(p => p.id === autoGenArticleId)?.content
                                   })
                                 });
 

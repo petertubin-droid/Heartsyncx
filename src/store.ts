@@ -1246,12 +1246,16 @@ export class HeartsyncStore {
 
       // 2. Fetch Posts
       try {
-        const { data: postData, error: postError } = await this.supabase.from('posts').select('*').order('publish_date', { ascending: false });
+        // List columns only (same projection as the server boot state) — article
+      // bodies are fetched per-article via ensureArticleContent().
+      const { data: postData, error: postError } = await this.supabase.from('posts')
+        .select('id,title,slug,excerpt,status,publish_date,featured_image,read_time,category_id,author_id,tags,likes,reactions,views,seo_title,seo_description,seo_keywords,is_premium,created_at,updated_at,is_featured,reading_time')
+        .order('publish_date', { ascending: false });
         if (postError) {
           console.warn('Supabase fetch posts warning:', postError);
           this.logAction('Supabase Fetch Warning', `Table posts: ${postError.message} (${postError.code})`);
         } else if (postData) {
-          const mappedPosts = postData.map(p => ({
+          const mappedPosts = (postData as any[]).map((p: any) => ({
             id: p.id,
             title: p.title,
             slug: p.slug,
@@ -2528,6 +2532,27 @@ export class HeartsyncStore {
     this.logAction('Created Article', expandedPost.title);
     await this.saveState(true);
     return expandedPost;
+  }
+
+  /** Ensure a post has its full article body. Posts from the projected boot
+   *  state carry list columns only; content is fetched once per article from
+   *  GET /api/posts/:slug and cached on the in-memory object. Returns the
+   *  enriched post, or null on fetch failure (honest absence). */
+  public async ensureArticleContent(post: { id: string; slug: string; content?: string }): Promise<any | null> {
+    if (post.content && String(post.content).trim().length > 0) return post;
+    try {
+      const res = await fetch('/api/posts/' + encodeURIComponent(post.slug));
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data || !data.content) return null;
+      const idx = this.posts.findIndex(p => p.id === post.id || p.slug === post.slug);
+      if (idx !== -1) this.posts[idx] = { ...this.posts[idx], ...data };
+      this.saveState();
+      this.triggerUpdate();
+      return this.posts[idx] || { ...post, ...data };
+    } catch {
+      return null;
+    }
   }
 
   public async updatePost(id: string, updates: Partial<Post>) {

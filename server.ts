@@ -3044,6 +3044,12 @@ async function getFirestoreDbSafe() {
 }
 
 // Helper to load authoritative state from Supabase dynamically on startup (Primary Storage)
+const POST_LIST_COLUMNS = [
+  'id','title','slug','excerpt','status','publish_date','featured_image','read_time',
+  'category_id','author_id','tags','likes','reactions','views','seo_title','seo_description',
+  'seo_keywords','is_premium','created_at','updated_at','is_featured','reading_time'
+];
+
 async function loadStateFromSupabase(): Promise<any> {
   const supabase = getSupabaseClient();
   if (!supabase) {
@@ -3080,7 +3086,9 @@ async function loadStateFromSupabase(): Promise<any> {
       adProvidersRes,
       sponsorshipCampaignsRes
     ] = await Promise.all([
-      queryWithTimeout(supabase.from('posts').select('*').order('publish_date', { ascending: false })),
+      // List columns only: content (full article bodies) is fetched per-article
+      // via GET /api/posts/:slug — it no longer ships in the boot payload.
+      queryWithTimeout(supabase.from('posts').select(POST_LIST_COLUMNS.join(',')).order('publish_date', { ascending: false })),
       queryWithTimeout(supabase.from('categories').select('*')),
       queryWithTimeout(supabase.from('comments').select('*')),
       queryWithTimeout(supabase.from('profiles').select('id,full_name,avatar_url,bio,website,role,created_at,updated_at')),
@@ -5011,6 +5019,27 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
 
   res.json({ success: true, profile: profileObj });
   return;
+});
+
+// Public: full single article by slug (content included) — the per-article
+// counterpart of the projected boot state. Only published, non-draft rows.
+app.get('/api/posts/:slug', async (req: Request, res: Response) => {
+  try {
+    const slug = String(req.params.slug || '');
+    if (!slug || slug.length > 300) { res.status(400).json({ error: 'Valid slug required.' }); return; }
+    const client = getSupabaseClient();
+    if (!client) { res.status(503).json({ error: 'Database is not configured.' }); return; }
+    const { data, error } = await client.from('posts').select('*').eq('slug', slug).eq('status', 'published').maybeSingle();
+    if (error) { res.status(500).json({ error: 'Failed to fetch article.' }); return; }
+    if (!data) { res.status(404).json({ error: 'Article not found.' }); return; }
+    res.json({
+      ...data,
+      in_article_inserts: data.in_article_inserts ? (typeof data.in_article_inserts === 'string' ? JSON.parse(data.in_article_inserts) : data.in_article_inserts) : data.in_article_inserts,
+      author_id: fromDbUUID(data.author_id)
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch article: ' + err.message });
+  }
 });
 
 app.get('/api/state', async (req: Request, res: Response) => {

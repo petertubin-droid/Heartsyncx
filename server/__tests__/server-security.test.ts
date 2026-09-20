@@ -440,3 +440,34 @@ describe('schema contract', () => {
     expect(schemaSrc).toMatch(/FOREACH key_col IN ARRAY ARRAY\['gemini_api_key','elevenlabs_api_key','supabase_key','recaptcha_secret_key','extra_api_keys'\]/);
   });
 });
+
+// ===========================================================================
+// Public per-article endpoint (projected boot state counterpart)
+// ===========================================================================
+describe('GET /api/posts/:slug (public article body)', () => {
+  it('serves the full published article to anonymous callers', async () => {
+    supabase.state.tables['posts'] = [{
+      id: 'post-1', slug: 'attachment-styles', status: 'published',
+      title: 'Attachment Styles', content: '## Full article body',
+      author_id: '11111111-1111-1111-1111-111111111111'
+    }];
+    const res = await req('GET', '/api/posts/attachment-styles');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.content).toBe('## Full article body');
+    expect(body.slug).toBe('attachment-styles');
+  });
+
+  it('returns 404 when no published article matches', async () => {
+    supabase.state.tables['posts'] = [];
+    const res = await req('GET', '/api/posts/nope');
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects malformed slugs without touching the database', async () => {
+    supabase.state.calls = [];
+    const res = await req('GET', '/api/posts/');
+    expect([400, 404]).toContain(res.status);
+    expect(supabase.state.calls.length).toBe(0);
+  });
+});
