@@ -22,6 +22,30 @@ if (typeof window !== 'undefined') {
   registerServiceWorker();
 }
 
+// Attach the active Supabase session token to same-origin API requests so
+// admin-gated server endpoints can verify real authenticated sessions.
+if (typeof window !== 'undefined') {
+  const nativeFetch = window.fetch.bind(window);
+  (window as any).fetch = async (input: any, init?: any) => {
+    try {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.startsWith('/api/')) {
+        const { heartsync } = await import('./store.ts');
+        const { data: sessionData } = (await heartsync.supabase?.auth?.getSession?.()) ?? { data: null };
+        const accessToken = (sessionData as any)?.session?.access_token;
+        if (accessToken) {
+          const headers = new Headers(init?.headers || {});
+          headers.set('Authorization', `Bearer ${accessToken}`);
+          init = { ...init, headers };
+        }
+      }
+    } catch (_) {
+      // Fall through to native fetch when no session can be resolved
+    }
+    return nativeFetch(input, init);
+  };
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ConsentProvider>

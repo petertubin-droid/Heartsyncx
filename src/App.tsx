@@ -1230,21 +1230,19 @@ export default function App() {
       return;
     }
 
-    // Unrestricted Admin access - auto-populate default admin user if absent
-    if (tab === 'admin' || tab === 'login' || tab === 'access-denied') {
+    // Admin access requires a signed-in admin account — no auto-provisioned sessions
+    if (tab === 'admin' || tab === 'access-denied') {
       if (!heartsync.current_user || heartsync.current_user.role !== 'admin') {
-        heartsync.current_user = {
-          id: 'admin-default',
-          email: 'admin@heartsync.app',
-          role: 'admin',
-          name: 'Administrator',
-          avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
-          bio: 'System Administrator',
-          created_at: new Date().toISOString()
-        };
-        heartsync.saveState();
+        setCurrentTab('login');
+        setTabArg('');
+        return;
       }
       setCurrentTab('admin');
+      setTabArg(arg);
+      return;
+    }
+    if (tab === 'login') {
+      setCurrentTab('login');
       setTabArg(arg);
       return;
     }
@@ -5647,8 +5645,13 @@ export default function App() {
               <SubscriptionPage onNavigate={navigateTo} />
             )}
 
-            {/* 18. ADMIN CONSOLE PANES */}
-            {(currentTab === 'admin' || currentTab === 'login' || currentTab === 'access-denied') && (
+            {/* 18. ADMIN AUTHENTICATION — real sign-in gate */}
+            {currentTab === 'login' && (
+              <AdminLogin onNavigate={navigateTo} onSuccess={() => navigateTo('admin')} />
+            )}
+
+            {/* 18b. ADMIN CONSOLE PANES (admins only — gated in verifyAndSetTab) */}
+            {(currentTab === 'admin' || currentTab === 'access-denied') && (
               <AdminConsole 
                 onNavigate={navigateTo} 
                 theme={adminTheme} 

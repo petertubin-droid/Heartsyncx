@@ -3156,9 +3156,52 @@ app.post('/api/admin/tts/save', adminAuthMiddleware, async (req: Request, res: R
 
 // Secure clinical directory verification middleware using live Supabase token validation
 // Unrestricted admin middleware - allows administrative API execution
+const ADMIN_ROLES = ['admin', 'superadmin', 'Super Admin', 'Administrator', 'Editor'];
+
 async function adminAuthMiddleware(req: Request, res: Response, next: any) {
-  (req as any).user = { id: 'admin-session', email: 'admin@heartsync.app', role: 'admin', name: 'Administrator' };
-  return next();
+  const authHeader = (req.headers['authorization'] || '') as string;
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!token) {
+    res.status(401).json({ error: 'Admin authentication required. Please sign in to the admin console.' });
+    return;
+  }
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    res.status(503).json({ error: 'Authentication backend is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.' });
+    return;
+  }
+  try {
+    const { data: authData, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !authData?.user) {
+      res.status(401).json({ error: 'Invalid or expired admin session. Please sign in again.' });
+      return;
+    }
+    const envUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
+    const envKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
+    const userClient = createClient(envUrl, envKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+    const { data: profile, error: profileErr } = await userClient
+      .from('profiles')
+      .select('role, is_suspended')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+    const role = profile?.role || '';
+    if (profileErr || !profile || !ADMIN_ROLES.includes(role) || profile.is_suspended) {
+      res.status(403).json({ error: 'Administrator privileges required for this operation.' });
+      return;
+    }
+    (req as any).user = {
+      id: authData.user.id,
+      email: authData.user.email,
+      role,
+      name: authData.user.user_metadata?.full_name || 'Administrator'
+    };
+    return next();
+  } catch (err) {
+    console.warn('adminAuthMiddleware verification failure:', err);
+    res.status(401).json({ error: 'Admin session verification failed.' });
+  }
 }
 
 let serverCacheState: any = null;
