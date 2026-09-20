@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { promises as dnsPromises } from 'dns';
-import { createServer as createViteServer } from 'vite';
+
 import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
@@ -7334,7 +7334,9 @@ async function registerProductionRoutes() {
   // 2. Set up development / production routing (non-blocking)
   const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(path.join(process.cwd(), 'dist'));
   if (!isProduction) {
-    // Inject Vite middleware inside Dev sandboxes
+    // Inject Vite middleware inside Dev sandboxes. Lazy import: keeps Vite
+    // out of the serverless bundle (only the dev sandbox ever loads it).
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
