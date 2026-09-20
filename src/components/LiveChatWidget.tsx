@@ -4,7 +4,7 @@ import { MessageCircle, X, Send, Smile, Paperclip, Check, CheckCheck, Loader2, H
 import { heartsync } from '../store';
 import { ChatMessage, ChatAttachment } from '../types';
 
-const EMOJIS = ['👋', '❤️', '😊', '✨', '🙏', '🙌', '💡', '🌱', '💬', '🔥', '🌸', '☀️'];
+const EMOJIS = ['👋', '❤️', '😊', '🙏', '🙌', '💡', '🌱', '💬', '🔥', '🌸', '☀️'];
 
 export default function LiveChatWidget() {
   const [storeState, setStoreState] = useState({
@@ -398,7 +398,7 @@ export default function LiveChatWidget() {
 
               {offlineFormSubmitted && (
                 <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 text-[11px] leading-relaxed">
-                  ✨ Thank you! Your request was stored as a pending ticket. We'll reply shortly to your provided email address.
+                  Thank you! Your request was stored as a pending ticket. We'll reply shortly to your provided email address.
                 </div>
               )}
 

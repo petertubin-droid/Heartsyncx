@@ -4787,7 +4787,7 @@ export default function AdminConsole({
                                   "👋 Hello! How can I assist you with your relationship journey today?",
                                   "💖 Thank you for reaching out to Heartsync support.",
                                   "📚 Have you explored our core guide articles?",
-                                  "✨ Let me connect you with one of our expert relationship coaches."
+                                  "Let me connect you with one of our expert relationship coaches."
                                 ].map((canned, idx) => (
                                   <button
                                     key={idx}
@@ -15803,7 +15803,7 @@ export default function AdminConsole({
                                   }}
                                   className="p-2 bg-zinc-900 border border-zinc-700 text-amber-400 rounded-xl font-bold text-[10px] hover:scale-102 transition-transform cursor-pointer"
                                 >
-                                  ✨ Luxury Noir
+                                  Luxury Noir
                                 </button>
                               </div>
                             </div>

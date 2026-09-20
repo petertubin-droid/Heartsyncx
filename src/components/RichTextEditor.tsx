@@ -589,7 +589,7 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
                   <button onClick={() => insertFormat('<table-of-contents />\n')} className="w-full text-left p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-955/20 text-xs text-zinc-700 dark:text-zinc-300 block font-bold">📖 Table of Contents (TOC)</button>
                   <button onClick={() => setInsertType('related')} className="w-full text-left p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-955/20 text-xs text-zinc-700 dark:text-zinc-300 block font-bold">🧭 Related Article Link</button>
                   <button onClick={() => insertFormat('<newsletter-signup />\n')} className="w-full text-left p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-955/20 text-xs text-zinc-700 dark:text-zinc-300 block font-bold">✉️ Newsletter Subscription Card</button>
-                  <button onClick={() => setInsertType('author')} className="w-full text-left p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-955/20 text-xs text-zinc-700 dark:text-zinc-300 block font-bold">✨ Expert Author Signature</button>
+                  <button onClick={() => setInsertType('author')} className="w-full text-left p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-955/20 text-xs text-zinc-700 dark:text-zinc-300 block font-bold">Expert Author Signature</button>
                   <button onClick={() => setInsertType('custom-section')} className="w-full text-left p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-955/20 text-xs text-zinc-700 dark:text-zinc-300 block font-bold">🎨 Styled Magazine Section</button>
                   <button onClick={() => insertFormat('<premium-divider />\n')} className="w-full text-left p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-955/20 text-xs text-rose-500 block font-bold">🔒 Premium Content Split</button>
                 </div>
@@ -674,7 +674,7 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
                         <label className="block mb-1 font-bold">Style/Vibe</label>
                         <select value={insertData.style || 'NOTE'} onChange={(e) => setInsertData({ ...insertData, style: e.target.value })} className="w-full p-2 bg-white dark:bg-zinc-800 rounded-lg border dark:border-zinc-700">
                           <option value="NOTE">💡 Relational Insight</option>
-                          <option value="TIP">🌟 Expert Clinical Suggestion</option>
+                          <option value="TIP">Expert Clinical Suggestion</option>
                           <option value="WARNING">⚠️ Important Caution</option>
                           <option value="TAKEAWAY">🎯 Core Lesson Takeaway</option>
                         </select>
@@ -1119,7 +1119,7 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
                       onClick={() => setAiMode(mode)} 
                       className={`px-3 py-1.5 rounded-lg font-bold transition-all ${aiMode === mode ? 'bg-rose-500 text-white shadow-xs' : 'bg-white dark:bg-zinc-900 border dark:border-zinc-850 hover:bg-rose-50 dark:hover:bg-rose-955 text-zinc-500 hover:text-rose-600'}`}
                     >
-                      {mode === 'expand' && '✨ Expand Draft'}
+                      {mode === 'expand' && 'Expand Draft'}
                       {mode === 'tone' && '🎙️ Clinical Tone Calibration'}
                       {mode === 'summarize' && '📝 Exec Summary Draft'}
                       {mode === 'seo' && '🔍 SEO Optimization'}

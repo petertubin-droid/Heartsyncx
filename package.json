@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "heartsyncx",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -21,8 +21,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
-    "drizzle-kit": "^0.31.10",
-    "drizzle-orm": "^0.45.2",
     "esbuild": "^0.25.12",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
