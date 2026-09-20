@@ -1515,8 +1515,8 @@ export default function App() {
         />
       )}
 
-      {/* Global Header Banner Ad Placement (Google AdSense, Monetag, Adsterra) */}
-      {currentTab !== 'admin' && (
+      {/* Global Header Banner Ad Placement (Google AdSense) — never on admin/auth/error views */}
+      {['admin', 'login', 'error', 'access-denied'].every((t) => t !== currentTab) && (
         <div className="max-w-6xl mx-auto px-4 w-full">
           <AdPlacement slot="header" />
         </div>
@@ -1605,6 +1605,12 @@ export default function App() {
                 }
               }
 
+              {/* Homepage mid-feed ad slot (Google AdSense, lazy) */}
+              {['admin', 'login', 'error', 'access-denied'].every((t) => t !== currentTab) && (
+                <div className="max-w-6xl mx-auto px-4 w-full">
+                  <AdPlacement slot="homepage" className="my-8" lazy />
+                </div>
+              )}
               // Redesign requirements: Inject Latest Articles and Premium Articles sections if not already present
               if (!seenTypes.has('latest_articles')) {
                 homeSectionsList.push({ id: 'sec-latest-articles', type: 'latest_articles', title: "Latest Publications", is_active: true });
@@ -4338,6 +4344,9 @@ export default function App() {
                         }}
                       />
 
+                      {/* Article-bottom ad slot (Google AdSense, lazy) */}
+                      <AdPlacement slot="article_bottom" className="my-8" lazy />
+
                       {/* INTERACTIVE COMPREHENSION QUIZ CHALLENGE */}
                       {(() => {
                         const activeQuiz = (heartsync.quizzes || []).find(q => q.articleId === activeArticle.id);
@@ -5624,8 +5633,10 @@ export default function App() {
       {currentTab !== 'admin' && (
         <>
           <Footer onNavigate={navigateTo} siteSettings={siteSettings} lang={lang} />
-          {/* Sticky Mobile/Desktop Footer Ad Banner (AdSense, Monetag, Adsterra) */}
-          <AdPlacement slot="footer" />
+          {/* Footer Ad Banner (Google AdSense) — never on admin/auth/error views */}
+          {['admin', 'login', 'error', 'access-denied'].every((t) => t !== currentTab) && (
+            <AdPlacement slot="footer" lazy />
+          )}
         </>
       )}
       </div>

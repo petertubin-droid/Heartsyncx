@@ -197,14 +197,9 @@ app.post('/api/webhooks/dispatch', async (req: Request, res: Response) => {
 app.post('/api/dns/diagnostics', async (req: Request, res: Response) => {
   try {
     const { domains, domain } = req.body;
-    const targetDomains: string[] = Array.isArray(domains) && domains.length > 0 
-      ? domains 
-      : (domain ? [domain] : [
-          'wellnesscouples.com',
-          'www.wellnesscouples.com',
-          'preview-heartsync.run.app',
-          'staging.wellnesscouples.com'
-        ]);
+    const targetDomains: string[] = Array.isArray(domains) && domains.length > 0
+      ? domains
+      : (domain ? [domain] : []);
 
     const results = [];
     const logLines: string[] = [];
@@ -325,12 +320,7 @@ app.post('/api/seo/index-submit', async (req: Request, res: Response) => {
     const { urls, url } = req.body;
     const inputUrls: string[] = Array.isArray(urls) && urls.length > 0
       ? urls
-      : (url ? [url] : [
-          'https://wellnesscouples.com/',
-          'https://wellnesscouples.com/articles',
-          'https://wellnesscouples.com/quiz',
-          'https://wellnesscouples.com/sitemap.xml'
-        ]);
+      : (url ? [url] : []);
 
     const results = [];
 
@@ -6367,6 +6357,34 @@ app.post('/api/admin/integrations/logs/clear', adminAuthMiddleware, async (req: 
 app.get('/google9904a5acdaa0b412.html', (req: Request, res: Response) => {
   res.type('text/html');
   res.send('google-site-verification: google9904a5acdaa0b412.html');
+});
+
+// 1b. ads.txt — required for AdSense serving. Serves the real publisher id
+// once configured in Monetization settings; an honest comment until then.
+app.get('/ads.txt', async (req: Request, res: Response) => {
+  res.type('text/plain');
+  try {
+    const client = getSupabaseClient();
+    let pubId = '';
+    if (client) {
+      const { data } = await queryWithTimeout(
+        client.from('site_settings').select('adsense_client_id').eq('id', 'singleton').maybeSingle(),
+        2500
+      );
+      const value = (data as Record<string, unknown> | null)?.adsense_client_id;
+      if (typeof value === 'string') pubId = value.trim();
+    }
+    if (!pubId && typeof process.env.VITE_ADSENSE_PUBLISHER_ID === 'string') {
+      pubId = process.env.VITE_ADSENSE_PUBLISHER_ID.trim();
+    }
+    if (/^ca-pub-\d{10,}$/.test(pubId)) {
+      res.send(`google.com, ${pubId.replace('ca-pub-', 'pub-')}, DIRECT, f08c47fec0942fa0\n`);
+    } else {
+      res.send('# ads.txt will publish the Google AdSense line once the publisher ID is configured in Monetization settings.\n');
+    }
+  } catch {
+    res.send('# ads.txt unavailable.\n');
+  }
 });
 
 // 2. robots.txt - dynamic generation compliant with Google AdSense best practices

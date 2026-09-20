@@ -391,10 +391,10 @@ export default function AdminConsole({
       if (saved) return JSON.parse(saved);
     } catch (_) {}
     return [
-      { id: '1', domain: 'wellnesscouples.com', type: 'production', isPrimary: true, sslStatus: 'active', dnsStatus: 'verified', verifiedAt: '2026-06-08 10:24', hsts: true, forceHttps: true },
-      { id: '2', domain: 'preview-heartsync.run.app', type: 'preview', isPrimary: false, sslStatus: 'active', dnsStatus: 'verified', verifiedAt: '2026-06-08 12:45', hsts: false, forceHttps: true },
-      { id: '3', domain: 'staging.wellnesscouples.com', type: 'staging', isPrimary: false, sslStatus: 'active', dnsStatus: 'verified', verifiedAt: '2026-06-08 14:10', hsts: false, forceHttps: true },
-      { id: '4', domain: 'dev.wellnesscouples.local', type: 'development', isPrimary: false, sslStatus: 'pending', dnsStatus: 'pending', verifiedAt: '', hsts: false, forceHttps: false }
+      
+      
+      
+      
     ];
   });
 
@@ -452,10 +452,10 @@ export default function AdminConsole({
   const [strictHostFiltering, setStrictHostFiltering] = useState(() => heartsync.getLocalStorage<string>('hs_dns_host_filtering', 'true') !== 'false');
   
   // Custom dedicated environment fields matching requirements
-  const [configuredProdDomain, setConfiguredProdDomain] = useState(() => heartsync.getLocalStorage<string>('hs_domain_prod', 'wellnesscouples.com'));
-  const [configuredPreviewDomain, setConfiguredPreviewDomain] = useState(() => heartsync.getLocalStorage<string>('hs_domain_preview', 'preview-heartsync.run.app'));
-  const [configuredStagingDomain, setConfiguredStagingDomain] = useState(() => heartsync.getLocalStorage<string>('hs_domain_staging', 'staging.wellnesscouples.com'));
-  const [configuredDevDomain, setConfiguredDevDomain] = useState(() => heartsync.getLocalStorage<string>('hs_domain_dev', 'dev.wellnesscouples.local'));
+  const [configuredProdDomain, setConfiguredProdDomain] = useState(() => heartsync.getLocalStorage<string>('hs_domain_prod', ''));
+  const [configuredPreviewDomain, setConfiguredPreviewDomain] = useState(() => heartsync.getLocalStorage<string>('hs_domain_preview', ''));
+  const [configuredStagingDomain, setConfiguredStagingDomain] = useState(() => heartsync.getLocalStorage<string>('hs_domain_staging', ''));
+  const [configuredDevDomain, setConfiguredDevDomain] = useState(() => heartsync.getLocalStorage<string>('hs_domain_dev', ''));
 
   // State-saver effects
   useEffect(() => {
@@ -1132,9 +1132,9 @@ export default function AdminConsole({
   const [newCampaignUrl, setNewCampaignUrl] = useState('');
   const [newCampaignStatus, setNewCampaignStatus] = useState('Active');
 
-  const [adsensePubId, setAdsensePubId] = useState(() => siteSettings.adsense_client_id || heartsync.site_settings.adsense_client_id || 'pub-7483921098483921');
+  const [adsensePubId, setAdsensePubId] = useState(() => siteSettings.adsense_client_id || heartsync.site_settings.adsense_client_id || '');
   const [adsenseAutoCode, setAdsenseAutoCode] = useState(() => String(siteSettings.adsense_active ?? heartsync.site_settings.adsense_active ?? true));
-  const [adsenseAutoScript, setAdsenseAutoScript] = useState(() => siteSettings.adsense_auto_script || heartsync.site_settings.adsense_auto_script || `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7483921098483921" crossorigin="anonymous"></script>`);
+  const [adsenseAutoScript, setAdsenseAutoScript] = useState(() => siteSettings.adsense_auto_script || heartsync.site_settings.adsense_auto_script || '');
   
   const [placementHeader, setPlacementHeader] = useState(() => siteSettings.placement_header ?? heartsync.site_settings.placement_header ?? true);
   const [placementSidebar, setPlacementSidebar] = useState(() => siteSettings.placement_sidebar ?? heartsync.site_settings.placement_sidebar ?? true);
@@ -1187,7 +1187,7 @@ export default function AdminConsole({
       return heartsync.ad_providers;
     }
     return [
-      { id: 'ap-1', name: 'Google AdSense Auto Ad Network', type: 'adsense', pubId: 'pub-7483921098483921', scriptCode: '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7483921098483921" crossorigin="anonymous"></script>', slot: 'all', active: true, cpmEstimate: '$14.10', lazyLoadDelay: 'none', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'Responsive (Fluid)' },
+      { id: 'ap-1', name: 'Google AdSense Display Network', type: 'adsense', pubId: '', scriptCode: '', slot: 'all', active: false, cpmEstimate: '', lazyLoadDelay: 'none', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'Responsive (Fluid)' },
       { id: 'ap-2', name: 'Monetag MultiTag Smart Placement', type: 'monetag', pubId: '275352', scriptCode: '<script src="https://alwingulla.com/88/tag.min.js" data-zone="275352" async data-cfasync="false"></script>', slot: 'header', active: true, cpmEstimate: '$16.80', lazyLoadDelay: 'none', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'MultiTag / Vignette', format: 'multitag' },
       { id: 'ap-3', name: 'Adsterra Social Bar & Native', type: 'adsterra', pubId: '883921', scriptCode: '<script type="text/javascript" src="//www.highperformanceformat.com/883921/invoke.js"></script>', slot: 'sidebar', active: true, cpmEstimate: '$14.50', lazyLoadDelay: 'scroll_100', geoTarget: 'worldwide', isConsentCompliant: true, customSize: 'Social Bar / 300x250', format: 'social_bar' }
     ];
@@ -5326,12 +5326,42 @@ export default function AdminConsole({
                         e.preventDefault();
                         heartsync.updateSettings({
                           adsense_client_id: siteSettings.adsense_client_id,
-                          adsense_active: siteSettings.adsense_active
+                          adsense_active: siteSettings.adsense_active,
+                          adsense_slot_header: siteSettings.adsense_slot_header,
+                          adsense_slot_sidebar: siteSettings.adsense_slot_sidebar,
+                          adsense_slot_in_article: siteSettings.adsense_slot_in_article,
+                          adsense_slot_footer: siteSettings.adsense_slot_footer,
+                          adsense_slot_homepage: siteSettings.adsense_slot_homepage,
+                          adsense_slot_article_bottom: siteSettings.adsense_slot_article_bottom
                         });
                         triggerToast('Google AdSense settings successfully saved!');
                       }}
                       className="space-y-4"
                     >
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">AdSense Unit Slot IDs (one per placement — create the units in your AdSense account)</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {([
+                            ['adsense_slot_header', 'Header'],
+                            ['adsense_slot_sidebar', 'Sidebar'],
+                            ['adsense_slot_in_article', 'In-article'],
+                            ['adsense_slot_footer', 'Footer'],
+                            ['adsense_slot_homepage', 'Homepage feed'],
+                            ['adsense_slot_article_bottom', 'Article bottom']
+                          ] as const).map(([field, label]) => (
+                            <div key={field} className="space-y-0.5">
+                              <span className="text-[9px] text-zinc-400">{label}</span>
+                              <input
+                                type="text"
+                                placeholder="1234567890"
+                                value={(siteSettings as Record<string, string>)[field] || ''}
+                                onChange={(e) => setSiteSettings({ ...siteSettings, [field]: e.target.value })}
+                                className="w-full p-2 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-mono text-[11px]"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">AdSense Client ID Code</label>

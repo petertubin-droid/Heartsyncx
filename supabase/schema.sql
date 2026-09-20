@@ -1067,3 +1067,15 @@ CREATE POLICY "Owner full access journal" ON public.journal_entries
   FOR ALL
   USING (auth.uid()::text = user_id)
   WITH CHECK (auth.uid()::text = user_id);
+
+-- ----------------------------------------------------------------------------
+-- ADSENSE SLOT CONFIGURATION (Monetization settings)
+-- Per-placement AdSense unit ids, editable in Admin → Monetization.
+-- ----------------------------------------------------------------------------
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_header TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_sidebar TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_in_article TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_footer TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_homepage TEXT;
+ALTER TABLE public.site_settings 
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_article_bottom TEXT;
