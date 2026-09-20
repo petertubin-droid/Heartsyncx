@@ -6815,23 +6815,32 @@ async function handleDynamicHtml(req: Request, res: Response) {
   const adsenseClientId = adsenseData.clientId;
   const adsenseActive = adsenseData.active;
 
-  // Locate and read index.html from dist (production output) or root (development fallback)
-  const distPath = path.join(process.cwd(), 'dist');
-  const indexPath = path.join(distPath, 'index.html');
-  const devIndexPath = path.join(process.cwd(), 'index.html');
-  
+  // Locate and read index.html. Candidates cover Cloud Run (cwd/dist), local
+  // dev (cwd/index.html), and the Vercel serverless bundle, where the HTML is
+  // includeFiles-shipped next to (or relative to) the compiled function.
+  const indexCandidates = [
+    path.join(process.cwd(), 'dist', 'index.html'),
+    path.join(process.cwd(), 'index.html'),
+    path.join(__dirname, 'index.html'),
+    path.join(__dirname, '..', 'index.html'),
+    path.join(__dirname, 'dist', 'index.html'),
+    path.join(__dirname, '..', 'dist', 'index.html'),
+    path.join(__dirname, '..', '..', 'dist', 'index.html')
+  ];
+
   let html = '';
-  try {
-    if (fs.existsSync(indexPath)) {
-      html = fs.readFileSync(indexPath, 'utf8');
-    } else if (fs.existsSync(devIndexPath)) {
-      html = fs.readFileSync(devIndexPath, 'utf8');
-    } else {
-      res.status(500).send('Index HTML not found');
-      return;
-    }
-  } catch (err) {
-    res.status(500).send('Error loading app canvas');
+  let foundIndex = false;
+  for (const candidate of indexCandidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        html = fs.readFileSync(candidate, 'utf8');
+        foundIndex = true;
+        break;
+      }
+    } catch (_) {}
+  }
+  if (!foundIndex || !html) {
+    res.status(500).send('Index HTML not found');
     return;
   }
 
@@ -7304,6 +7313,9 @@ async function handleDynamicHtml(req: Request, res: Response) {
   html = html.replace('</head>', `${seoHeadInject}\n</head>`);
 
   res.type('text/html');
+  // Vercel's edge caches the function response per-path when s-maxage allows,
+  // keeping serverless-served article pages fast. Harmless elsewhere.
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=86400, stale-while-revalidate=604800');
   res.send(html);
 }
 
@@ -7311,7 +7323,7 @@ async function handleDynamicHtml(req: Request, res: Response) {
 // DEV & PRODUCTION INTERFACE SERVING
 // --------------------------------------------------------
 
-async function startServer() {
+async function registerProductionRoutes() {
   // 1. Instantly seed/resolve local disk state synchronously so that API calls don't hit null state
   serverCacheState = serverCacheState || {};
 
@@ -7351,16 +7363,28 @@ async function startServer() {
     app.get('*', handleDynamicHtml);
   }
 
-  // 3. Bind the server port immediately on port 3000 so the Cloud Run startup probe passes instantly!
+}
+
+async function startServer() {
+  await registerProductionRoutes();
+
+  // Bind the server port immediately on port 3000 so the Cloud Run startup probe passes instantly!
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Heartsync server active exclusively on external port ${PORT}`);
   });
 
-  // 4. Trigger remote persistent database sync asynchronously in the background without blocking listen
+  // Trigger remote persistent database sync asynchronously in the background without blocking listen
   console.log('🔌 Primary remote database is set to Supabase Cloud.');
   initializeSharedState().catch(err => {
     console.warn('⚠️ Background initializeSharedState failure:', err);
   });
 }
 
-startServer();
+// On Vercel the module is imported by the serverless handler (api/index.ts) —
+// no listener, no background loop. Everywhere else, run as a standalone server.
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+// Exported for the Vercel serverless entrypoint
+export { app, registerProductionRoutes };

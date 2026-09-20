@@ -1,6 +1,18 @@
 {
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build && cp dist/index.html api/index.html && rm -f dist/server.cjs dist/server.cjs.map",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/article/(.*)", "destination": "/api" },
+    { "source": "/category/(.*)", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": ["dist/index.html", "api/index.html"],
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  }
 }
