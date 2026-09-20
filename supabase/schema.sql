@@ -1019,6 +1019,91 @@ CREATE POLICY "Users insert own settings" ON public.user_settings
   FOR INSERT WITH CHECK (auth.uid()::text = user_id);
 
 -- ----------------------------------------------------------------------------
+-- DIGITAL PRODUCTS (H-06): fully DB-backed catalog + order ledger. Orders are
+-- created ONLY by verified payment webhooks (service role). The download RPC
+-- is the single anonymous access path (token = capability).
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.digital_products (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  subtitle TEXT DEFAULT '',
+  description TEXT DEFAULT '',
+  price NUMERIC NOT NULL DEFAULT 0,
+  sale_price NUMERIC,
+  cover_image TEXT DEFAULT '',
+  file_url TEXT DEFAULT '',
+  file_type TEXT DEFAULT 'pdf',
+  category TEXT DEFAULT 'E-Books & Workbooks',
+  tags JSONB DEFAULT '[]'::jsonb,
+  is_featured BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  total_sales INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.digital_product_orders (
+  id TEXT PRIMARY KEY,
+  user_email TEXT NOT NULL,
+  product_id TEXT NOT NULL REFERENCES public.digital_products(id) ON DELETE CASCADE,
+  product_title TEXT NOT NULL,
+  amount NUMERIC NOT NULL DEFAULT 0,
+  currency TEXT DEFAULT 'USD',
+  download_token TEXT NOT NULL UNIQUE,
+  download_count INT DEFAULT 0,
+  status TEXT DEFAULT 'completed',
+  gateway TEXT,
+  transaction_id TEXT,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.digital_products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.digital_product_orders ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public read active digital products" ON public.digital_products;
+CREATE POLICY "Public read active digital products" ON public.digital_products
+  FOR SELECT USING (is_active = true);
+DROP POLICY IF EXISTS "Admin full access digital products" ON public.digital_products;
+CREATE POLICY "Admin full access digital products" ON public.digital_products
+  USING (public.is_admin()) WITH CHECK (public.is_admin());
+DROP POLICY IF EXISTS "Admin full access digital product orders" ON public.digital_product_orders;
+CREATE POLICY "Admin full access digital product orders" ON public.digital_product_orders
+  USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+CREATE OR REPLACE FUNCTION public.digital_product_download(p_token TEXT)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  o RECORD;
+  p RECORD;
+BEGIN
+  SELECT * INTO o FROM public.digital_product_orders
+    WHERE download_token = p_token AND status = 'completed'
+    LIMIT 1;
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+  IF o.expires_at IS NOT NULL AND o.expires_at < NOW() THEN
+    RETURN NULL;
+  END IF;
+  SELECT file_url INTO p FROM public.digital_products WHERE id = o.product_id LIMIT 1;
+  UPDATE public.digital_product_orders
+    SET download_count = COALESCE(download_count, 0) + 1
+    WHERE id = o.id;
+  RETURN jsonb_build_object(
+    'product_title', o.product_title,
+    'file_url', p.file_url,
+    'user_email', o.user_email,
+    'expires_at', o.expires_at
+  );
+END;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- SCHEMA DRIFT FIX: site_settings columns the server actually writes
 -- (ads sync + TTS settings singletons from /api/state and /api/admin/tts/save)
 -- ----------------------------------------------------------------------------

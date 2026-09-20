@@ -943,186 +943,169 @@ app.patch('/api/gdpr/dsr-requests/:id', adminAuthMiddleware, (req: Request, res:
 // GROUP 1: MEMBERSHIP TIERS & E-COMMERCE DIGITAL PRODUCTS STORE
 // =========================================================================
 
-const DIGITAL_PRODUCTS_STORE: any[] = [
-  {
-    id: 'prod-101',
-    title: 'The Attachment Re-wiring Master Workbook',
-    subtitle: '142-page interactive guide to shifting from Anxious/Avoidant to Secure Attachment',
-    description: 'Practical clinical prompts, somatic micro-practices, and relational dialogue scripts designed by couples therapists.',
-    price: 29.00,
-    salePrice: 19.00,
-    coverImage: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800',
-    fileUrl: 'https://heartsync.app/assets/downloads/attachment-master-workbook-v2026.pdf',
-    fileType: 'pdf',
-    category: 'E-Books & Workbooks',
-    rating: null,
-    totalSales: 0,
-    isFeatured: true,
-    tags: ['attachment-theory', 'worksheets', 'self-guided'],
-    created_at: new Date(Date.now() - 3600000 * 24 * 30).toISOString()
-  },
-  {
-    id: 'prod-102',
-    title: 'Gottman Conflict De-escalation Audio Masterclass',
-    subtitle: '4-hour guided somatic audio practice & repair script breakdown',
-    description: 'High-definition audio sessions featuring real-time soft startup protocols, 4 Horsemen antidotes, and nervous system calmers.',
-    price: 49.00,
-    salePrice: 34.00,
-    coverImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80&w=800',
-    fileUrl: 'https://heartsync.app/assets/downloads/gottman-de-escalation-audio.zip',
-    fileType: 'audio',
-    category: 'Audio Masterclasses',
-    rating: null,
-    totalSales: 0,
-    isFeatured: true,
-    tags: ['audio', 'de-escalation', 'gottman-method'],
-    created_at: new Date(Date.now() - 3600000 * 24 * 15).toISOString()
-  },
-  {
-    id: 'prod-103',
-    title: 'Somatic Co-Regulation & Breathwork Digital Toolkit',
-    subtitle: 'Guided MP3 audio tracks, vagus nerve exercises & flashcard deck',
-    description: 'Instant downloadable bundle containing 6 somatic audio loops, vagal nerve reset exercises, and printable pocket cards.',
-    price: 39.00,
-    salePrice: 24.00,
-    coverImage: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=800',
-    fileUrl: 'https://heartsync.app/assets/downloads/somatic-coregulation-toolkit.zip',
-    fileType: 'toolkit',
-    category: 'Digital Toolkits',
-    rating: 4.8,
-    totalSales: 189,
-    isFeatured: false,
-    tags: ['somatic', 'breathwork', 'vagus-nerve'],
-    created_at: new Date(Date.now() - 3600000 * 24 * 10).toISOString()
-  },
-  {
-    id: 'prod-104',
-    title: 'Conscious Dating & Early Boundary Blueprint',
-    subtitle: 'How to pace communication, spot red flags, and stay grounded',
-    description: 'Stop swipe fatigue and anxious texting loops with this clear 40-page roadmap for intentional early romance.',
-    price: 19.00,
-    salePrice: 12.00,
-    coverImage: 'https://images.unsplash.com/photo-1464998857633-50e59fbf2fe6?auto=format&fit=crop&q=80&w=800',
-    fileUrl: 'https://heartsync.app/assets/downloads/conscious-dating-blueprint.pdf',
-    fileType: 'pdf',
-    category: 'Guides & Blueprints',
-    rating: 4.7,
-    totalSales: 412,
-    isFeatured: false,
-    tags: ['dating', 'boundaries', 'pacing'],
-    created_at: new Date(Date.now() - 3600000 * 24 * 5).toISOString()
-  }
-];
+// ============================================================================
+// DIGITAL PRODUCTS — fully database-backed (Supabase). No in-memory stores and
+// no fake seeds: the catalog starts empty and admins create real products.
+// Orders are created ONLY by verified payment webhooks (service role); readers
+// redeem downloads exclusively through the token-holding RPC.
+// ============================================================================
 
-const DIGITAL_ORDERS_STORE: any[] = [
-  {
-    id: 'ord-801',
-    userEmail: 'admin@heartsync.app',
-    productId: 'prod-101',
-    productTitle: 'The Attachment Re-wiring Master Workbook',
-    amount: 19.00,
-    currency: 'USD',
-    downloadToken: 'dl_tok_893201_attach',
-    downloadUrl: 'https://heartsync.app/assets/downloads/attachment-master-workbook-v2026.pdf',
-    expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
-    status: 'completed',
-    gateway: 'stripe',
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString()
-  },
-  {
-    id: 'ord-802',
-    userEmail: 'reader@heartsync.app',
-    productId: 'prod-102',
-    productTitle: 'Gottman Conflict De-escalation Audio Masterclass',
-    amount: 34.00,
-    currency: 'USD',
-    downloadToken: 'dl_tok_948210_audio',
-    downloadUrl: 'https://heartsync.app/assets/downloads/gottman-de-escalation-audio.zip',
-    expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
-    status: 'completed',
-    gateway: 'stripe',
-    createdAt: new Date(Date.now() - 3600000 * 36).toISOString()
+async function createDigitalProductOrder(opts: {
+  productId: string; email: string; amount: number; currency: string; transactionId: string; gateway: string;
+}): Promise<any | null> {
+  const svc = getServiceRoleSupabase();
+  if (!svc) {
+    console.warn('Digital order creation skipped: SUPABASE_SERVICE_ROLE_KEY is not configured.');
+    return null;
   }
-];
+  const { data: product, error: prodErr } = await svc.from('digital_products')
+    .select('id, title, file_url, sale_price, price, total_sales')
+    .eq('id', opts.productId)
+    .maybeSingle();
+  if (prodErr || !product) {
+    console.warn('Digital order creation failed: product not found:', opts.productId, prodErr?.message || '');
+    return null;
+  }
+  const token = `dl_tok_${Math.random().toString(36).substring(2, 10)}_${Date.now()}`;
+  const { data: order, error: orderErr } = await svc.from('digital_product_orders').insert({
+    id: `ord-${Date.now()}`,
+    user_email: (opts.email || '').trim().toLowerCase(),
+    product_id: product.id,
+    product_title: product.title,
+    amount: opts.amount,
+    currency: opts.currency,
+    download_token: token,
+    status: 'completed',
+    gateway: opts.gateway,
+    transaction_id: opts.transactionId,
+    expires_at: new Date(Date.now() + 86400000 * 30).toISOString(),
+    created_at: new Date().toISOString()
+  }).select().single();
+  if (orderErr) {
+    console.warn('Digital order insert failed:', orderErr.message);
+    return null;
+  }
+  const { error: salesErr } = await svc.from('digital_products')
+    .update({ total_sales: Number(product.total_sales || 0) + 1 })
+    .eq('id', product.id);
+  if (salesErr) console.warn('Digital product sales counter update warning:', salesErr.message);
+  return order;
+}
 
-// GET ALL DIGITAL PRODUCTS
-app.get('/api/digital-products', (req: Request, res: Response) => {
-  res.json({ success: true, count: DIGITAL_PRODUCTS_STORE.length, products: DIGITAL_PRODUCTS_STORE });
+// GET ALL DIGITAL PRODUCTS (public: active products only)
+app.get('/api/digital-products', async (req: Request, res: Response) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) { res.json({ success: true, count: 0, products: [] }); return; }
+  const { data: products, error } = await supabase.from('digital_products')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.warn('Digital products fetch failed:', error.message);
+    res.json({ success: true, count: 0, products: [] });
+    return;
+  }
+  res.json({
+    success: true,
+    count: (products || []).length,
+    products: (products || []).map((p: any) => ({
+      ...p,
+      coverImage: p.cover_image,
+      fileUrl: p.file_url,
+      fileType: p.file_type,
+      salePrice: p.sale_price,
+      isFeatured: p.is_featured,
+      totalSales: p.total_sales
+    }))
+  });
 });
 
-// CREATE DIGITAL PRODUCT
-app.post('/api/digital-products', adminAuthMiddleware, (req: Request, res: Response) => {
+// CREATE DIGITAL PRODUCT (admin)
+app.post('/api/digital-products', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { title, subtitle, description, price, salePrice, coverImage, fileUrl, fileType, category, tags, isFeatured } = req.body;
-
   if (!title || price === undefined) {
     res.status(400).json({ error: 'Product title and base price are required.' });
     return;
   }
-
-  const newProd = {
+  const dbClient = getAdminDbClient(req);
+  if (!dbClient) { res.status(503).json({ error: 'Database is not configured.' }); return; }
+  const { data: product, error } = await dbClient.from('digital_products').insert({
     id: `prod-${Date.now()}`,
     title,
     subtitle: subtitle || '',
     description: description || '',
     price: Number(price),
-    salePrice: salePrice ? Number(salePrice) : undefined,
-    coverImage: coverImage || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800',
-    fileUrl: fileUrl || 'https://heartsync.app/assets/downloads/sample-digital-asset.pdf',
-    fileType: fileType || 'pdf',
+    sale_price: (salePrice !== undefined && salePrice !== null) ? Number(salePrice) : null,
+    cover_image: coverImage || '',
+    file_url: fileUrl || '',
+    file_type: fileType || 'pdf',
     category: category || 'E-Books & Workbooks',
-    rating: null,
-    totalSales: 0,
-    isFeatured: !!isFeatured,
-    tags: Array.isArray(tags) ? tags : [],
-    created_at: new Date().toISOString()
-  };
-
-  DIGITAL_PRODUCTS_STORE.unshift(newProd);
-  res.json({ success: true, product: newProd });
+    tags: JSON.stringify(Array.isArray(tags) ? tags : []),
+    is_featured: !!isFeatured,
+    is_active: true,
+    total_sales: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }).select().single();
+  if (error) { res.status(500).json({ error: 'Failed to create product: ' + error.message }); return; }
+  res.json({ success: true, product });
 });
 
-// UPDATE DIGITAL PRODUCT
-app.put('/api/digital-products/:id', adminAuthMiddleware, (req: Request, res: Response) => {
+// UPDATE DIGITAL PRODUCT (admin)
+app.put('/api/digital-products/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const idx = DIGITAL_PRODUCTS_STORE.findIndex(p => p.id === id);
-
-  if (idx !== -1) {
-    DIGITAL_PRODUCTS_STORE[idx] = { ...DIGITAL_PRODUCTS_STORE[idx], ...req.body };
-    res.json({ success: true, product: DIGITAL_PRODUCTS_STORE[idx] });
-  } else {
-    res.status(404).json({ error: 'Digital product not found.' });
-  }
+  const dbClient = getAdminDbClient(req);
+  if (!dbClient) { res.status(503).json({ error: 'Database is not configured.' }); return; }
+  const { title, subtitle, description, price, salePrice, coverImage, fileUrl, fileType, category, tags, isFeatured, isActive } = req.body;
+  const patch: any = { updated_at: new Date().toISOString() };
+  if (title !== undefined) patch.title = title;
+  if (subtitle !== undefined) patch.subtitle = subtitle;
+  if (description !== undefined) patch.description = description;
+  if (price !== undefined) patch.price = Number(price);
+  if (salePrice !== undefined) patch.sale_price = salePrice === null ? null : Number(salePrice);
+  if (coverImage !== undefined) patch.cover_image = coverImage;
+  if (fileUrl !== undefined) patch.file_url = fileUrl;
+  if (fileType !== undefined) patch.file_type = fileType;
+  if (category !== undefined) patch.category = category;
+  if (tags !== undefined) patch.tags = JSON.stringify(Array.isArray(tags) ? tags : []);
+  if (isFeatured !== undefined) patch.is_featured = !!isFeatured;
+  if (isActive !== undefined) patch.is_active = !!isActive;
+  const { data: product, error } = await dbClient.from('digital_products').update(patch).eq('id', id).select().maybeSingle();
+  if (error) { res.status(500).json({ error: 'Failed to update product: ' + error.message }); return; }
+  if (!product) { res.status(404).json({ error: 'Digital product not found.' }); return; }
+  res.json({ success: true, product });
 });
 
-// DELETE DIGITAL PRODUCT
-app.delete('/api/digital-products/:id', adminAuthMiddleware, (req: Request, res: Response) => {
+// DELETE DIGITAL PRODUCT (admin)
+app.delete('/api/digital-products/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const idx = DIGITAL_PRODUCTS_STORE.findIndex(p => p.id === id);
-
-  if (idx !== -1) {
-    const removed = DIGITAL_PRODUCTS_STORE.splice(idx, 1)[0];
-    res.json({ success: true, removed });
-  } else {
-    res.status(404).json({ error: 'Digital product not found.' });
-  }
+  const dbClient = getAdminDbClient(req);
+  if (!dbClient) { res.status(503).json({ error: 'Database is not configured.' }); return; }
+  const { data: removed, error } = await dbClient.from('digital_products').delete().eq('id', id).select().maybeSingle();
+  if (error) { res.status(500).json({ error: 'Failed to delete product: ' + error.message }); return; }
+  if (!removed) { res.status(404).json({ error: 'Digital product not found.' }); return; }
+  res.json({ success: true, removed });
 });
 
-// CHECKOUT DIGITAL PRODUCT (PURCHASE & GENERATE DOWNLOAD TOKEN)
+// CHECKOUT DIGITAL PRODUCT — opens a real gateway session only. The order and
+// download token are created exclusively by the VERIFIED payment webhook.
 app.post('/api/digital-products/checkout', async (req: Request, res: Response) => {
   const { productId, userEmail, gateway } = req.body;
-
-  const product = DIGITAL_PRODUCTS_STORE.find(p => p.id === productId);
+  const cleanEmail = (userEmail || '').trim().toLowerCase();
+  if (!productId || !cleanEmail || !cleanEmail.includes('@')) {
+    res.status(400).json({ error: 'A productId and a valid email address are required.' });
+    return;
+  }
+  const supabase = getSupabaseClient();
+  const product = supabase
+    ? (await supabase.from('digital_products').select('*').eq('id', productId).eq('is_active', true).maybeSingle()).data
+    : null;
   if (!product) {
     res.status(404).json({ error: 'Selected digital product was not found.' });
     return;
   }
 
-  const cleanEmail = (userEmail || 'reader@heartsync.app').trim().toLowerCase();
-  const chargedAmount = product.salePrice || product.price;
-  const downloadToken = `dl_tok_${Math.random().toString(36).substring(2, 10)}_${Date.now()}`;
-
-  // Real gateway only: an order and download token are created by the verified
-  // webhook after payment — never here. This endpoint now only opens a checkout.
+  const chargedAmount = product.sale_price ?? product.price;
   const origin = GATEWAY_BASE(req);
   const metadata = {
     kind: 'digital_product',
@@ -1154,29 +1137,37 @@ app.post('/api/digital-products/checkout', async (req: Request, res: Response) =
   }
 });
 
-// VERIFY AND DOWNLOAD DIGITAL PRODUCT ASSET
-app.get('/api/digital-products/download/:token', (req: Request, res: Response) => {
+// VERIFY AND DOWNLOAD DIGITAL PRODUCT ASSET (token-holding RPC — anonymous
+// users can never enumerate orders; the token IS the capability)
+app.get('/api/digital-products/download/:token', async (req: Request, res: Response) => {
   const { token } = req.params;
-  const order = DIGITAL_ORDERS_STORE.find(o => o.downloadToken === token);
-
-  if (!order) {
+  const supabase = getSupabaseClient();
+  if (!supabase) { res.status(503).json({ error: 'Database is not configured.' }); return; }
+  const { data: order, error } = await supabase.rpc('digital_product_download', { p_token: token });
+  if (error || !order) {
     res.status(404).json({ error: 'Invalid or expired cryptographic download token.' });
     return;
   }
-
   res.json({
     success: true,
-    productTitle: order.productTitle,
-    downloadUrl: order.downloadUrl,
-    authorizedEmail: order.userEmail,
-    expiresAt: order.expiresAt,
+    productTitle: order.product_title,
+    downloadUrl: order.file_url,
+    authorizedEmail: order.user_email,
+    expiresAt: order.expires_at,
     message: 'Authorized digital download ready.'
   });
 });
 
-// GET DIGITAL ORDERS LEDGER
-app.get('/api/digital-products/orders', adminAuthMiddleware, (req: Request, res: Response) => {
-  res.json({ success: true, count: DIGITAL_ORDERS_STORE.length, orders: DIGITAL_ORDERS_STORE });
+// GET DIGITAL ORDERS LEDGER (admin)
+app.get('/api/digital-products/orders', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const dbClient = getAdminDbClient(req);
+  if (!dbClient) { res.status(503).json({ error: 'Database is not configured.' }); return; }
+  const { data: orders, error } = await dbClient.from('digital_product_orders')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (error) { res.status(500).json({ error: 'Failed to load orders: ' + error.message }); return; }
+  res.json({ success: true, count: (orders || []).length, orders: orders || [] });
 });
 
 // Initialize Gemini Client with standard User-Agent header (Telemetry) and named parameters
@@ -4927,6 +4918,19 @@ app.post('/api/webhooks/stripe', async (req: Request, res: Response) => {
     const session = await verify.json();
     if (!verify.ok || session?.payment_status !== 'paid') { res.status(400).json({ error: 'Session could not be verified as paid.' }); return; }
     const md = session?.metadata || {};
+    if (md.kind === 'digital_product' && md.productId) {
+      const order = await createDigitalProductOrder({
+        productId: md.productId,
+        email: md.email || '',
+        amount: (session.amount_total || 0) / 100,
+        currency: (session.currency || 'usd').toUpperCase(),
+        transactionId: sessionId,
+        gateway: 'stripe'
+      });
+      if (!order) { res.status(500).json({ error: 'Failed to fulfill the digital product order.' }); return; }
+      res.json({ received: true });
+      return;
+    }
     if (!md.userId || !md.planId) { res.status(400).json({ error: 'Session is missing subscription metadata.' }); return; }
     await activatePaidSubscription({
       userId: md.userId,
@@ -4960,6 +4964,19 @@ app.post('/api/webhooks/paystack', async (req: Request, res: Response) => {
     const vdata = await verify.json();
     if (!verify.ok || vdata?.data?.status !== 'success') { res.status(400).json({ error: 'Transaction could not be verified as successful.' }); return; }
     const md = vdata.data.metadata || {};
+    if (md.kind === 'digital_product' && md.productId) {
+      const order = await createDigitalProductOrder({
+        productId: md.productId,
+        email: md.email || '',
+        amount: (vdata.data.amount || 0) / 100,
+        currency: (vdata.data.currency || 'USD').toUpperCase(),
+        transactionId: reference,
+        gateway: 'paystack'
+      });
+      if (!order) { res.status(500).json({ error: 'Failed to fulfill the digital product order.' }); return; }
+      res.json({ received: true });
+      return;
+    }
     if (!md.userId || !md.planId) { res.status(400).json({ error: 'Transaction is missing subscription metadata.' }); return; }
     await activatePaidSubscription({
       userId: md.userId,
@@ -5796,7 +5813,29 @@ app.post('/api/subscribe', async (req: Request, res: Response) => {
   }
 
   const exists = serverCacheState.subscribers.some((s: any) => s.email && s.email.toLowerCase() === cleanEmail);
+  let newlySubscribed = false;
+
   if (!exists) {
+    // Persist directly to the database (public insert policy; email is UNIQUE).
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { error: subErr } = await supabase.from('subscribers').insert({
+        email: cleanEmail,
+        source: source || 'footer',
+        status: 'active'
+      });
+      if (subErr) {
+        if (subErr.code === '23505' || /duplicate|unique/i.test(subErr.message || '')) {
+          // Already subscribed (the DB is the source of truth) — idempotent success.
+          res.json({ success: true, message: 'You are already subscribed. Welcome back!' });
+          return;
+        }
+        console.warn('Subscriber DB insert failed:', subErr.message);
+      } else {
+        newlySubscribed = true;
+      }
+    }
+
     const subscriber = {
       id: `sub-${Date.now()}`,
       email: cleanEmail,
@@ -5811,8 +5850,10 @@ app.post('/api/subscribe', async (req: Request, res: Response) => {
     } catch (err) {
       console.warn('Error saving state after subscribe:', err);
     }
+  }
 
-    // Trigger transactional welcome email sequence via Resend API
+  if (newlySubscribed || (!exists && !getSupabaseClient())) {
+    // Transactional welcome email sequence via Resend API (new subscribers only)
     sendResendWelcomeEmail(cleanEmail, source || 'footer').catch(e => {
       console.warn('Async welcome email dispatch error:', e);
     });

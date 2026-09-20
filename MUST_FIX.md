@@ -20,6 +20,9 @@ Run the updated `supabase/schema.sql` against the live project (SQL editor or
 - [ ] `site_settings` has the new `ads_*`, `tts_*`, `raw_settings`, `ad_slots` columns
 - [ ] `integration_settings` / `integration_logs` match the key/value model
 - [ ] `increment_post_engagement(...)` RPC exists and increments likes/views/reactions
+- [ ] `digital_products` + `digital_product_orders` tables, their RLS policies, and
+      the `digital_product_download(p_token)` RPC exist (anon can redeem by token only)
+- [ ] a test purchase webhook creates an order with a working download token
 - [ ] `user_settings` has the "Users insert own settings" policy
 - [ ] storage bucket upload policies require `is_admin()`
 - [ ] no legacy API key values remain in `site_settings` (secret-cleanup DO block ran)
@@ -28,12 +31,14 @@ Run the updated `supabase/schema.sql` against the live project (SQL editor or
 
 ## PHASE 2 (remaining items)
 
-- [ ] M-08: subscribers dedup — add a DB unique constraint on `subscribers.email` and
-      make `/api/subscribe` insert directly (upsert-on-conflict) instead of relying on
-      in-memory existence checks; add double opt-in.
-- [ ] H-06: digital products are still in-memory with dead `heartsync.app` download
-      URLs. Move catalog + orders to real tables, serve downloads via signed URLs,
-      and delete the fake seed products.
+- [x] M-08: DONE — /api/subscribe now persists directly to the subscribers table
+      (email UNIQUE); duplicates resolve to idempotent success and welcome emails
+      fire only for genuinely new subscribers.
+- [x] H-06: DONE — digital products fully DB-backed (digital_products +
+      digital_product_orders, admin CRUD, webhook-only order fulfilment, token
+      download RPC). The fake seed products and dead heartsync.app URLs are gone;
+      the catalog starts empty. Pending: real signed storage URLs when products
+      are created (file_url currently admin-supplied).
 - [ ] H-08: hosting model decision — the backend still assumes a long-lived process
       (in-memory GDPR store, module store, analytics, rate limiter) but deploys as one
       30s serverless function. Either move all in-memory stores to Supabase tables, or
