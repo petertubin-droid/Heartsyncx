@@ -9,7 +9,12 @@ process.env.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VIT
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_dummy_key_for_tests';
 process.env.PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || 'sk_test_dummy_key_for_tests';
 process.env.RESEND_API_KEY = process.env.RESEND_API_KEY || 're_dummy_test_key';
-// Deliberately NOT set: SUPABASE_SERVICE_ROLE_KEY (setup-wizard honesty test relies
-// on its absence) and GEMINI_API_KEY stays unset when not inherited.
+// Deterministic isolation: the setup-wizard honesty test requires
+// SUPABASE_SERVICE_ROLE_KEY to be ABSENT. A host machine (or CI secret) that
+// exports it would silently flip that test's precondition, so DELETE the
+// inherited value rather than merely not setting it. GEMINI_API_KEY likewise
+// must never leak from the host into the test process.
+delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+delete process.env.GEMINI_API_KEY;
 
 export {};

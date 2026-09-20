@@ -18,16 +18,16 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Function to automatically update the updated_at column
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER AS 845
+RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-845 LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Security Definer function to check if the current user is an admin
 CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS boolean AS 845
+RETURNS boolean AS $$
 DECLARE
   current_user_id uuid;
   user_role text;
@@ -59,15 +59,15 @@ BEGIN
 
   RETURN false;
 END;
-845 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Helper function to check if user is authenticated
 CREATE OR REPLACE FUNCTION public.is_authenticated()
-RETURNS boolean AS 845
+RETURNS boolean AS $$
 BEGIN
   RETURN (auth.role() = 'authenticated');
 END;
-845 LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ----------------------------------------------------------------------------
 -- 3. USER PROFILES & AUTH SYNCHRONIZATION
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false;
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS 845
+RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.profiles (id, email, full_name, avatar_url, role)
   VALUES (
@@ -109,7 +109,7 @@ BEGIN
     updated_at = NOW();
   RETURN NEW;
 END;
-845 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Drop trigger if exists and recreate
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -859,7 +859,7 @@ CREATE TABLE IF NOT EXISTS public.reading_statistics (
 -- ----------------------------------------------------------------------------
 
 -- Function to enable RLS across all tables in public schema
-DO 845
+DO $$
 DECLARE
   rec RECORD;
 BEGIN
@@ -871,7 +871,7 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', rec.table_name);
   END LOOP;
-END 845;
+END $$;
 
 -- ----------------------------------------------------------------------------
 -- POLICIES: PUBLIC CATALOG READ ACCESS
@@ -965,23 +965,23 @@ CREATE POLICY "Public insert comments" ON public.comments FOR INSERT WITH CHECK 
 -- Subscriptions
 DROP POLICY IF EXISTS "Users select own subscriptions" ON public.subscriptions;
 CREATE POLICY "Users select own subscriptions" ON public.subscriptions 
-FOR SELECT USING (auth.uid()::text = user_id OR public.is_admin());
+FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 
 -- User Settings
 DROP POLICY IF EXISTS "Users select own settings" ON public.user_settings;
 CREATE POLICY "Users select own settings" ON public.user_settings 
-FOR SELECT USING (auth.uid()::text = user_id OR public.is_admin());
+FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Users update own settings" ON public.user_settings;
 CREATE POLICY "Users update own settings" ON public.user_settings 
-FOR UPDATE USING (auth.uid()::text = user_id OR public.is_admin());
+FOR UPDATE USING (auth.uid() = user_id OR public.is_admin());
 
 -- ----------------------------------------------------------------------------
 -- POLICIES: ADMINISTRATOR FULL MANAGEMENT BYPASS
 -- Grant full ALL privileges to administrators or service_role across all tables
 -- ----------------------------------------------------------------------------
 
-DO 845
+DO $$
 DECLARE
   rec RECORD;
 BEGIN
@@ -999,7 +999,7 @@ BEGIN
       WITH CHECK (public.is_admin());
     ', rec.table_name, rec.table_name, rec.table_name, rec.table_name);
   END LOOP;
-END 845;
+END $$;
 
 -- ----------------------------------------------------------------------------
 -- SECURITY HARDENING: profiles PII column protection
@@ -1016,7 +1016,7 @@ GRANT UPDATE (full_name, avatar_url, bio, website) ON public.profiles TO authent
 -- SECURITY FIX: users must be able to create their own user_settings rows
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users insert own settings" ON public.user_settings
-  FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- ----------------------------------------------------------------------------
 -- DIGITAL PRODUCTS (H-06): fully DB-backed catalog + order ledger. Orders are
@@ -1207,6 +1207,125 @@ DROP POLICY IF EXISTS "Admin & User Media Upload" ON storage.objects;
 CREATE POLICY "Admin Media Upload" ON storage.objects
 FOR INSERT WITH CHECK (bucket_id IN ('media', 'heartsync-media') AND public.is_admin());
 
+
+-- ------------------------------------------------------------------------
+-- LEGACY LIVE-DB RECONCILIATION (idempotent)
+-- The live project predates this schema; existing tables drifted. Add every
+-- column the current app code and RLS policies require. Types mirror the
+-- CREATE TABLE definitions above exactly.
+-- ------------------------------------------------------------------------
+ALTER TABLE public.admin_users ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE public.admin_users ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.analytics ADD COLUMN IF NOT EXISTS path TEXT NOT NULL;
+ALTER TABLE public.analytics ADD COLUMN IF NOT EXISTS views INT DEFAULT 1;
+ALTER TABLE public.analytics ADD COLUMN IF NOT EXISTS unique_visitors INT DEFAULT 1;
+ALTER TABLE public.analytics ADD COLUMN IF NOT EXISTS date DATE DEFAULT CURRENT_DATE;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS details JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS ip_address TEXT;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.authors ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.authors ADD COLUMN IF NOT EXISTS avatar TEXT;
+ALTER TABLE public.authors ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS content TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS position TEXT DEFAULT 'top';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS parent_id TEXT REFERENCES public.categories(id) ON DELETE SET NULL;
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0;
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS author_name TEXT NOT NULL;
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS author_email TEXT;
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT true;
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS parent_id TEXT;
+ALTER TABLE public.contact_messages ADD COLUMN IF NOT EXISTS subject TEXT;
+ALTER TABLE public.contact_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false;
+ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS content TEXT NOT NULL;
+ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS target_audience TEXT DEFAULT 'all';
+ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS sent_count INT DEFAULT 0;
+ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS open_rate NUMERIC DEFAULT 0;
+ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS click_rate NUMERIC DEFAULT 0;
+ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ;
+ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS subject TEXT NOT NULL;
+ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS body_html TEXT NOT NULL;
+ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'transactional';
+ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS variables JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.featured_posts ADD COLUMN IF NOT EXISTS position INT DEFAULT 0;
+ALTER TABLE public.featured_posts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.footer ADD COLUMN IF NOT EXISTS sections JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.footer ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.integration_logs ADD COLUMN IF NOT EXISTS action TEXT;
+ALTER TABLE public.integration_logs ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'success';
+ALTER TABLE public.integration_logs ADD COLUMN IF NOT EXISTS details TEXT;
+ALTER TABLE public.integration_logs ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.integrations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'connected';
+ALTER TABLE public.integrations ADD COLUMN IF NOT EXISTS endpoint_url TEXT;
+ALTER TABLE public.integrations ADD COLUMN IF NOT EXISTS api_key_masked TEXT;
+ALTER TABLE public.integrations ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'general';
+ALTER TABLE public.media ADD COLUMN IF NOT EXISTS url TEXT NOT NULL;
+ALTER TABLE public.media ADD COLUMN IF NOT EXISTS type TEXT;
+ALTER TABLE public.media ADD COLUMN IF NOT EXISTS size INT;
+ALTER TABLE public.media ADD COLUMN IF NOT EXISTS storage_path TEXT;
+ALTER TABLE public.navigation ADD COLUMN IF NOT EXISTS items JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.navigation ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.pages ADD COLUMN IF NOT EXISTS page_type TEXT DEFAULT 'custom';
+ALTER TABLE public.pages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+ALTER TABLE public.pages ADD COLUMN IF NOT EXISTS meta_title TEXT;
+ALTER TABLE public.pages ADD COLUMN IF NOT EXISTS meta_description TEXT;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS subscription_id UUID REFERENCES public.subscriptions(id) ON DELETE SET NULL;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS billing_cycle TEXT DEFAULT 'monthly';
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS is_popular BOOLEAN DEFAULT false;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS stripe_price_id TEXT;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS reading_time INT DEFAULT 5;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS website TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.roles ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.rss_feeds ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Active';
+ALTER TABLE public.rss_feeds ADD COLUMN IF NOT EXISTS last_sync TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.seo_settings ADD COLUMN IF NOT EXISTS meta_title TEXT;
+ALTER TABLE public.seo_settings ADD COLUMN IF NOT EXISTS meta_description TEXT;
+ALTER TABLE public.seo_settings ADD COLUMN IF NOT EXISTS robots_txt TEXT;
+ALTER TABLE public.seo_settings ADD COLUMN IF NOT EXISTS sitemap_enabled BOOLEAN DEFAULT true;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tagline TEXT DEFAULT 'Scientific Relationship Guidance & Emotional Alignment';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS favicon_url TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS header_style TEXT DEFAULT 'blur';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS layout_width TEXT DEFAULT 'contained';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS font_family TEXT DEFAULT 'Plus Jakarta Sans';
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS custom_css TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS footer_text TEXT;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.subscribers ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE public.subscribers ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE public.subscribers ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'website';
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS auto_renew BOOLEAN DEFAULT true;
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS gateway TEXT DEFAULT 'stripe';
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS gateway_subscription_id TEXT;
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.tags ADD COLUMN IF NOT EXISTS color TEXT;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS author_role TEXT;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS rating INT DEFAULT 5;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.user_roles ADD COLUMN IF NOT EXISTS id TEXT DEFAULT gen_random_uuid()::text;
+ALTER TABLE public.user_roles ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'light';
+ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS notifications_enabled BOOLEAN DEFAULT true;
+ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'en';
+ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS preferences JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.webhook_logs ADD COLUMN IF NOT EXISTS webhook_id TEXT;
+ALTER TABLE public.webhook_logs ADD COLUMN IF NOT EXISTS response_status INT;
+ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS default_provider TEXT DEFAULT 'gemini';
+ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS default_model TEXT DEFAULT 'gemini-2.1-pro';
+ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS api_keys JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS system_prompt TEXT;
+ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+
 -- ----------------------------------------------------------------------------
 -- 13. SEED INITIAL SINGLETON & ESSENTIAL DATA
 -- ----------------------------------------------------------------------------
@@ -1215,20 +1334,25 @@ INSERT INTO public.site_settings (id, site_name, tagline)
 VALUES ('singleton', 'Heartsync Wellness', 'Scientific Relationship Guidance & Emotional Alignment')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.seo_settings (id, meta_title, meta_description) 
-VALUES ('singleton', 'Heartsync - Clinical Relationship Insights', 'Discover evidence-based research on adult attachment, intimacy, and romantic communication.')
-ON CONFLICT (id) DO NOTHING;
+-- NOTE: on the live project seo_settings/ai_settings/plans have UUID PKs
+-- (legacy shape). Seed with generated UUIDs, only when the table is empty,
+-- so the statement stays idempotent and type-correct on both shapes.
+INSERT INTO public.seo_settings (id, entity_type, entity_id, meta_title, meta_description)
+SELECT gen_random_uuid(), 'site', 'global', 'Heartsync - Clinical Relationship Insights', 'Discover evidence-based research on adult attachment, intimacy, and romantic communication.'
+WHERE NOT EXISTS (SELECT 1 FROM public.seo_settings);
 
-INSERT INTO public.ai_settings (id, default_provider, default_model) 
-VALUES ('singleton', 'gemini', 'gemini-2.1-pro')
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.ai_settings (id, default_provider, default_model)
+SELECT gen_random_uuid(), 'gemini', 'gemini-2.1-pro'
+WHERE NOT EXISTS (SELECT 1 FROM public.ai_settings);
 
-INSERT INTO public.plans (id, name, price, billing_cycle, features) 
-VALUES 
-  ('plan-free', 'Free Explorer', 0, 'monthly', '["Access to public articles", "Basic relationship quizzes"]'::jsonb),
-  ('plan-pro', 'Pro Couple', 19, 'monthly', '["Full premium article library", "Unlimited Gottman quizzes", "AI Relationship Copilot"]'::jsonb),
-  ('plan-vip', 'VIP Clinical Retreat', 49, 'monthly', '["1-on-1 therapist sessions", "Customized intimacy routines", "Priority support"]'::jsonb)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.plans (id, name, price, billing_cycle, features)
+SELECT gen_random_uuid(), v.name, v.price, 'monthly', v.features::jsonb
+FROM (VALUES
+  ('Free Explorer', 0, '["Access to public articles", "Basic relationship quizzes"]'),
+  ('Pro Couple', 19, '["Full premium article library", "Unlimited Gottman quizzes", "AI Relationship Copilot"]'),
+  ('VIP Clinical Retreat', 49, '["1-on-1 therapist sessions", "Customized intimacy routines", "Priority support"]')
+) AS v(name, price, features)
+WHERE NOT EXISTS (SELECT 1 FROM public.plans);
 
 -- ----------------------------------------------------------------------------
 -- HEARTSYNC LOVEVAULT — private reader storage (vault items + journal entries)
@@ -1274,7 +1398,6 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_sidebar T
 ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_in_article TEXT;
 ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_footer TEXT;
 ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_homepage TEXT;
-ALTER TABLE public.site_settings 
 ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS adsense_slot_article_bottom TEXT;
 
 -- ----------------------------------------------------------------------------

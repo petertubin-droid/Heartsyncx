@@ -6,28 +6,34 @@ can be considered production-ready.
 
 ## IMMEDIATE — ACTION REQUIRED OUTSIDE THE REPO (BLOCKER)
 
-The security and persistence fixes in Phases 1-2 change `supabase/schema.sql`, but the
-live Supabase project has NOT been migrated. **Until this runs, the database-side fixes
-(signup role hardening, PII column grants, engagement RPC, integration tables, TTS
-columns, secret scrub) are NOT active in production.**
+**DONE (2026-09-20): the live project (`pdtibsfasvicjptqirro`, Hearty) HAS been
+migrated.** `supabase/schema.sql` was run end-to-end against production. Along the way
+the schema gained: a "LEGACY LIVE-DB RECONCILIATION" section (idempotent
+`ADD COLUMN IF NOT EXISTS` for drifted pre-existing tables, placed BEFORE the seed
+section so seeds see reconciled shapes), uuid-typed `payments.subscription_id`
+FK + uuid-PK-safe seeds (live `seo_settings`/`ai_settings`/`plans` have UUID PKs and
+`seo_settings` has NOT NULL `entity_type`/`entity_id`), and uuid-vs-text policy
+predicate fixes (live `subscriptions`/`user_settings` use uuid `user_id`).
 
-Run the updated `supabase/schema.sql` against the live project (SQL editor or
-`supabase db push`). It is idempotent (`IF NOT EXISTS` / `CREATE OR REPLACE` /
-`ADD COLUMN IF NOT EXISTS`). Verify afterwards:
-- [ ] `public.handle_new_user()` sets `role = 'user'` (no client metadata trust)
-- [ ] `is_admin()` role list matches the JS `ADMIN_ROLES` list (incl. 'Super Admin')
-- [ ] `profiles.email` NOT selectable by `anon` (test with the anon key)
-- [ ] `site_settings` has the new `ads_*`, `tts_*`, `raw_settings`, `ad_slots` columns
-- [ ] `integration_settings` / `integration_logs` match the key/value model
-- [ ] `increment_post_engagement(...)` RPC exists and increments likes/views/reactions
-- [ ] `digital_products` + `digital_product_orders` tables, their RLS policies, and
-      the `digital_product_download(p_token)` RPC exist (anon can redeem by token only)
+Post-migration verification (all checked live):
+- [x] `public.handle_new_user()` sets `role = 'user'` (no client metadata trust)
+- [x] `is_admin()` role list matches the JS `ADMIN_ROLES` list (incl. 'Super Admin')
+- [x] `profiles.email` NOT selectable by `anon` — REST test with the anon key:
+      `?select=email` => 401 permission denied; `?select=id,full_name` => 200
+- [x] `site_settings` has the new `ads_*`, `tts_*`, `raw_settings`, `ad_slots` columns
+- [x] `integration_settings` / `integration_logs` match the key/value model
+      (`key`/`value`/`is_sensitive` added alongside legacy columns)
+- [x] `increment_post_engagement(...)` RPC exists and increments likes/views/reactions
+- [x] `digital_products` + `digital_product_orders` tables + RLS policies exist and
+      the `digital_product_download(p_token)` RPC exists (anon can redeem by token only)
 - [ ] a test purchase webhook creates an order with a working download token
-- [ ] `user_settings` has the "Users insert own settings" policy
-- [ ] storage bucket upload policies require `is_admin()`
-- [ ] no legacy API key values remain in `site_settings` (secret-cleanup DO block ran)
-- [ ] any manually-created admin from the broken wizard era has a valid role value
-      (lowercase `admin`), and no stray `Admin`-cased users hold privileges
+      (deferred: E2E requires a live gateway key — see Phase 3 checkout E2E)
+- [x] `user_settings` has the "Users insert own settings" policy
+- [x] storage bucket upload policies require `is_admin()` (with_check verified)
+- [x] no legacy API key values remain in `site_settings` (secret-cleanup DO block ran;
+      `extra_api_keys` = `{}`, `elevenlabs_api_key`/`recaptcha` cleared, `metadata` = `{}`)
+- [x] admin role hygiene: only lowercase `admin` x1 (owner) + `subscriber` x2 in
+      profiles; `admin_users` contains exactly the owner; no stray `Admin`-cased users
 
 ## PHASE 2 (remaining items)
 
