@@ -57,6 +57,16 @@ There is a third option, and it is not a compromise between the two. It is the *
 
 This works because the two ledgers are genuinely separate. The harm you caused is real and deserves repair regardless of who was right about the underlying dispute; the dispute itself deserves a real conversation regardless of the harm. Collapsing them — "I'll admit the shouting if you admit you were wrong about the plan" — is not peace; it is hostage arithmetic, and both parties know it.
 
+## Timing: The Gap Between Ready and Requested
+
+Two timing errors ruin more apologies than bad wording does.
+
+**Too slow.** Waiting for certainty or for your own defensiveness to drain can feel like prudence, but from the injured side, every silent day is data: *they still don't see it.* The injury compounds at interest. For most injuries, the useful move is the early down-payment — "I know I hurt you yesterday. I don't have the right words yet, but I see it, and I'm not going to pretend I don't." — followed by the full apology when you've actually understood what happened. The down-payment costs ten seconds and stops the interest clock.
+
+**Too fast.** The opposite error is apologizing while the injured person is still angry enough that your apology functions as a request for them to stop. Repair needs a partner who has come down far enough to hear it. If you apologize into a storm, you are not repairing; you are asking the storm to hurry, and the storm will charge you for the request. A simple "I want to apologize properly — is now okay, or is tonight better?" respects both clocks.
+
+The pattern to aim for, then: early acknowledgment, unhurried full repair, and the patience to let forgiveness take the time it takes — which is the other person's time, not yours.
+
 ## Receiving an Apology
 
 Half the anatomy belongs to the listener. When a real apology arrives, meet it with proportion: "Thank you. That means a lot" costs nothing and pays out in your partner's willingness to be humble next time. And when a counterfeit arrives, you are allowed to decline politely — "I appreciate you saying something, but that felt like an apology for my feelings rather than for what happened. Can we try again?" — which sounds clinical until you consider the alternative, which is quietly consuming counterfeit apologies for decades.

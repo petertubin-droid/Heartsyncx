@@ -71,6 +71,14 @@ If you have been the household fixer for years, announcing "I'm going to listen 
 
 **Debrief without keeping score.** Afterward, privately note one thing you understood that you would have missed. You are retraining your attention to find that understanding, not solving, is also productivity.
 
+## The Other Side of the Table: Asking for What You Need
+
+This article has been addressed to the fixer, but half the skill lives with the venting partner, whose requests are often as ambiguous as the fixer's solutions. Two upgrades for the asker:
+
+**Label the container.** At the start: "I need to vent for a few minutes — I'm not looking for solutions, just you." This sentence is not bossy; it is a map. It removes the fixer's guesswork (which is where most premature fixing comes from) and it protects you from the resentment of having been "managed" when you wanted witnessing. People complain that their partner "should just know" — but mind-reading is a poor foundation for a communication system. Label the container.
+
+**Receive a slip gracefully.** Your partner will sometimes fix anyway — mid-vent, reflexively, because decades of wiring do not yield to a single request. The punishing response ("I SAID no advice!") teaches them that trying is dangerous, and what's taught instead is silence. The graceful redirect — "I know, thank you — can I keep venting?" — gets you back on track while keeping their effort alive. You are training each other in real time; train in the direction you want the relationship to go.
+
 ## The Payoff
 
 Couples who can vent without triggering a task force are not just more pleasant to talk to. They are safer to be honest with, and honesty is the raw material of everything else — repair, desire, joint planning, all of it. The fixer's trap, at bottom, is a loss of information: every premature solution teaches your partner to edit, then to summarize, then to stop coming. The listener's discipline reverses the trend. The problems you were so eager to solve are, it turns out, rarely the point. The point was the sentence underneath the problem — "stay with me in this" — and it has been waiting, patiently, for you to stop answering it with a plan.

@@ -63,6 +63,16 @@ You cannot fix the physics, but you can design around it. These are the load-bea
 
 **Rule 6: Close the loop at night.** Unresolved text tension overnight marinates. Whatever the hour, a "we're good — genuinely — talk tomorrow" is the circuit breaker that lets both nervous systems stand down. Saying the relationship is bigger than the thread is sometimes the whole job.
 
+## Artificial Tone: Voice Notes, Emoji, and Punctuation
+
+Since the deleted channels are the problem, the obvious hacks are the ones that reinject tone artificially, and they work well — within limits.
+
+**Voice notes** are the strongest repair available: pitch, warmth, and hesitation restored, at the cost of one-sidedness (the other person often listens alone and cannot interrupt to course-correct, so a monologue can still curdle into a speech). Best use: warmth-carrying and repair-carrying messages — "hey, about earlier, listen" lands differently in a voice than in a paragraph. Worst use: anything that is really a negotiation; those need real-time back-and-forth.
+
+**Emoji and reaction-taps** are tone markup — a compression format for "this is said with a smile." Used sparingly they do genuine work, particularly on short sentences, where a single softener re-frames everything around it. They fail when asked to carry sincerity they don't have: an apology garnished with a winking face is not softened, it is mocked. The rule of thumb: emoji can add warmth to a message that already has it; they cannot manufacture it where the words are cold.
+
+**Punctuation and syntax** do the quietest work. A "K" and a "K!" are different people. Full sentences read calmer than fragments. A name — "okay, Sarah" — signals care in a channel where care is otherwise invisible. These are small tools, but they're free, and their effect compounds over years of daily use.
+
 ## The Deeper Point
 
 The phone did not create these problems; it revealed them. Every text fight is a live demonstration that our pictures of each other are partly inventions — the person you were sure was cold from their "k." was maybe just walking to the train with one hand and a bag. What texting teaches, if you let it, is humility about how much of your certainty about another person's inner state was always projection wearing the costume of perception.
