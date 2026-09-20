@@ -17,6 +17,9 @@ import { COMM_DIGITAL_TONE } from './comm-digital-tone';
 import { LOVE_ROOMMATE_DRIFT } from './love-roommate-drift';
 import { LOVE_LONG_DISTANCE_MATH } from './love-long-distance-math';
 import { LOVE_ANXIOUS_AVOIDANT_DANCE } from './love-anxious-avoidant-dance';
+import { DATING_SLOW_DATING } from './dating-slow-dating';
+import { DATING_LOVE_BOMBING } from './dating-love-bombing';
+import { DATING_AFTER_BREAKUP } from './dating-after-breakup';
 
 // HeartSync long-form corpus — genuinely written editorial pieces, added over
 // time in batches. Word target per article: ~2000 words. Never filler.
@@ -38,7 +41,10 @@ export const HEARTSYNC_ARTICLES: Post[] = [
   ...COMM_DIGITAL_TONE,
   ...LOVE_ROOMMATE_DRIFT,
   ...LOVE_LONG_DISTANCE_MATH,
-  ...LOVE_ANXIOUS_AVOIDANT_DANCE
+  ...LOVE_ANXIOUS_AVOIDANT_DANCE,
+  ...DATING_SLOW_DATING,
+  ...DATING_LOVE_BOMBING,
+  ...DATING_AFTER_BREAKUP
 ];
 
 // Crawler/sitemap-facing SEO projection of the in-code corpus. Kept lean (no
