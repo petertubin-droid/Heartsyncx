@@ -73,8 +73,14 @@ Post-migration verification (all checked live):
 
 ## PHASE 4 — Architecture / duplication
 
-- [ ] Collapse ad config to a single source (env vars vs site_settings vs store.ts
-      code templates currently duplicate AdSense slots/publisher ids).
+- [x] DONE (2026-09-20): ad config collapsed to a single source. The production
+      publisher ID (ca-pub-3404100134534192) now lives ONLY in site_settings
+      (migrated into the live DB — identical value the old code fallback served,
+      so live behavior unchanged). server getAdsenseConfig has NO hardcoded
+      fallback anymore (honest absence when unconfigured) and the dist-HTML swap
+      is guarded on a non-empty ID. AdminConsole ad-provider/auto-script templates
+      now use the admin-configured adsense_client_id dynamically; the stale
+      hardcoded pub-7483921098483921 in code templates is gone.
 - [ ] Remove the hardcoded Supabase URL + anon key fallback in `src/store.ts`
       (env-only configuration).
 - [ ] Unify Supabase client creation (store.ts, server getSupabaseClient,

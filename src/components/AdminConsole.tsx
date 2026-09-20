@@ -6897,8 +6897,9 @@ export default function AdminConsole({
                               onClick={() => {
                                 setNewProvName('Google AdSense Responsive Unit');
                                 setNewProvType('adsense');
-                                setNewProvPubId('pub-7483921098483921');
-                                setNewProvCode('<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7483921098483921" crossorigin="anonymous"></script>');
+                                const tplAdsenseId = (siteSettings.adsense_client_id || heartsync.site_settings.adsense_client_id || '').trim();
+                                setNewProvPubId(tplAdsenseId ? tplAdsenseId.replace('ca-pub-', 'pub-') : 'pub-XXXXXXXXXXXXXXXX');
+                                setNewProvCode(`<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${tplAdsenseId || 'ca-pub-XXXXXXXXXXXXXXXX'}" crossorigin="anonymous"></script>`);
                                 setNewProvSlot('header');
                                 setNewProvCpmEstimate('$14.10');
                                 setNewProvCustomSize('Responsive (Fluid)');
@@ -6998,7 +6999,7 @@ export default function AdminConsole({
                               <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Publisher ID / Zone ID</label>
                               <input 
                                 type="text" 
-                                placeholder="e.g. ca-pub-74839210"
+                                placeholder="e.g. ca-pub-XXXXXXXXXXXXXXXX"
                                 value={newProvPubId}
                                 onChange={(e) => setNewProvPubId(e.target.value)}
                                 className="w-full p-2 rounded-xl border bg-transparent font-mono" 
@@ -7253,7 +7254,7 @@ export default function AdminConsole({
                           <button
                             type="button"
                             onClick={() => {
-                              setAdsenseAutoScript(`<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsensePubId || 'ca-pub-7483921098483921'}" crossorigin="anonymous"></script>`);
+                              setAdsenseAutoScript(`<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsensePubId || 'ca-pub-XXXXXXXXXXXXXXXX'}" crossorigin="anonymous"></script>`);
                               triggerToast('Auto-generated standard Google AdSense tag!');
                             }}
                             className="text-[10px] text-rose-500 hover:underline font-bold"
