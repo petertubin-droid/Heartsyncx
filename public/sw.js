@@ -4,11 +4,20 @@
    pre-caching of bookmarked/saved relationship guides.
    ============================================================================ */
 
+// __SW_VERSION__ is stamped at build time by scripts/stamp-sw-version.mjs
+// (deploy commit sha, or timestamp locally). Every deploy therefore publishes
+// new cache names, and the existing cleanup pass deletes the old caches —
+// no manual 'v2' bumping. Unstamped file (raw dev serve) falls back to 'dev'.
+const SW_VERSION = (() => {
+  const v = '__SW_VERSION__';
+  return v.startsWith('__SW') ? 'dev' : v; // 'dev' when served unstamped
+})();
+
 const CACHE_NAMES = {
-  STATIC: 'heartsync-static-v2',
-  ARTICLES: 'heartsync-articles-v2',
-  IMAGES: 'heartsync-images-v2',
-  OFFLINE: 'heartsync-offline-v2',
+  STATIC: `heartsync-static-${SW_VERSION}`,
+  ARTICLES: `heartsync-articles-${SW_VERSION}`,
+  IMAGES: `heartsync-images-${SW_VERSION}`,
+  OFFLINE: `heartsync-offline-${SW_VERSION}`,
 };
 
 const PRECACHE_ASSETS = [

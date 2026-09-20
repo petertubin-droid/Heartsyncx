@@ -166,7 +166,14 @@ Post-migration verification (all checked live):
       from-address (editorial@heartsync.com) should be settled and set as
       PUBLIC_SITE_URL/SITE_URL in the Vercel env.
 - [ ] Accessibility pass: focus traps in modals/lightbox, form label audit, contrast.
-- [ ] Service worker cache-version bump process (currently manual `v2` constants).
+- [x] DONE (2026-09-20): SW cache versions are stamped automatically at build
+      time. public/sw.js carries a __SW_VERSION__ placeholder; new
+      scripts/stamp-sw-version.mjs (wired into the npm build chain before the
+      sitemap step) replaces it with the deploy commit sha (VERCEL_GIT_COMMIT_SHA)
+      or a local build timestamp. Every deploy publishes fresh cache names, so
+      the browser's byte-compare triggers the SW update and the existing
+      activation cleanup deletes the old-version caches — no manual bumping.
+      Unstamped file (raw dev serve) falls back to a 'dev' version safely.
 
 ## PHASE 7 — Documentation honesty
 
