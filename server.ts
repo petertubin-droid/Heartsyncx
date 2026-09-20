@@ -2626,7 +2626,7 @@ function stripSecretFields(input: any): any {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
   const out: Record<string, any> = {};
   for (const [k, v] of Object.entries(input)) {
-    if (typeof v === 'string' && SECRET_FIELD_RE.test(k)) continue;
+    if (SECRET_FIELD_RE.test(k)) continue;
     out[k] = v;
   }
   return out;
@@ -7568,4 +7568,4 @@ if (!process.env.VERCEL) {
 }
 
 // Exported for the Vercel serverless entrypoint
-export { app, registerProductionRoutes };
+export { app, registerProductionRoutes, stripSecretFields };

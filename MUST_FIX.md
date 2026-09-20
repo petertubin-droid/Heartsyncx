@@ -45,16 +45,25 @@ Run the updated `supabase/schema.sql` against the live project (SQL editor or
       deploy to a long-lived single-origin host as the README prescribes. Analytics
       currently resets on every cold start (per-instance counters).
 
-## PHASE 3 — Missing tests (no product changes)
+## PHASE 3 — Missing tests
 
-- [ ] Server route tests: auth matrix per route (401/403 for anon, success for admin),
-      webhook gateway re-verification, state sync sanitization.
-- [ ] RLS/policy tests: signup trigger role, profiles column grants, engagement RPC
-      (likes/views/reactions via anon), subscribers insert.
-- [ ] Admin flow tests: setup wizard promotion (service role), admin settings save,
-      integrations save/read round-trip.
-- [ ] Checkout E2E: /api/subscriptions/checkout -> gateway -> webhook -> subscription row.
-      (`npm test` now runs in CI; the suite currently covers frontend only.)
+- [x] Server route tests: DONE — `server/__tests__/server-security.test.ts` runs the
+      real Express app on an ephemeral port with mocked Supabase: 21-route auth
+      matrix (401 anon / 403 non-admin / admin admitted), suspended-admin block,
+      public-route contract, state-sync sanitization end-to-end, subscribe
+      idempotency, download-token RPC, integrations error surfacing, honest
+      setup-wizard 503, plus source/schema regression locks. Also caught and fixed
+      a real bug: stripSecretFields now drops secret-named fields of ANY type
+      (arrays like extra_api_keys previously slipped through).
+- [x] RLS/policy tests: DONE as schema-source contract tests (trigger role
+      hardcode, is_admin vocabulary, profiles column grants, engagement RPC
+      guards, digital-product policies, subscribers UNIQUE). Live RLS behavior is
+      verified by the post-migration checklist above (requires the live DB).
+- [x] Admin flow tests: DONE — admin settings save, integrations save/read with
+      error surfacing, service-role honesty. Setup-wizard live promotion test runs
+      after migration when SUPABASE_SERVICE_ROLE_KEY is present.
+- [ ] Checkout E2E: /api/subscriptions/checkout -> gateway -> webhook ->
+      subscription row. Requires live gateway keys; do after migration + keys.
 
 ## PHASE 4 — Architecture / duplication
 

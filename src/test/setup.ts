@@ -9,7 +9,7 @@ afterEach(() => {
 
 // jsdom has no matchMedia implementation; several components (theme, layout,
 // responsive hooks) call it on mount and would throw without this stub.
-if (!window.matchMedia) {
+if (typeof window !== 'undefined' && !window.matchMedia) {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
     matches: false,
     media: query,
@@ -33,7 +33,7 @@ class MockIntersectionObserver implements IntersectionObserver {
   disconnect = vi.fn();
   takeRecords = vi.fn(() => []);
 }
-if (!('IntersectionObserver' in window)) {
+if (typeof window !== 'undefined' && !('IntersectionObserver' in window)) {
   (window as any).IntersectionObserver = MockIntersectionObserver;
   (globalThis as any).IntersectionObserver = MockIntersectionObserver;
 }
@@ -44,7 +44,7 @@ class MockResizeObserver implements ResizeObserver {
   unobserve = vi.fn();
   disconnect = vi.fn();
 }
-if (!('ResizeObserver' in window)) {
+if (typeof window !== 'undefined' && !('ResizeObserver' in window)) {
   (window as any).ResizeObserver = MockResizeObserver;
   (globalThis as any).ResizeObserver = MockResizeObserver;
 }
