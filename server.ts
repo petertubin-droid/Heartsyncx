@@ -7,7 +7,6 @@ import { promises as dnsPromises } from 'dns';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import pg from 'pg';
 import jwt from 'jsonwebtoken';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { getArticleSeoData } from './src/utils/seoArticleData';
@@ -1703,46 +1702,6 @@ Return ONLY the new article content in clean Markdown. No preamble, no explanati
   }
 });
 
-app.post('/api/gemini/summarize', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { title, content } = req.body;
-  if (!title || !content) {
-    res.status(400).json({ error: 'Title and content are required.' });
-    return;
-  }
-  const ai = await getGeminiClient();
-  if (!ai) {
-    res.status(503).json({ error: 'Gemini service is unconfigured or key is absent.' });
-    return;
-  }
-  try {
-    const prompt = `You are a professional counseling and relationship summary helper.
-Please read the following relationship advice article content titled "${title}" and create a highly empathetic, modern, and punchy executive bullet summary.
-Focus on the practical, therapeutic relational takeaways and key points. Keep the language human-written, warm, and clear.
-Use clean Markdown bullet points. Limit the total output length to under 150 words.
-
-Content to summarize:
-${content}
-`;
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.6,
-        topP: 0.95
-      }
-    });
-    res.json({ summary: response.text || 'Could not draft a summary of this piece.' });
-  } catch (error) {
-    console.warn('Gemini summarize error:', error);
-    res.json({
-      summary: `### Core Dynamic Takeaways (Local Sandbox Fallback)
-- **Active Listening validation:** Creating a space completely free of advice-giving can help partners align on relational stress.
-- **Micro-checkpoints:** Dedicating a short, intentional bonding routine daily minimizes resentment build-up.
-- **Empathetic Resonance:** Prioritizing validation before attempting logical resolution reinforces a secure attachment style.`
-    });
-  }
-});
-
 // 1.30. AI In-Article Inserts Generator Endpoint
 app.post('/api/gemini/generate-inserts', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { title, content, excerpt, keywords, tone, insertType } = req.body;
@@ -2266,217 +2225,6 @@ ${jsonStr}`;
   }
 });
 
-// 1.7. Dynamic Live Run for 110+ AI Tools
-app.post('/api/gemini/run-ai-feature', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { featureName, inputs } = req.body;
-  if (!featureName) {
-     res.status(400).json({ error: 'Feature name is required.' });
-     return;
-  }
-
-  const ai = await getGeminiClient();
-  // Graceful fallback if Gemini unconfigured
-  if (!ai) {
-    const focusVal = inputs?.concept || inputs?.title || inputs?.prompt || 'General Strategy';
-    res.json({
-      output: `### Local Preview Output: "${featureName}"\n\n*(SaaS sandbox mode running: GEMINI_API_KEY is not set yet in your Settingssecrets)*\n\n**Processed Inputs:**\n- Theme/Concept Focus: *${focusVal}*\n- Other parameters: ${inputs ? JSON.stringify(inputs) : 'None'}\n\n**Generated Professional Recommendation:**\n1. **Core Diagnostic:** Identify structural attachment triggers inside relational patterns.\n2. **System Alignment:** Set up cognitive checkpoints to prevent communicative feedback loops.\n3. **Practical Step:** Introduce active emotional wellness validation exercises during high-stress scenarios.`
-    });
-    return;
-  }
-
-  try {
-    const inputSummary = Object.entries(inputs || {})
-      .map(([k, v]) => `- **${k}**: "${v}"`)
-      .join('\n');
-
-    const prompt = `You are a high-end AI assistant and couples counselling specialist at Heartsync.
-You are running the automated tool: "${featureName}".
-
-Here are the user inputs:
-${inputSummary}
-
-Please write a highly professional, beautifully styled, and completely fully functional response matching the purpose of the tool "${featureName}".
-Avoid generic summaries. Render direct, deep, actionable recommendations, plans, copies, layouts, or templates formatted inside beautiful Markdown. 
-Do not write "Sure, here's the output" or mention Gemini or models. Start directly with the professional output. Keep it under 400 words.`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.75,
-        topP: 0.95,
-      }
-    });
-
-    const text = response.text || 'Unable to generate response from Gemini.';
-    res.json({ output: text });
-  } catch (error: any) {
-    console.warn(`Heartsync feature execution error for ${featureName}:`, error);
-    // Recover gracefully is 503 is hit
-    const focusVal = inputs?.concept || inputs?.title || inputs?.prompt || 'Clinical Wellness';
-    res.json({
-      output: `### Resilience Recovery: ${featureName}\n\n*(Our AI model returned a temporary busy error, so we drafted a beautiful local fallback)*\n\n**Your Target Topic:** *${focusVal}*\n\n**Strategic Blueprint:**\n- **Emotional Tone:** Empathetic, supportive, structured, clear.\n- **Action Step:** Implement active sensory tracking to offset relational anxiety.\n- **Outcome Focus:** Deepen co-regulatory responses and validate each partner's secure limits.`,
-      warning: 'Gemini model high demand, fallback successfully loaded.'
-    });
-  }
-});
-
-// 1.8. Dynamic AI Page/Website Builder Generator
-app.post('/api/gemini/generate-page', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { prompt, vibe, industry } = req.body;
-
-  if (!prompt) {
-    res.status(400).json({ error: 'A core design prompt/idea is required for AI generation.' });
-    return;
-  }
-
-  const ai = await getGeminiClient();
-  // Fallback to rich contextual layout structures if AI is unconfigured
-  if (!ai) {
-    const titleMatch = prompt.replace(/[^a-zA-Z0-9\s]/g, '');
-    res.json({
-      sections: [
-        {
-          id: `sec-ai-1`,
-          type: 'hero',
-          title: `Connect Deeper with ${titleMatch || 'Heartsync Couples Studio'}`,
-          subtitle: `A customized, ${vibe || 'empathetic'} digital experience created specifically for your needs. Structured for clinical bonding metrics and beautiful interpersonal core safety.`,
-          buttonText: 'Begin Transformation',
-          buttonUrl: '/register'
-        },
-        {
-          id: `sec-ai-2`,
-          type: 'text',
-          title: `Why This Matters for Your Relationship & Bonding`,
-          body: `We used advanced research to tailor this experience for: ${prompt}. Attachment theory tells us that secure core scaffolding and actionable dialogue triggers are critical when creating resilient love networks. This canvas provides exactly that.`
-        },
-        {
-          id: `sec-ai-3`,
-          type: 'testimonials',
-          title: 'Hear From Active Practitioners',
-          items: [
-            { title: 'The Gottman Collaborative Review', desc: 'An outstanding framework that makes daily co-regulation automatic and highly rewarding.' },
-            { title: 'Sasha & Liam, Beta Users', desc: 'We love how the visual directives aligned right with our weekly therapy session checkups.' }
-          ]
-        },
-        {
-          id: `sec-ai-4`,
-          type: 'cta',
-          title: 'Ready to Experience Secure Bonding Insights?',
-          subtitle: 'Upgrade to our Premium tier and claim your personalized attachment profile report today.',
-          buttonText: 'Claim Free 7-Day Access Pass',
-          buttonUrl: '/billing'
-        }
-      ]
-    });
-    return;
-  }
-
-  try {
-    const systemPrompt = `You are a professional full-stack website layout engineer and copywriter.
-Generate a cohesive multi-section landing page based on:
-Prompt: "${prompt}"
-Design Vibe: "${vibe || 'empathetic and professional'}"
-
-Return a JSON payload containing an array of page sections. Supported section types and their schema properties:
-- 'hero': title, subtitle, buttonText, buttonUrl
-- 'text': title, body
-- 'cta': title, subtitle, buttonText, buttonUrl
-- 'testimonials': title, items: [{title, desc}]
-- 'faq': title, items: [{title, desc}]
-
-Provide at least 4 sections (typically hero, text, testimonials, cta) with high-fidelity, customized therapeutic copywriting tailored to "${prompt}". Make it extremely premium, engaging, and fully complete.`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: systemPrompt,
-      config: {
-        temperature: 0.8,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          required: ['sections'],
-          properties: {
-            sections: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                required: ['id', 'type', 'title'],
-                properties: {
-                  id: { type: Type.STRING },
-                  type: { type: Type.STRING, description: "Must be exactly 'hero', 'text', 'cta', 'testimonials', or 'faq'" },
-                  title: { type: Type.STRING },
-                  subtitle: { type: Type.STRING },
-                  body: { type: Type.STRING },
-                  buttonText: { type: Type.STRING },
-                  buttonUrl: { type: Type.STRING },
-                  items: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      required: ['title', 'desc'],
-                      properties: {
-                        title: { type: Type.STRING },
-                        desc: { type: Type.STRING }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const text = response.text;
-    if (!text) {
-      throw new Error('AI website generator yielded empty code.');
-    }
-
-    const payload = JSON.parse(text);
-    res.json(payload);
-  } catch (error: any) {
-    console.warn('Gemini site generator error (triggered fallback):', error);
-    const titleMatch = prompt.replace(/[^a-zA-Z0-9\s]/g, '') || 'Heartsync Couples Studio';
-    res.json({
-      sections: [
-        {
-          id: `sec-ai-1`,
-          type: 'hero',
-          title: `Connect Deeper with ${titleMatch}`,
-          subtitle: `A customized, ${vibe || 'empathetic'} digital experience created specifically for your needs. Structured for clinical bonding metrics and beautiful interpersonal core safety.`,
-          buttonText: 'Begin Transformation',
-          buttonUrl: '/register'
-        },
-        {
-          id: `sec-ai-2`,
-          type: 'text',
-          title: `Why This Matters for Your Relationship & Bonding`,
-          body: `We used advanced research to tailor this experience for: ${prompt}. Attachment theory tells us that secure core scaffolding and actionable dialogue triggers are critical when creating resilient love networks. This canvas provides exactly that.`
-        },
-        {
-          id: `sec-ai-3`,
-          type: 'testimonials',
-          title: 'Hear From Active Practitioners',
-          items: [
-            { title: 'The Gottman Collaborative Review', desc: 'An outstanding framework that makes daily co-regulation automatic and highly rewarding.' },
-            { title: 'Sasha & Liam, Beta Users', desc: 'We love how the visual directives aligned right with our weekly therapy session checkups.' }
-          ]
-        },
-        {
-          id: `sec-ai-4`,
-          type: 'cta',
-          title: 'Ready to Experience Secure Bonding Insights?',
-          subtitle: 'Upgrade to our Premium tier and claim your personalized attachment profile report today.',
-          buttonText: 'Claim Free 7-Day Access Pass',
-          buttonUrl: '/billing'
-        }
-      ]
-    });
-  }
-});
-
 // --------------------------------------------------------
 // SECURED TEXT-TO-SPEECH (TTS) PROXY & CACHE (ELEVENLABS)
 // --------------------------------------------------------
@@ -2540,37 +2288,8 @@ function isValidSupabaseConfig(url: string | null | undefined, key: string | nul
   return true;
 }
 
-function decoratePoolWithRetry(pool: pg.Pool, poolName: string) {
-  const originalConnect = pool.connect.bind(pool);
-  
-  // Overwrite the connect method to have highly resilient retry behavior
-  pool.connect = (async (...args: any[]) => {
-    let attempts = 0;
-    const maxAttempts = 5;
-    while (attempts < maxAttempts) {
-      try {
-        return await originalConnect(...args);
-      } catch (err: any) {
-        attempts++;
-        if (attempts >= maxAttempts) {
-          throw err;
-        }
-        console.warn(`⚠️ [${poolName}] Connection attempt ${attempts} failed: ${err.message || err}. Retrying in 1.5s...`);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      }
-    }
-  }) as any;
-  
-  return pool;
-}
 
-function getPgPool(): pg.Pool | null {
-  return null;
-}
 
-function getAdminPgPool(): pg.Pool | null {
-  return null;
-}
 
 let supabaseClient: any = null;
 let lastUsedSupabaseUrl: string | null = null;
@@ -3570,10 +3289,6 @@ async function loadStateFromSupabase(): Promise<any> {
 }
 
 // Highly resilient database tuning, self-healing, and index optimization engine
-async function tuneSupabaseDatabase() {
-  console.log('⚡ [DB TUNING] Database persistence configured exclusively for Supabase.');
-  return;
-}
 
 // Global cached sync timestamp
 let lastSupabaseFetchTime = 0;
@@ -5260,296 +4975,86 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
   const cleanEmail = (authUser.email || '').trim().toLowerCase();
   const name = req.body.name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || cleanEmail.split('@')[0];
   const avatarUrl = req.body.avatarUrl || authUser.user_metadata?.avatar_url;
-  const pool = getPgPool();
-  if (!pool) {
-    const supabase = getSupabaseClient();
-    
-    // Check if user is registered in admin_users or profiles in serverCacheState
-    const adminUser = (serverCacheState.admin_users || []).find((a: any) => 
-      a.id === userId || (a.email && a.email.toLowerCase() === cleanEmail)
-    );
+  
+  // Check if user is registered in admin_users or profiles in serverCacheState
+  const adminUser = (serverCacheState.admin_users || []).find((a: any) => 
+    a.id === userId || (a.email && a.email.toLowerCase() === cleanEmail)
+  );
 
-    const existingProfile = (serverCacheState.profiles || []).find((p: any) => 
-      p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail)
-    );
+  const existingProfile = (serverCacheState.profiles || []).find((p: any) => 
+    p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail)
+  );
 
-    const isAdmin = !!adminUser || (existingProfile && ['admin', 'Super Admin', 'Admin'].includes(existingProfile.role));
-    const finalRole = isAdmin ? 'admin' : (existingProfile?.role || 'subscriber');
+  const isAdmin = !!adminUser || (existingProfile && ['admin', 'Super Admin', 'Admin'].includes(existingProfile.role));
+  const finalRole = isAdmin ? 'admin' : (existingProfile?.role || 'subscriber');
 
-    const profileObj = {
+  const profileObj = {
+    id: userId,
+    email: cleanEmail,
+    name: name || existingProfile?.name || cleanEmail.split('@')[0],
+    full_name: name || existingProfile?.full_name || cleanEmail.split('@')[0],
+    role: finalRole,
+    status: existingProfile?.status || 'active',
+    is_suspended: existingProfile?.is_suspended || false,
+    avatar_url: avatarUrl || existingProfile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
+    bio: existingProfile?.bio || '',
+    created_at: existingProfile?.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  // Update serverCacheState memory and save to disk
+  if (!serverCacheState.profiles) serverCacheState.profiles = [];
+  const profIdx = serverCacheState.profiles.findIndex((p: any) => p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail));
+  if (profIdx >= 0) {
+    serverCacheState.profiles[profIdx] = { ...serverCacheState.profiles[profIdx], ...profileObj };
+  } else {
+    serverCacheState.profiles.push(profileObj);
+  }
+
+  if (isAdmin) {
+    if (!serverCacheState.admin_users) serverCacheState.admin_users = [];
+    const adminIdx = serverCacheState.admin_users.findIndex((a: any) => a.id === userId || (a.email && a.email.toLowerCase() === cleanEmail));
+    const adminObj = {
       id: userId,
       email: cleanEmail,
-      name: name || existingProfile?.name || cleanEmail.split('@')[0],
-      full_name: name || existingProfile?.full_name || cleanEmail.split('@')[0],
-      role: finalRole,
-      status: existingProfile?.status || 'active',
-      is_suspended: existingProfile?.is_suspended || false,
-      avatar_url: avatarUrl || existingProfile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
-      bio: existingProfile?.bio || '',
-      created_at: existingProfile?.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      name: profileObj.name,
+      role: 'admin',
+      is_active: true,
+      created_at: profileObj.created_at
     };
-
-    // Update serverCacheState memory and save to disk
-    if (!serverCacheState.profiles) serverCacheState.profiles = [];
-    const profIdx = serverCacheState.profiles.findIndex((p: any) => p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail));
-    if (profIdx >= 0) {
-      serverCacheState.profiles[profIdx] = { ...serverCacheState.profiles[profIdx], ...profileObj };
+    if (adminIdx >= 0) {
+      serverCacheState.admin_users[adminIdx] = { ...serverCacheState.admin_users[adminIdx], ...adminObj };
     } else {
-      serverCacheState.profiles.push(profileObj);
+      serverCacheState.admin_users.push(adminObj);
     }
+  }
 
-    if (isAdmin) {
-      if (!serverCacheState.admin_users) serverCacheState.admin_users = [];
-      const adminIdx = serverCacheState.admin_users.findIndex((a: any) => a.id === userId || (a.email && a.email.toLowerCase() === cleanEmail));
-      const adminObj = {
+  saveServerCacheState(serverCacheState);
+
+  // Mirror to Supabase as the verified user (RLS own-row policies apply).
+  // Role is NEVER client-writable here; admin roles are managed exclusively
+  // by the setup wizard's service-role promotion.
+  try {
+    const syncUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
+    const syncKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
+    const userScopedClient = (syncUrl && syncKey && token)
+      ? createClient(syncUrl, syncKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
+      : null;
+    if (userScopedClient) {
+      const { error: profileMirrorErr } = await userScopedClient.from('profiles').upsert({
         id: userId,
         email: cleanEmail,
-        name: profileObj.name,
-        role: 'admin',
-        is_active: true,
-        created_at: profileObj.created_at
-      };
-      if (adminIdx >= 0) {
-        serverCacheState.admin_users[adminIdx] = { ...serverCacheState.admin_users[adminIdx], ...adminObj };
-      } else {
-        serverCacheState.admin_users.push(adminObj);
-      }
+        full_name: profileObj.full_name,
+        avatar_url: profileObj.avatar_url,
+        bio: profileObj.bio,
+        updated_at: profileObj.updated_at
+      });
+      if (profileMirrorErr) console.warn('Profile mirror upsert warning:', profileMirrorErr.message);
     }
+  } catch (_) {}
 
-    saveServerCacheState(serverCacheState);
-
-    // Mirror to Supabase as the verified user (RLS own-row policies apply).
-    // Role is NEVER client-writable here; admin roles are managed exclusively
-    // by the setup wizard's service-role promotion.
-    try {
-      const syncUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
-      const syncKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
-      const userScopedClient = (syncUrl && syncKey && token)
-        ? createClient(syncUrl, syncKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
-        : null;
-      if (userScopedClient) {
-        const { error: profileMirrorErr } = await userScopedClient.from('profiles').upsert({
-          id: userId,
-          email: cleanEmail,
-          full_name: profileObj.full_name,
-          avatar_url: profileObj.avatar_url,
-          bio: profileObj.bio,
-          updated_at: profileObj.updated_at
-        });
-        if (profileMirrorErr) console.warn('Profile mirror upsert warning:', profileMirrorErr.message);
-      }
-    } catch (_) {}
-
-    res.json({ success: true, profile: profileObj });
-    return;
-  }
-
-  let client;
-
-  try {
-    client = await pool.connect();
-    await client.query('BEGIN');
-
-    // 1. Check if a profile with the same email already exists
-    const existingProfileRes = await client.query(
-      'SELECT * FROM public.profiles WHERE LOWER(email) = $1 LIMIT 1',
-      [cleanEmail]
-    );
-
-    // 1b. Check if a profile with the same id already exists
-    const existingProfileByIdRes = await client.query(
-      'SELECT * FROM public.profiles WHERE id = $1 LIMIT 1',
-      [userId]
-    );
-
-    let profile = null;
-
-    // Query active role from user_roles / roles table and admin_users in Cloud SQL
-    const userRoleRes = await client.query(`
-      SELECT r.name 
-      FROM public.user_roles ur 
-      JOIN public.roles r ON ur.role_id = r.id 
-      WHERE ur.user_id = $1 
-      LIMIT 1
-    `, [userId]);
-
-    const adminCheckRes = await client.query(`
-      SELECT id FROM public.admin_users WHERE LOWER(email) = $1 OR id = $2 LIMIT 1
-    `, [cleanEmail, userId]);
-
-    const isAdminCheck = adminCheckRes.rows.length > 0;
-    const dbRoleName = userRoleRes.rows[0]?.name || 'Subscriber';
-    const mappedRole = isAdminCheck || ['Super Admin', 'Admin'].includes(dbRoleName) ? 'admin' : 
-                       ['Editor', 'Author', 'Moderator'].includes(dbRoleName) ? dbRoleName.toLowerCase() : 'subscriber';
-
-    if (existingProfileByIdRes.rows.length > 0) {
-      console.log(`[sync-profile] Profile with ID ${userId} already exists in database.`);
-      const existingProfileById = existingProfileByIdRes.rows[0];
-
-      // Update email or name or avatar if needed to ensure alignment
-      await client.query(`
-        UPDATE public.profiles
-        SET email = $1,
-            name = COALESCE($2, name),
-            avatar_url = COALESCE($3, avatar_url),
-            role = $4,
-            updated_at = NOW()
-        WHERE id = $5
-      `, [cleanEmail, name || existingProfileById.name, avatarUrl || existingProfileById.avatar_url, mappedRole, userId]);
-
-      // If there is ALSO another profile with this email but under a different ID, we should merge them!
-      if (existingProfileRes.rows.length > 0 && existingProfileRes.rows[0].id !== userId) {
-        const oldId = existingProfileRes.rows[0].id;
-        console.log(`[sync-profile] Email match found under old ID: ${oldId} but current ID is ${userId}. Merging old ID...`);
-
-        // Safely migrate children from old ID to current userId
-        // A. user_roles
-        const existingRoles = await client.query('SELECT role_id FROM public.user_roles WHERE user_id = $1', [oldId]);
-        for (const r of existingRoles.rows) {
-          await client.query(`
-            INSERT INTO public.user_roles (user_id, role_id, assigned_at)
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (user_id, role_id) DO NOTHING
-          `, [userId, r.role_id]);
-        }
-
-        // B. user_settings
-        await client.query(`
-          INSERT INTO public.user_settings (user_id, theme, notifications_enabled, tts_voice_preference)
-          SELECT $1, theme, notifications_enabled, tts_voice_preference
-          FROM public.user_settings WHERE user_id = $2
-          ON CONFLICT (user_id) DO NOTHING
-        `, [userId, oldId]);
-
-        // C. user_sessions
-        await client.query(`
-          UPDATE public.user_sessions SET user_id = $1 WHERE user_id = $2
-        `, [userId, oldId]);
-
-        // D. posts
-        await client.query(`
-          UPDATE public.posts SET author_id = $1 WHERE author_id = $2
-        `, [userId, oldId]);
-
-        // E. admin_users
-        await client.query(`
-          UPDATE public.admin_users SET id = $1 WHERE LOWER(email) = $2
-        `, [userId, cleanEmail]);
-
-        // F. Delete old profile safely
-        await client.query('DELETE FROM public.profiles WHERE id = $1', [oldId]);
-      }
-
-      const finalProfileRes = await client.query('SELECT * FROM public.profiles WHERE id = $1 LIMIT 1', [userId]);
-      profile = finalProfileRes.rows[0];
-
-    } else if (existingProfileRes.rows.length > 0) {
-      const existingProfile = existingProfileRes.rows[0];
-      const oldId = existingProfile.id;
-
-      console.log(`[sync-profile] Email match found for ${cleanEmail} under old ID: ${oldId}. Migrating to new ID: ${userId}...`);
-
-      // Copy fields from old profile to new profile ID (since we verified userId doesn't exist yet)
-      await client.query(`
-        INSERT INTO public.profiles (
-          id, email, name, role, avatar_url, bio, settings, is_suspended, full_name, username, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      `, [
-        userId,
-        cleanEmail,
-        name || existingProfile.name,
-        mappedRole,
-        avatarUrl || existingProfile.avatar_url,
-        existingProfile.bio,
-        existingProfile.settings || '{}',
-        existingProfile.is_suspended || false,
-        existingProfile.full_name,
-        existingProfile.username || cleanEmail.split('@')[0],
-        existingProfile.status || 'active',
-        existingProfile.created_at || new Date(),
-        new Date()
-      ]);
-
-      // Safely migrate children
-      // A. user_roles
-      const existingRoles = await client.query('SELECT role_id FROM public.user_roles WHERE user_id = $1', [oldId]);
-      for (const r of existingRoles.rows) {
-        await client.query(`
-          INSERT INTO public.user_roles (user_id, role_id, assigned_at)
-          VALUES ($1, $2, NOW())
-          ON CONFLICT (user_id, role_id) DO NOTHING
-        `, [userId, r.role_id]);
-      }
-
-      // B. user_settings
-      await client.query(`
-        INSERT INTO public.user_settings (user_id, theme, notifications_enabled, tts_voice_preference)
-        SELECT $1, theme, notifications_enabled, tts_voice_preference
-        FROM public.user_settings WHERE user_id = $2
-        ON CONFLICT (user_id) DO NOTHING
-      `, [userId, oldId]);
-
-      // C. user_sessions
-      await client.query(`
-        UPDATE public.user_sessions SET user_id = $1 WHERE user_id = $2
-      `, [userId, oldId]);
-
-      // D. posts
-      await client.query(`
-        UPDATE public.posts SET author_id = $1 WHERE author_id = $2
-      `, [userId, oldId]);
-
-      // E. admin_users
-      await client.query(`
-        UPDATE public.admin_users SET id = $1 WHERE LOWER(email) = $2
-      `, [userId, cleanEmail]);
-
-      // F. Delete old profile safely
-      await client.query('DELETE FROM public.profiles WHERE id = $1', [oldId]);
-
-      console.log(`[sync-profile] Successfully merged old profile ID ${oldId} into new ID ${userId}`);
-
-      const finalProfileRes = await client.query('SELECT * FROM public.profiles WHERE id = $1 LIMIT 1', [userId]);
-      profile = finalProfileRes.rows[0];
-
-    } else {
-      console.log(`[sync-profile] Creating brand new profile for ${cleanEmail}`);
-      const insertProfileRes = await client.query(`
-        INSERT INTO public.profiles (
-          id, email, name, role, avatar_url, settings, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-        RETURNING *
-      `, [
-        userId,
-        cleanEmail,
-        name || cleanEmail.split('@')[0],
-        mappedRole,
-        avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-        '{}'
-      ]);
-      profile = insertProfileRes.rows[0];
-    }
-
-    await client.query('COMMIT');
-
-    setTimeout(() => {
-      initializeSharedState().catch(err => console.warn('Background sync failed:', err));
-    }, 100);
-
-    res.json({ success: true, profile });
-
-  } catch (err: any) {
-    if (client) {
-      try {
-        await client.query('ROLLBACK');
-      } catch (_) {}
-    }
-    console.error('❌ Error during /api/auth/sync-profile:', err);
-    res.status(500).json({ error: err.message || 'An unexpected database error occurred.' });
-  } finally {
-    if (client) client.release();
-  }
+  res.json({ success: true, profile: profileObj });
+  return;
 });
 
 app.get('/api/state', async (req: Request, res: Response) => {
@@ -5711,25 +5216,6 @@ async function verifyRecaptcha(token?: string): Promise<{ success: boolean; erro
 
 async function getResendClient(): Promise<{ resend: Resend; apiKey: string } | null> {
   let apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    const pool = getPgPool();
-    let client;
-    try {
-      if (pool) {
-        client = await pool.connect();
-        const dbRes = await client.query(
-          "SELECT value FROM public.integration_settings WHERE id = 'resend_api_key'"
-        );
-        if (dbRes.rows.length > 0 && dbRes.rows[0].value) {
-          apiKey = dbRes.rows[0].value;
-        }
-      }
-    } catch (dbErr: any) {
-      console.warn('Failed to fetch Resend API key from database fallback:', dbErr.message);
-    } finally {
-      if (client) client.release();
-    }
-  }
 
   if (!apiKey) return null;
   return { resend: new Resend(apiKey), apiKey };
@@ -6039,24 +5525,7 @@ app.post('/api/admin/keys/sync', adminAuthMiddleware, async (req: Request, res: 
 
 // Admin Integrations Hub API
 app.get('/api/admin/integrations', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const pool = getPgPool();
-  let client;
   try {
-    if (pool) {
-      client = await pool.connect();
-      const catsRes = await client.query('SELECT * FROM public.integration_categories ORDER BY id');
-      const intsRes = await client.query('SELECT * FROM public.integrations ORDER BY id');
-      const settingsRes = await client.query('SELECT * FROM public.integration_settings');
-      const logsRes = await client.query('SELECT * FROM public.integration_logs ORDER BY timestamp DESC LIMIT 200');
-
-      res.json({
-        categories: catsRes.rows,
-        integrations: intsRes.rows,
-        settings: settingsRes.rows,
-        logs: logsRes.rows
-      });
-      return;
-    }
     const supabase = getAdminDbClient(req) || getSupabaseClient();
     if (supabase) {
       const [catsRes, intsRes, settingsRes, logsRes] = await Promise.all([
@@ -6077,8 +5546,6 @@ app.get('/api/admin/integrations', adminAuthMiddleware, async (req: Request, res
   } catch (err: any) {
     console.error('Error fetching integrations:', err);
     res.status(500).json({ error: 'Failed to fetch integrations: ' + err.message });
-  } finally {
-    if (client) client.release();
   }
 });
 
@@ -6089,61 +5556,34 @@ app.post('/api/admin/integrations/toggle', adminAuthMiddleware, async (req: Requ
     return;
   }
 
-  const pool = getPgPool();
-  let client;
   try {
-    if (pool) {
-      client = await pool.connect();
-      
-      // Get integration name
-      const nameRes = await client.query('SELECT name FROM public.integrations WHERE id = $1', [integrationId]);
-      const intName = nameRes.rows[0]?.name || integrationId;
+    const supabase = getAdminDbClient(req) || getSupabaseClient();
+    if (supabase) {
+      const { data: nameData } = await supabase.from('integrations').select('name').eq('id', integrationId).maybeSingle();
+      const intName = nameData?.name || integrationId;
 
-      await client.query(
-        'UPDATE public.integrations SET is_enabled = $1, updated_at = NOW() WHERE id = $2',
-        [isEnabled, integrationId]
-      );
+      await supabase.from('integrations').update({
+        is_enabled: isEnabled,
+        updated_at: new Date().toISOString()
+      }).eq('id', integrationId);
 
-      // Insert log
       const logId = 'log_' + Math.random().toString(36).substr(2, 9);
       const action = isEnabled ? 'enable' : 'disable';
       const details = `${intName} integration was ${isEnabled ? 'enabled' : 'disabled'} successfully.`;
-      
-      await client.query(
-        'INSERT INTO public.integration_logs (id, integration_id, action, status, details, timestamp) VALUES ($1, $2, $3, $4, $5, NOW())',
-        [logId, integrationId, action, 'success', details]
-      );
-    } else {
-      const supabase = getAdminDbClient(req) || getSupabaseClient();
-      if (supabase) {
-        const { data: nameData } = await supabase.from('integrations').select('name').eq('id', integrationId).maybeSingle();
-        const intName = nameData?.name || integrationId;
 
-        await supabase.from('integrations').update({
-          is_enabled: isEnabled,
-          updated_at: new Date().toISOString()
-        }).eq('id', integrationId);
-
-        const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-        const action = isEnabled ? 'enable' : 'disable';
-        const details = `${intName} integration was ${isEnabled ? 'enabled' : 'disabled'} successfully.`;
-
-        await supabase.from('integration_logs').insert([{
-          id: logId,
-          integration_id: integrationId,
-          action,
-          status: 'success',
-          details,
-          timestamp: new Date().toISOString()
-        }]);
-      }
+      await supabase.from('integration_logs').insert([{
+        id: logId,
+        integration_id: integrationId,
+        action,
+        status: 'success',
+        details,
+        timestamp: new Date().toISOString()
+      }]);
     }
     res.json({ success: true, message: `Toggle updated.` });
   } catch (err: any) {
     console.error('Error toggling integration:', err);
     res.status(500).json({ error: 'Failed to toggle integration: ' + err.message });
-  } finally {
-    if (client) client.release();
   }
 });
 
@@ -6154,153 +5594,71 @@ app.post('/api/admin/integrations/save', adminAuthMiddleware, async (req: Reques
     return;
   }
 
-  const pool = getPgPool();
-  let client;
   try {
-    if (pool) {
-      client = await pool.connect();
-
-      // Fetch existing settings to know if anything sensitive is unchanged (i.e., masked)
-      const existingRes = await client.query(
-        'SELECT key, value FROM public.integration_settings WHERE integration_id = $1',
-        [integrationId]
-      );
+    const supabase = getAdminDbClient(req) || getSupabaseClient();
+    if (supabase) {
+      const { data: existingRows } = await supabase.from('integration_settings').select('key, value').eq('integration_id', integrationId);
       const existingMap = new Map<string, string>();
-      for (const r of existingRes.rows) {
-        existingMap.set(r.key, r.value);
-      }
+      (existingRows || []).forEach((r: any) => existingMap.set(r.key, r.value));
 
       for (const key of Object.keys(settings)) {
         const value = settings[key];
-        
-        // If the incoming value is masked, and we have an existing value, do NOT overwrite it!
         const isMasked = typeof value === 'string' && (value.includes('•') || value.includes('●'));
-        if (isMasked && existingMap.has(key)) {
-          continue; // Keep the existing unmasked value
-        }
+        if (isMasked && existingMap.has(key)) continue;
 
         const id = `${integrationId}_${key}`;
         const isSensitive = key.toLowerCase().includes('key') || key.toLowerCase().includes('secret') || key.toLowerCase().includes('token');
-        
-        await client.query(`
-          INSERT INTO public.integration_settings (id, integration_id, key, value, is_sensitive, updated_at)
-          VALUES ($1, $2, $3, $4, $5, NOW())
-          ON CONFLICT (id) DO UPDATE SET
-            value = EXCLUDED.value,
-            is_sensitive = EXCLUDED.is_sensitive,
-            updated_at = NOW()
-        `, [id, integrationId, key, value, isSensitive]);
-      }
 
-      // Propagate payment keys to site_settings.extra_api_keys for frontend use
-      if (integrationId === 'payments') {
-        try {
-          const settingsRes = await client.query("SELECT * FROM public.site_settings WHERE id = 'singleton'");
-          if (settingsRes.rows.length > 0) {
-            const currentSettings = settingsRes.rows[0];
-            let extraApiKeys: any = currentSettings.extra_api_keys || {};
-            if (typeof extraApiKeys === 'string') {
-              try { extraApiKeys = JSON.parse(extraApiKeys); } catch(e) { extraApiKeys = {}; }
-            }
-            if (Array.isArray(extraApiKeys)) {
-              extraApiKeys = {};
-            }
-
-            const provider = settings['provider'] || 'stripe';
-            const pubKey = settings['public_key'];
-            const secKey = settings['secret_key'];
-
-            if (pubKey && !pubKey.includes('•') && !pubKey.includes('●')) {
-              extraApiKeys[`${provider}_publishable`] = pubKey;
-            }
-
-            await client.query(`
-              UPDATE public.site_settings
-              SET extra_api_keys = $1, updated_at = NOW()
-              WHERE id = 'singleton'
-            `, [JSON.stringify(extraApiKeys)]);
-
-            console.log('🗣️ Propagated payment keys to site_settings.extra_api_keys:', provider);
-          }
-        } catch (err: any) {
-          console.warn('Failed to propagate payment keys to site_settings:', err.message);
-        }
-      }
-
-      // Add log
-      const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-      await client.query(
-        'INSERT INTO public.integration_logs (id, integration_id, action, status, details, timestamp) VALUES ($1, $2, $3, $4, $5, NOW())',
-        [logId, integrationId, 'update_keys', 'success', `Configuration parameters updated for ${integrationId}.`]
-      );
-    } else {
-      const supabase = getAdminDbClient(req) || getSupabaseClient();
-      if (supabase) {
-        const { data: existingRows } = await supabase.from('integration_settings').select('key, value').eq('integration_id', integrationId);
-        const existingMap = new Map<string, string>();
-        (existingRows || []).forEach((r: any) => existingMap.set(r.key, r.value));
-
-        for (const key of Object.keys(settings)) {
-          const value = settings[key];
-          const isMasked = typeof value === 'string' && (value.includes('•') || value.includes('●'));
-          if (isMasked && existingMap.has(key)) continue;
-
-          const id = `${integrationId}_${key}`;
-          const isSensitive = key.toLowerCase().includes('key') || key.toLowerCase().includes('secret') || key.toLowerCase().includes('token');
-
-          const { error: upsertErr } = await supabase.from('integration_settings').upsert([{
-            id,
-            integration_id: integrationId,
-            key,
-            value,
-            is_sensitive: isSensitive,
-            updated_at: new Date().toISOString()
-          }]);
-          if (upsertErr) throw new Error(upsertErr.message);
-        }
-
-        if (integrationId === 'payments') {
-          const { data: sData } = await supabase.from('site_settings').select('*').eq('id', 'singleton').maybeSingle();
-          if (sData) {
-            let extraApiKeys: any = sData.extra_api_keys || {};
-            if (typeof extraApiKeys === 'string') {
-              try { extraApiKeys = JSON.parse(extraApiKeys); } catch(e) { extraApiKeys = {}; }
-            }
-            if (Array.isArray(extraApiKeys)) extraApiKeys = {};
-
-            const provider = settings['provider'] || 'stripe';
-            const pubKey = settings['public_key'];
-            const secKey = settings['secret_key'];
-
-            if (pubKey && !pubKey.includes('•') && !pubKey.includes('●')) {
-              extraApiKeys[`${provider}_publishable`] = pubKey;
-            }
-
-            await supabase.from('site_settings').update({
-              extra_api_keys: extraApiKeys,
-              updated_at: new Date().toISOString()
-            }).eq('id', 'singleton');
-          }
-        }
-
-        const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-        await supabase.from('integration_logs').insert([{
-          id: logId,
+        const { error: upsertErr } = await supabase.from('integration_settings').upsert([{
+          id,
           integration_id: integrationId,
-          action: 'update_keys',
-          status: 'success',
-          details: `Configuration parameters updated for ${integrationId}.`,
-          timestamp: new Date().toISOString()
+          key,
+          value,
+          is_sensitive: isSensitive,
+          updated_at: new Date().toISOString()
         }]);
+        if (upsertErr) throw new Error(upsertErr.message);
       }
+
+      if (integrationId === 'payments') {
+        const { data: sData } = await supabase.from('site_settings').select('*').eq('id', 'singleton').maybeSingle();
+        if (sData) {
+          let extraApiKeys: any = sData.extra_api_keys || {};
+          if (typeof extraApiKeys === 'string') {
+            try { extraApiKeys = JSON.parse(extraApiKeys); } catch(e) { extraApiKeys = {}; }
+          }
+          if (Array.isArray(extraApiKeys)) extraApiKeys = {};
+
+          const provider = settings['provider'] || 'stripe';
+          const pubKey = settings['public_key'];
+          const secKey = settings['secret_key'];
+
+          if (pubKey && !pubKey.includes('•') && !pubKey.includes('●')) {
+            extraApiKeys[`${provider}_publishable`] = pubKey;
+          }
+
+          await supabase.from('site_settings').update({
+            extra_api_keys: extraApiKeys,
+            updated_at: new Date().toISOString()
+          }).eq('id', 'singleton');
+        }
+      }
+
+      const logId = 'log_' + Math.random().toString(36).substr(2, 9);
+      await supabase.from('integration_logs').insert([{
+        id: logId,
+        integration_id: integrationId,
+        action: 'update_keys',
+        status: 'success',
+        details: `Configuration parameters updated for ${integrationId}.`,
+        timestamp: new Date().toISOString()
+      }]);
     }
 
     res.json({ success: true, message: 'Settings saved successfully.' });
   } catch (err: any) {
     console.error('Error saving settings:', err);
     res.status(500).json({ error: 'Failed to save settings: ' + err.message });
-  } finally {
-    if (client) client.release();
   }
 });
 
@@ -6311,28 +5669,13 @@ app.post('/api/admin/integrations/test', adminAuthMiddleware, async (req: Reques
     return;
   }
 
-  const pool = getPgPool();
-  let client;
   try {
     const config: Record<string, string> = {};
 
-    if (pool) {
-      client = await pool.connect();
-
-      // Fetch integration settings
-      const settingsRes = await client.query(
-        'SELECT key, value FROM public.integration_settings WHERE integration_id = $1',
-        [integrationId]
-      );
-      for (const r of settingsRes.rows) {
-        config[r.key] = r.value || '';
-      }
-    } else {
-      const supabase = getAdminDbClient(req) || getSupabaseClient();
-      if (supabase) {
-        const { data: sRows } = await supabase.from('integration_settings').select('key, value').eq('integration_id', integrationId);
-        (sRows || []).forEach((r: any) => config[r.key] = r.value || '');
-      }
+    const supabase = getAdminDbClient(req) || getSupabaseClient();
+    if (supabase) {
+      const { data: sRows } = await supabase.from('integration_settings').select('key, value').eq('integration_id', integrationId);
+      (sRows || []).forEach((r: any) => config[r.key] = r.value || '');
     }
 
     let success = false;
@@ -6459,13 +5802,7 @@ app.post('/api/admin/integrations/test', adminAuthMiddleware, async (req: Reques
     }
 
     // Log the outcome
-    if (client) {
-      const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-      await client.query(
-        'INSERT INTO public.integration_logs (id, integration_id, action, status, details, timestamp) VALUES ($1, $2, $3, $4, $5, NOW())',
-        [logId, integrationId, 'test_auth', success ? 'success' : 'failed', details]
-      );
-    } else {
+    {
       const supabase = getAdminDbClient(req) || getSupabaseClient();
       if (supabase) {
         const logId = 'log_' + Math.random().toString(36).substr(2, 9);
@@ -6484,47 +5821,29 @@ app.post('/api/admin/integrations/test', adminAuthMiddleware, async (req: Reques
   } catch (err: any) {
     console.error('Error testing connection:', err);
     res.status(500).json({ error: 'Failed to test connection: ' + err.message });
-  } finally {
-    if (client) client.release();
   }
 });
 
 app.post('/api/admin/integrations/logs/clear', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const pool = getPgPool();
-  let client;
   try {
-    if (pool) {
-      client = await pool.connect();
-      await client.query('DELETE FROM public.integration_logs');
-      
-      // Log deletion action
+    const supabase = getAdminDbClient(req) || getSupabaseClient();
+    if (supabase) {
+      await supabase.from('integration_logs').delete().neq('id', '');
       const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-      await client.query(
-        'INSERT INTO public.integration_logs (id, integration_id, action, status, details, timestamp) VALUES ($1, $2, $3, $4, $5, NOW())',
-        [logId, null, 'clear_logs', 'success', 'All integration diagnostic logs have been cleared.']
-      );
-    } else {
-      const supabase = getAdminDbClient(req) || getSupabaseClient();
-      if (supabase) {
-        await supabase.from('integration_logs').delete().neq('id', '');
-        const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-        await supabase.from('integration_logs').insert([{
-          id: logId,
-          integration_id: null,
-          action: 'clear_logs',
-          status: 'success',
-          details: 'All integration diagnostic logs have been cleared.',
-          timestamp: new Date().toISOString()
-        }]);
-      }
+      await supabase.from('integration_logs').insert([{
+        id: logId,
+        integration_id: null,
+        action: 'clear_logs',
+        status: 'success',
+        details: 'All integration diagnostic logs have been cleared.',
+        timestamp: new Date().toISOString()
+      }]);
     }
 
     res.json({ success: true, message: 'All diagnostic logs cleared.' });
   } catch (err: any) {
     console.error('Error clearing integration logs:', err);
     res.status(500).json({ error: 'Failed to clear diagnostic logs: ' + err.message });
-  } finally {
-    if (client) client.release();
   }
 });
 
@@ -6943,28 +6262,6 @@ async function resolveAdSenseClientIdServer(): Promise<{ clientId: string; activ
     return { clientId: envKey.trim(), active: true };
   }
 
-  // 2. Check Postgres integration_settings
-  const pool = getPgPool();
-  let client;
-  try {
-    if (pool) {
-      client = await pool.connect();
-      const res = await client.query(
-        "SELECT value FROM public.integration_settings WHERE integration_id = 'adsense' AND key = 'publisher_id' LIMIT 1"
-      );
-      const enabledRes = await client.query(
-        "SELECT is_enabled FROM public.integrations WHERE id = 'adsense' LIMIT 1"
-      );
-      const active = enabledRes.rows.length > 0 ? enabledRes.rows[0].is_enabled : false;
-      if (res.rows.length > 0 && res.rows[0].value) {
-        return { clientId: res.rows[0].value.trim(), active };
-      }
-    }
-  } catch (err) {
-    console.warn('Failed to fetch AdSense from integration_settings:', err);
-  } finally {
-    if (client) client.release();
-  }
 
   // 3. Fallback to site_settings
   const sSettings = (global as any).serverCacheState?.site_settings || (serverCacheState as any)?.site_settings;
@@ -7126,50 +6423,9 @@ async function handleDynamicHtml(req: Request, res: Response) {
     await initializeSharedState();
   }
 
-  const pool = getPgPool();
-  let client;
   let post: any = null;
   let category: any = null;
 
-  try {
-    if (pool) {
-      client = await pool.connect();
-      
-      // 1. Article view SEO
-      if (req.path.startsWith('/article/')) {
-        const slug = req.path.split('/article/')[1]?.split('?')[0];
-        if (slug) {
-          const postRes = await client.query(`
-            SELECT p.*, 
-                   a.name as author_name, a.avatar_url as author_avatar, a.bio as author_bio,
-                   c.name as category_name, c.slug as category_slug
-            FROM public.posts p
-            LEFT JOIN public.profiles a ON p.author_id::text = a.id::text
-            LEFT JOIN public.categories c ON p.category_id::text = c.id::text
-            WHERE p.slug = $1 LIMIT 1
-          `, [slug]);
-          if (postRes.rows.length > 0) {
-            post = postRes.rows[0];
-          }
-        }
-      } else if (req.path.startsWith('/category/')) {
-        const slug = req.path.split('/category/')[1]?.split('?')[0];
-        if (slug) {
-          const catRes = await client.query(
-            'SELECT name, description, seo_title, seo_description, seo_keywords, featured_image FROM public.categories WHERE slug = $1 LIMIT 1',
-            [slug]
-          );
-          if (catRes.rows.length > 0) {
-            category = catRes.rows[0];
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('Error reading dynamic SEO metadata from PostgreSQL pool:', err);
-  } finally {
-    if (client) client.release();
-  }
 
   // Fallback to Supabase / serverCacheState if post or category wasn't retrieved via pool
   if (req.path.startsWith('/article/')) {

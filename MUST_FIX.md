@@ -79,10 +79,15 @@ Post-migration verification (all checked live):
       (env-only configuration).
 - [ ] Unify Supabase client creation (store.ts, server getSupabaseClient,
       getAdminDbClient, service-role) into one module.
-- [ ] Remove dead code: pg-pool branches (`getPgPool` always returns null — delete the
-      whole Cloud SQL path + SQL_* env group), `tuneSupabaseDatabase` no-op,
-      unused routes (`/api/gemini/run-ai-feature`, `generate-page`, `summarize` if no
-      caller), `public/_redirects`.
+- [x] DONE (2026-09-20): dead code removed. The whole Cloud SQL path is gone:
+      `getPgPool`/`getAdminPgPool`/`decoratePoolWithRetry`, the `pg` import and
+      dependency (lockfile pruned), the 9 call-site `if (pool) {direct SQL} else
+      {Supabase}` branches (only the live Supabase path remains — behavior
+      identical since pool was always null), `tuneSupabaseDatabase`, the unused
+      routes `/api/gemini/summarize`, `/api/gemini/run-ai-feature`,
+      `/api/gemini/generate-page` (verified zero callers), and
+      `public/_redirects` (Vercel rewrites in vercel.json cover it).
+      server.ts shrank ~950 net lines. tsc clean, suite green.
 - [x] DONE (2026-09-20): 42 unreferenced tables dropped from the live DB
       (legacy `users`, `rss_*`, `ai_*`, `api_keys`, `api_logs`, `invoices`,
       `transactions`, `premium_access`, `dashboard_stats`, `reading_statistics`,

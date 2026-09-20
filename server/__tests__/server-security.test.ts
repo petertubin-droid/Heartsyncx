@@ -145,7 +145,6 @@ const PROTECTED_ROUTES: Array<[string, string]> = [
   ['post', '/api/seo/index-submit'],
   ['post', '/api/cicd/check'],
   ['post', '/api/gemini/translate'],
-  ['post', '/api/gemini/summarize'],
   ['post', '/api/ai/draft'],
   ['post', '/api/admin/settings'],
   ['get', '/api/admin/modules'],
