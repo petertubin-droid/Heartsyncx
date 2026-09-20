@@ -6392,7 +6392,8 @@ app.get('/ads.txt', async (req: Request, res: Response) => {
 app.get('/robots.txt', (req: Request, res: Response) => {
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   res.type('text/plain');
-  res.send(`User-agent: *
+  res.send(`# Algolia-Crawler-Verif: 104EB7F2B1A59F2A
+User-agent: *
 Allow: /
 Allow: /index.html
 Allow: /articles

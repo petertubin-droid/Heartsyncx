@@ -110,7 +110,8 @@ ${urls
 </urlset>
 `;
 
-const robotsTxt = `User-agent: *
+const robotsTxt = `# Algolia-Crawler-Verif: 104EB7F2B1A59F2A
+User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /api/
