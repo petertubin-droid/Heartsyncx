@@ -4,6 +4,20 @@ import {
 } from '../types/module';
 import { heartsync } from '../store';
 
+// Attach the current admin session (when present) to module-management API calls.
+async function adminModuleFetch(url: string, init: any = {}): Promise<Response> {
+  try {
+    const client = (heartsync as any).supabase;
+    if (client) {
+      const { data: { session } } = await client.auth.getSession();
+      if (session?.access_token) {
+        init.headers = { ...(init.headers || {}), Authorization: `Bearer ${session.access_token}` };
+      }
+    }
+  } catch (_) { /* offline: plain fetch proceeds without a token */ }
+  return fetch(url, init);
+}
+
 // BUILT-IN SAMPLE PRODUCTION-READY MODULES (Empty default so users start with a clean slate without mock modules)
 export const INITIAL_BUILTIN_MODULES: ModuleState[] = [];
 
@@ -261,7 +275,7 @@ class ModuleRegistry {
 
     this.saveState();
 
-    fetch(`/api/admin/modules/${id}/rollback`, {
+    adminModuleFetch(`/api/admin/modules/${id}/rollback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetVersion: backup.version })
@@ -286,7 +300,7 @@ class ModuleRegistry {
     this.modules.delete(id);
     this.saveState();
 
-    fetch(`/api/admin/modules/${id}`, {
+    adminModuleFetch(`/api/admin/modules/${id}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ removeTables: removeDatabaseTables })

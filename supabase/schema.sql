@@ -44,7 +44,7 @@ BEGIN
 
   -- Check profiles table role
   SELECT role INTO user_role FROM public.profiles WHERE id = current_user_id;
-  IF user_role IN ('admin', 'superadmin', 'Administrator', 'Editor') THEN
+  IF user_role IN ('admin', 'superadmin', 'Administrator', 'Editor', 'Super Admin') THEN
     RETURN true;
   END IF;
 
@@ -88,6 +88,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 -- Trigger function to handle new auth.users signup
+-- SECURITY FIX: is_suspended is read by the admin middleware
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false;
+
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS 845
 BEGIN
@@ -97,7 +100,7 @@ BEGIN
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
     COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture', ''),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'user')
+    'user' -- SECURITY: role is NEVER taken from client signup metadata
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
@@ -993,6 +996,43 @@ BEGIN
 END 845;
 
 -- ----------------------------------------------------------------------------
+-- SECURITY HARDENING: profiles PII column protection
+-- Row policies stay as-is, but the email/metadata columns are no longer
+-- readable by the public anon role (or other authenticated users).
+-- ----------------------------------------------------------------------------
+REVOKE SELECT ON public.profiles FROM anon, authenticated;
+GRANT SELECT (id, full_name, avatar_url, bio, website, role, is_suspended, created_at, updated_at)
+  ON public.profiles TO anon, authenticated;
+REVOKE UPDATE ON public.profiles FROM anon;
+GRANT UPDATE (full_name, avatar_url, bio, website) ON public.profiles TO authenticated;
+
+-- ----------------------------------------------------------------------------
+-- SECURITY FIX: users must be able to create their own user_settings rows
+-- ----------------------------------------------------------------------------
+CREATE POLICY "Users insert own settings" ON public.user_settings
+  FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+
+-- ----------------------------------------------------------------------------
+-- SECURITY CLEANUP: API keys must NEVER live in site_settings (publicly readable).
+-- Keys are server-environment-only (see .env.example). Scrub legacy values if the
+-- columns exist from an older deployment.
+-- ----------------------------------------------------------------------------
+DO $$
+DECLARE
+  key_col TEXT;
+BEGIN
+  FOREACH key_col IN ARRAY ARRAY['gemini_api_key','elevenlabs_api_key','supabase_key','recaptcha_secret_key','extra_api_keys']
+  LOOP
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'site_settings' AND column_name = key_col
+    ) THEN
+      EXECUTE format('UPDATE public.site_settings SET %I = %L WHERE id = %L', key_col, CASE WHEN key_col = 'extra_api_keys' THEN '{}'::text ELSE '' END, 'singleton');
+    END IF;
+  END LOOP;
+END $$;
+
+-- ----------------------------------------------------------------------------
 -- 12. STORAGE BUCKET CREATION & POLICIES
 -- ----------------------------------------------------------------------------
 
@@ -1007,8 +1047,8 @@ FOR SELECT USING (bucket_id IN ('media', 'heartsync-media'));
 
 -- Authenticated and Admin upload access for media objects
 DROP POLICY IF EXISTS "Admin & User Media Upload" ON storage.objects;
-CREATE POLICY "Admin & User Media Upload" ON storage.objects 
-FOR INSERT WITH CHECK (bucket_id IN ('media', 'heartsync-media') AND (auth.role() = 'authenticated' OR public.is_admin()));
+CREATE POLICY "Admin Media Upload" ON storage.objects
+FOR INSERT WITH CHECK (bucket_id IN ('media', 'heartsync-media') AND public.is_admin());
 
 -- ----------------------------------------------------------------------------
 -- 13. SEED INITIAL SINGLETON & ESSENTIAL DATA

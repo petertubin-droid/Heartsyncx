@@ -29,6 +29,9 @@ jobs:
       - name: Static Code Analysis & TypeScript Verification
         run: npm run lint
 
+      - name: Run Test Suite
+        run: npm test
+
   build-and-package:
     name: Production Build & Bundle Verification
     runs-on: ubuntu-latest

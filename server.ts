@@ -18,9 +18,8 @@ import { Resend } from 'resend';
 dotenv.config();
 dotenv.config({ path: '.env.local' });
 
-// Explicitly revoke any ElevenLabs API keys or Voice IDs parsed from environment files of disk
-delete process.env.ELEVENLABS_API_KEY;
-delete process.env.ELEVENLABS_VOICE_ID;
+// ElevenLabs keys are resolved from the server environment (documented in .env.example).
+// API keys are NEVER stored in the publicly-readable site_settings table.
 
 const app = express();
 const PORT = 3000;
@@ -123,7 +122,7 @@ app.use('/api/auth/', rateLimiter(30, 60 * 1000));
 app.use('/api/setup/', rateLimiter(10, 60 * 1000));
 
 // REAL WEBHOOKS DISPATCH ENGINE ENDPOINT
-app.post('/api/webhooks/dispatch', async (req: Request, res: Response) => {
+app.post('/api/webhooks/dispatch', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { url, event, payload, secret, customHeaders } = req.body;
 
   if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
@@ -195,7 +194,7 @@ app.post('/api/webhooks/dispatch', async (req: Request, res: Response) => {
 });
 
 // REAL DNS DIAGNOSTICS & PROBE ENGINE ENDPOINT
-app.post('/api/dns/diagnostics', async (req: Request, res: Response) => {
+app.post('/api/dns/diagnostics', adminAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { domains, domain } = req.body;
     const targetDomains: string[] = Array.isArray(domains) && domains.length > 0
@@ -316,7 +315,7 @@ app.post('/api/dns/diagnostics', async (req: Request, res: Response) => {
 });
 
 // REAL GOOGLE INDEXING & SEARCH ENGINE SUBMISSION ENGINE ENDPOINT
-app.post('/api/seo/index-submit', async (req: Request, res: Response) => {
+app.post('/api/seo/index-submit', adminAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { urls, url } = req.body;
     const inputUrls: string[] = Array.isArray(urls) && urls.length > 0
@@ -459,7 +458,7 @@ app.get('/api/cicd/status', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/cicd/check', async (req: Request, res: Response) => {
+app.post('/api/cicd/check', adminAuthMiddleware, async (req: Request, res: Response) => {
   const startTime = Date.now();
   const stages: Array<{ name: string; status: 'pass' | 'fail' | 'warn'; durationMs: number; details: string; logs?: string[] }> = [];
 
@@ -771,7 +770,7 @@ app.delete('/api/diagnostics/results/:id', (req: Request, res: Response) => {
 });
 
 // GDPR COMPLIANCE ENGINE API ENDPOINTS
-app.post('/api/gdpr/export', (req: Request, res: Response) => {
+app.post('/api/gdpr/export', adminAuthMiddleware, (req: Request, res: Response) => {
   const { email } = req.body;
 
   if (!email || typeof email !== 'string') {
@@ -823,7 +822,7 @@ app.post('/api/gdpr/export', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/gdpr/purge', (req: Request, res: Response) => {
+app.post('/api/gdpr/purge', adminAuthMiddleware, (req: Request, res: Response) => {
   const { email, reason } = req.body;
 
   if (!email || typeof email !== 'string') {
@@ -866,11 +865,11 @@ app.post('/api/gdpr/purge', (req: Request, res: Response) => {
   });
 });
 
-app.get('/api/gdpr/audit-log', (req: Request, res: Response) => {
+app.get('/api/gdpr/audit-log', adminAuthMiddleware, (req: Request, res: Response) => {
   res.json({ success: true, count: GDPR_AUDIT_LOG_STORE.length, logs: GDPR_AUDIT_LOG_STORE });
 });
 
-app.post('/api/gdpr/audit-log', (req: Request, res: Response) => {
+app.post('/api/gdpr/audit-log', rateLimiter(20, 60 * 1000), (req: Request, res: Response) => {
   const { event, userEmail, details } = req.body;
   const newLog = {
     id: `glog-${Date.now()}`,
@@ -884,11 +883,11 @@ app.post('/api/gdpr/audit-log', (req: Request, res: Response) => {
   res.json({ success: true, log: newLog });
 });
 
-app.get('/api/gdpr/dsr-requests', (req: Request, res: Response) => {
+app.get('/api/gdpr/dsr-requests', adminAuthMiddleware, (req: Request, res: Response) => {
   res.json({ success: true, count: GDPR_DSR_REQUESTS_STORE.length, requests: GDPR_DSR_REQUESTS_STORE });
 });
 
-app.post('/api/gdpr/dsr-requests', (req: Request, res: Response) => {
+app.post('/api/gdpr/dsr-requests', rateLimiter(5, 60 * 1000), (req: Request, res: Response) => {
   const { type, userEmail, reason } = req.body;
 
   if (!userEmail || !type) {
@@ -923,7 +922,7 @@ app.post('/api/gdpr/dsr-requests', (req: Request, res: Response) => {
   res.json({ success: true, request: newDsr });
 });
 
-app.patch('/api/gdpr/dsr-requests/:id', (req: Request, res: Response) => {
+app.patch('/api/gdpr/dsr-requests/:id', adminAuthMiddleware, (req: Request, res: Response) => {
   const { id } = req.params;
   const { status, certificateId } = req.body;
 
@@ -1052,7 +1051,7 @@ app.get('/api/digital-products', (req: Request, res: Response) => {
 });
 
 // CREATE DIGITAL PRODUCT
-app.post('/api/digital-products', (req: Request, res: Response) => {
+app.post('/api/digital-products', adminAuthMiddleware, (req: Request, res: Response) => {
   const { title, subtitle, description, price, salePrice, coverImage, fileUrl, fileType, category, tags, isFeatured } = req.body;
 
   if (!title || price === undefined) {
@@ -1083,7 +1082,7 @@ app.post('/api/digital-products', (req: Request, res: Response) => {
 });
 
 // UPDATE DIGITAL PRODUCT
-app.put('/api/digital-products/:id', (req: Request, res: Response) => {
+app.put('/api/digital-products/:id', adminAuthMiddleware, (req: Request, res: Response) => {
   const { id } = req.params;
   const idx = DIGITAL_PRODUCTS_STORE.findIndex(p => p.id === id);
 
@@ -1096,7 +1095,7 @@ app.put('/api/digital-products/:id', (req: Request, res: Response) => {
 });
 
 // DELETE DIGITAL PRODUCT
-app.delete('/api/digital-products/:id', (req: Request, res: Response) => {
+app.delete('/api/digital-products/:id', adminAuthMiddleware, (req: Request, res: Response) => {
   const { id } = req.params;
   const idx = DIGITAL_PRODUCTS_STORE.findIndex(p => p.id === id);
 
@@ -1176,7 +1175,7 @@ app.get('/api/digital-products/download/:token', (req: Request, res: Response) =
 });
 
 // GET DIGITAL ORDERS LEDGER
-app.get('/api/digital-products/orders', (req: Request, res: Response) => {
+app.get('/api/digital-products/orders', adminAuthMiddleware, (req: Request, res: Response) => {
   res.json({ success: true, count: DIGITAL_ORDERS_STORE.length, orders: DIGITAL_ORDERS_STORE });
 });
 
@@ -1669,7 +1668,7 @@ ${mode === 'journal_prompt' ? 'The reader pressed "inspire me" on their private 
   }
 });
 
-app.post('/api/gemini/summarize', async (req: Request, res: Response) => {
+app.post('/api/gemini/summarize', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { title, content } = req.body;
   if (!title || !content) {
     res.status(400).json({ error: 'Title and content are required.' });
@@ -1930,11 +1929,11 @@ app.post('/api/gemini/generate-article', adminAuthMiddleware, async (req: Reques
 
 let SERVER_MODULES_STORE: any[] = [];
 
-app.get('/api/admin/modules', (req: Request, res: Response) => {
+app.get('/api/admin/modules', adminAuthMiddleware, (req: Request, res: Response) => {
   res.json({ success: true, count: SERVER_MODULES_STORE.length, modules: SERVER_MODULES_STORE });
 });
 
-app.post('/api/admin/modules/install', (req: Request, res: Response) => {
+app.post('/api/admin/modules/install', adminAuthMiddleware, (req: Request, res: Response) => {
   const moduleState = req.body;
   if (!moduleState || !moduleState.manifest || !moduleState.manifest.id) {
     res.status(400).json({ error: 'Valid module state and manifest are required.' });
@@ -1952,7 +1951,7 @@ app.post('/api/admin/modules/install', (req: Request, res: Response) => {
   res.json({ success: true, module: moduleState });
 });
 
-app.post('/api/admin/modules/:id/toggle', (req: Request, res: Response) => {
+app.post('/api/admin/modules/:id/toggle', adminAuthMiddleware, (req: Request, res: Response) => {
   const { id } = req.params;
   const { enabled } = req.body;
 
@@ -1966,7 +1965,7 @@ app.post('/api/admin/modules/:id/toggle', (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/admin/modules/:id/update', (req: Request, res: Response) => {
+app.post('/api/admin/modules/:id/update', adminAuthMiddleware, (req: Request, res: Response) => {
   const { id } = req.params;
   const { version, manifest } = req.body;
 
@@ -1987,7 +1986,7 @@ app.post('/api/admin/modules/:id/update', (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/admin/modules/:id/rollback', (req: Request, res: Response) => {
+app.post('/api/admin/modules/:id/rollback', adminAuthMiddleware, (req: Request, res: Response) => {
   const { id } = req.params;
   const mod = SERVER_MODULES_STORE.find(m => m.manifest.id === id);
   if (mod && mod.rollbackBackup) {
@@ -2001,7 +2000,7 @@ app.post('/api/admin/modules/:id/rollback', (req: Request, res: Response) => {
   }
 });
 
-app.delete('/api/admin/modules/:id', (req: Request, res: Response) => {
+app.delete('/api/admin/modules/:id', adminAuthMiddleware, (req: Request, res: Response) => {
   const { id } = req.params;
   const idx = SERVER_MODULES_STORE.findIndex(m => m.manifest.id === id);
   if (idx !== -1) {
@@ -2011,7 +2010,7 @@ app.delete('/api/admin/modules/:id', (req: Request, res: Response) => {
 });
 
 // AI FEATURE BUILDER ENDPOINT USING GEMINI OR FALLBACK CODE SYNTHESIZER
-app.post('/api/admin/modules/ai-builder/generate', async (req: Request, res: Response) => {
+app.post('/api/admin/modules/ai-builder/generate', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { prompt, category, requiredRole, includeDbMigrations } = req.body;
 
   if (!prompt || typeof prompt !== 'string') {
@@ -2178,7 +2177,7 @@ Return JSON with this exact schema:
 });
 
 // 1.6. Secure Gemini SaaS Translingual Translator
-app.post('/api/gemini/translate', async (req: Request, res: Response) => {
+app.post('/api/gemini/translate', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { payload, targetLang } = req.body;
 
   if (!payload || !targetLang) {
@@ -2584,6 +2583,18 @@ function getSupabaseClient() {
 function sanitizeApiKey(key: string): string {
   if (!key) return '';
   return key.trim().replace(/^["']|["']$/g, '').trim();
+}
+
+// SECURITY: credential-like fields must never round-trip through client-visible state.
+const SECRET_FIELD_RE = /(^|_)(api_keys?|secret_keys?|secrets?|tokens?|passwords?|private_keys?)$/i;
+function stripSecretFields(input: any): any {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (typeof v === 'string' && SECRET_FIELD_RE.test(k)) continue;
+    out[k] = v;
+  }
+  return out;
 }
 
 // Fast timeout wrapper for DB operations to avoid blocking API threads
@@ -3211,7 +3222,6 @@ app.post('/api/admin/tts/save', adminAuthMiddleware, async (req: Request, res: R
         tts_voice_gender: settings.tts_voice_gender || 'female',
         tts_selected_voice: settings.tts_selected_voice || 'Rachel',
         tts_provider: 'elevenlabs',
-        elevenlabs_api_key: settings.elevenlabs_api_key || '',
         tts_selected_voice_id: settings.tts_selected_voice_id || '',
         tts_stability: settings.tts_stability !== undefined ? Number(settings.tts_stability) : 0.55,
         tts_similarity_boost: settings.tts_similarity_boost !== undefined ? Number(settings.tts_similarity_boost) : 0.75,
@@ -3223,11 +3233,6 @@ app.post('/api/admin/tts/save', adminAuthMiddleware, async (req: Request, res: R
         tts_voice_cache: typeof settings.tts_voice_cache === 'string'
           ? JSON.parse(settings.tts_voice_cache)
           : (settings.tts_voice_cache || []),
-        gemini_api_key: settings.gemini_api_key || '',
-        supabase_url: settings.supabase_url || '',
-        supabase_key: settings.supabase_key || '',
-        recaptcha_site_key: settings.recaptcha_site_key || '',
-        extra_api_keys: settings.extra_api_keys || [],
         updated_at: new Date().toISOString()
       };
 
@@ -3354,7 +3359,7 @@ async function loadStateFromSupabase(): Promise<any> {
       queryWithTimeout(supabase.from('posts').select('*').order('publish_date', { ascending: false })),
       queryWithTimeout(supabase.from('categories').select('*')),
       queryWithTimeout(supabase.from('comments').select('*')),
-      queryWithTimeout(supabase.from('profiles').select('*')),
+      queryWithTimeout(supabase.from('profiles').select('id,full_name,avatar_url,bio,website,role,created_at,updated_at')),
       queryWithTimeout(supabase.from('pages').select('*')),
       queryWithTimeout(supabase.from('quizzes').select('*')),
       queryWithTimeout(supabase.from('site_settings').select('*').eq('id', 'singleton').maybeSingle()),
@@ -3391,7 +3396,7 @@ async function loadStateFromSupabase(): Promise<any> {
     if (!authorsRes.error && authorsRes.data) {
       state.authors = authorsRes.data.map((p: any) => ({
         id: fromDbUUID(p.id),
-        name: p.name || 'Anonymous User',
+        name: p.full_name || p.name || 'Anonymous User',
         avatar_url: p.avatar_url || '',
         bio: p.bio || '',
         role_tag: p.role === 'admin' ? 'Administrator' : 'Clinical Advisor',
@@ -3417,10 +3422,11 @@ async function loadStateFromSupabase(): Promise<any> {
       if (typeof raw === 'string') {
         try { raw = JSON.parse(raw); } catch {}
       }
-      state.site_settings = {
+      // SECURITY: strip any legacy credential fields before the state is served publicly
+      state.site_settings = stripSecretFields({
         ...(typeof raw === 'object' && raw ? raw : {}),
         ...settingsRes.data
-      };
+      });
     }
     if (!plansRes.error && plansRes.data) {
       state.plans = plansRes.data;
@@ -4937,14 +4943,19 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
   const cleanEmail = email.trim().toLowerCase();
 
   try {
-    // 1. Enforce backend security: check if any admin already exists
+    // 1. Enforce backend security: authoritative DB lookup (never the client-poisonable state cache)
+    const svc = getServiceRoleSupabase();
+    if (!svc) {
+      res.status(503).json({ error: 'First-admin setup requires SUPABASE_SERVICE_ROLE_KEY on the server. Install it and retry.' });
+      return;
+    }
     let existingAdmin: any = null;
-    if (serverCacheState) {
-      const adminUsersList = Array.isArray(serverCacheState.admin_users) ? serverCacheState.admin_users : [];
-      const profilesList = Array.isArray(serverCacheState.profiles) ? serverCacheState.profiles : [];
-
-      existingAdmin = adminUsersList.find((u: any) => (u.role === 'admin' || u.role === 'Super Admin') && u.is_active !== false) ||
-                      profilesList.find((p: any) => (p.role === 'admin' || p.role === 'Super Admin') && !p.is_suspended);
+    const { data: existingAdminRows, error: existingAdminErr } = await svc.from('profiles')
+      .select('id, email')
+      .in('role', ['admin', 'superadmin', 'Administrator', 'Editor', 'Super Admin'])
+      .limit(1);
+    if (!existingAdminErr && existingAdminRows && existingAdminRows.length > 0) {
+      existingAdmin = existingAdminRows[0];
     }
 
     if (existingAdmin && existingAdmin.email && existingAdmin.email.toLowerCase() !== cleanEmail) {
@@ -4970,7 +4981,7 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
           data: {
             full_name: cleanName,
             username: cleanEmail.split('@')[0].toLowerCase(),
-            role: 'Admin'
+            role: 'user'
           }
         }
       });
@@ -5107,14 +5118,21 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
     // Persist serverCacheState to disk
     await saveServerCacheState(serverCacheState);
 
-    // 5. Attempt best-effort REST sync to Supabase (ignore RLS error if unprivileged)
-    if (supabase) {
-      try {
-        await supabase.from('profiles').upsert(profileRecord);
-        await supabase.from('admin_users').upsert(adminUserRecord);
-      } catch (e: any) {
-        console.warn('Supabase REST background sync notice:', e.message || e);
-      }
+    // 5. Promote the account to administrator via the service role (authoritative DB write)
+    try {
+      const { error: profileUpsertErr } = await svc.from('profiles').upsert({
+        id: userId,
+        email: cleanEmail,
+        full_name: cleanName,
+        role: 'admin',
+        is_suspended: false,
+        updated_at: nowIso
+      }, { onConflict: 'id' });
+      if (profileUpsertErr) throw new Error(profileUpsertErr.message);
+      console.log(`ADMIN ROLE PERSISTED: ${cleanEmail} promoted via service role.`);
+    } catch (e: any) {
+      res.status(500).json({ error: 'Failed to persist administrator role: ' + (e.message || e) });
+      return;
     }
 
     console.log(`✅ First administrator [${cleanEmail}] configured successfully. User ID: ${userId}`);
@@ -5487,7 +5505,7 @@ app.get('/api/state', async (req: Request, res: Response) => {
   res.json(serverCacheState || {});
 });
 
-app.post('/api/state', async (req: Request, res: Response) => {
+app.post('/api/state', adminAuthMiddleware, async (req: Request, res: Response) => {
   const newState = req.body;
   if (!newState || typeof newState !== 'object') {
      res.status(400).json({ error: 'Payload must be a valid state object.' });
@@ -5495,6 +5513,11 @@ app.post('/api/state', async (req: Request, res: Response) => {
   }
   
   try {
+    // SECURITY: never accept credential-like fields from the client payload
+    if (newState.site_settings) {
+      newState.site_settings = stripSecretFields(newState.site_settings);
+    }
+
     // Preserve existing sensitive server state fields if client doesn't send them
     if (serverCacheState && serverCacheState.site_settings) {
       if (newState.site_settings) {

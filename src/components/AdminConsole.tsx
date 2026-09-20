@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { heartsync } from '../store';
+
+// Attach the current admin session to privileged API calls.
+const getAdminAuthHeaders = async (): Promise<Record<string, string>> => {
+  try {
+    if (heartsync.supabase) {
+      const { data: { session } } = await heartsync.supabase.auth.getSession();
+      if (session?.access_token) return { Authorization: `Bearer ${session.access_token}` };
+    }
+  } catch (_) { /* not signed in */ }
+  return {};
+};
+
+const adminFetch = async (url: string, init: any = {}): Promise<Response> => {
+  const headers = { ...(init.headers || {}), ...(await getAdminAuthHeaders()) };
+  return fetch(url, { ...init, headers });
+};
 import { Post, Category, Comment, AdZone, NewsletterSubscriber, SiteSettings, User, Author, Page, SidebarWidget, FooterSection, MediaItem, HeaderSettings, HeaderMenuItem, HeroSettings, Quiz, QuizQuestion } from '../types';
 import { 
   LayoutDashboard, FileText, FolderHeart, Folder, Image as ImageIcon, MessageSquare, 
@@ -554,7 +570,7 @@ export default function AdminConsole({
         const payload: Record<string, string> = {};
         coreTexts.forEach(t => { payload[t] = t; });
 
-        const res = await fetch('/api/gemini/translate', {
+        const res = await adminFetch('/api/gemini/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ payload, targetLang: adminLang })
@@ -740,7 +756,7 @@ export default function AdminConsole({
 
     // 1. Save directly to Server REST API
     try {
-      await fetch('/api/admin/integrations/save', {
+      await adminFetch('/api/admin/integrations/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1351,7 +1367,7 @@ export default function AdminConsole({
   useEffect(() => {
     async function loadServerIntegrations() {
       try {
-        const res = await fetch('/api/admin/integrations');
+        const res = await adminFetch('/api/admin/integrations');
         if (res.ok) {
           const data = await res.json();
           if (data && data.settings && Array.isArray(data.settings)) {
@@ -2532,7 +2548,7 @@ export default function AdminConsole({
     if (!item) return;
     setIsIndexingIndex(index);
     try {
-      const res = await fetch('/api/seo/index-submit', {
+      const res = await adminFetch('/api/seo/index-submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: item.url })
@@ -2566,7 +2582,7 @@ export default function AdminConsole({
     setIsIndexingAll(true);
     try {
       const urlsToSubmit = indexingUrls.map(u => u.url);
-      const res = await fetch('/api/seo/index-submit', {
+      const res = await adminFetch('/api/seo/index-submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ urls: urlsToSubmit })
@@ -4929,7 +4945,7 @@ export default function AdminConsole({
                                 const selectedPost = posts.find(p => p.id === autoGenArticleId);
                                 if (!selectedPost) throw new Error('No article selected');
 
-                                const response = await fetch('/api/gemini/generate-quiz', {
+                                const response = await adminFetch('/api/gemini/generate-quiz', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({
@@ -5852,7 +5868,7 @@ export default function AdminConsole({
                                 return;
                               }
                               setOutlineLoading(true);
-                              fetch('/api/gemini/assist', {
+                              adminFetch('/api/gemini/assist', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
@@ -6322,7 +6338,7 @@ export default function AdminConsole({
                                   <button
                                     onClick={() => {
                                       setIsSynthesizingId(story.id);
-                                      fetch('/api/gemini/generate-article', {
+                                      adminFetch('/api/gemini/generate-article', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({
@@ -12436,7 +12452,7 @@ export default function AdminConsole({
                                 triggerToast(`Dispatching live webhook to ${target.name}...`);
                                 try {
                                   const startTime = Date.now();
-                                  const res = await fetch('/api/webhooks/dispatch', {
+                                  const res = await adminFetch('/api/webhooks/dispatch', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
@@ -12576,7 +12592,7 @@ export default function AdminConsole({
                             setIsCheckingCicd(true);
                             triggerToast('Executing real-time CI/CD pipeline verification...');
                             try {
-                              const res = await fetch('/api/cicd/check', { method: 'POST' });
+                              const res = await adminFetch('/api/cicd/check', { method: 'POST' });
                               const data = await res.json();
                               if (data.success) {
                                 setCicdReport(data);
@@ -15614,7 +15630,7 @@ export default function AdminConsole({
                               triggerToast('Running real-time DNS & HTTP probe sequence...');
                               try {
                                 const targetDomains = domainList.map(d => d.domain);
-                                const res = await fetch('/api/dns/diagnostics', {
+                                const res = await adminFetch('/api/dns/diagnostics', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ domains: targetDomains })

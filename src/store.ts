@@ -2083,6 +2083,14 @@ export class HeartsyncStore {
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // Server state sync requires an administrator session. Readers keep
+            // full local persistence; this is not an error condition.
+            console.info('State sync skipped: server requires an administrator session.');
+            this.isSaving = false;
+            this.onStateChangeCallbacks.forEach(cb => cb());
+            return null;
+          }
           const errData = await response.json().catch(() => ({}));
           throw new Error(errData.error || errData.details || `HTTP error ${response.status}`);
         }
@@ -3116,7 +3124,17 @@ export class HeartsyncStore {
     }
 
     if (this.supabase) {
-      this.supabase.from('comments').insert([newComment]).then(({ error }) => {
+      // Schema-accurate column mapping for the public comments table
+      this.supabase.from('comments').insert([{
+        id: newComment.id,
+        post_id: postId,
+        author_name: name,
+        author_email: email,
+        content,
+        is_approved: isApproved,
+        parent_id: parentId ?? null,
+        created_at: newComment.created_at
+      }]).then(({ error }) => {
         if (error) console.warn('Supabase comment insert failed:', error);
       });
     }
