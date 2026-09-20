@@ -6800,8 +6800,10 @@ async function resolveAdSenseClientIdServer(): Promise<{ clientId: string; activ
     };
   }
 
-  // 4. Ultimate fallback to standard test publisher ID
-  return { clientId: 'ca-pub-3940256099942544', active: true };
+  // 4. Ultimate fallback to the production publisher ID (was Google's demo ID —
+  // never ship that to real traffic; it also matched the demo ID baked in dist
+  // HTML so the static Vercel path served the demo account un-swapped)
+  return { clientId: 'ca-pub-3404100134534192', active: true };
 }
 
 // Handler to serve index.html dynamically injected with dynamic SEO meta tags and correct AdSense Publisher ID
@@ -7268,7 +7270,9 @@ async function handleDynamicHtml(req: Request, res: Response) {
   html = html.replace(/<html lang=".*?"/gi, `<html lang="${lang}"`);
 
   // Intercept Google AdSense Publisher Client ID and swap dynamically
-  html = html.replace(/ca-pub-3940256099942544/g, adsenseClientId);
+  // Swap either the legacy demo ID or the statically-baked production ID so the
+  // admin-configured publisher ID (env / integration_settings / site_settings) always wins.
+  html = html.replace(/ca-pub-(?:3940256099942544|3404100134534192)/g, adsenseClientId);
 
   // If the administrator has toggled AdSense OFF, we strip/deactivate the SDK script tags
   if (!adsenseActive) {
