@@ -14,6 +14,9 @@ import { SELFLOVE_REST_IS_NOT_A_REWARD } from './selflove-rest-is-not-a-reward';
 import { COMM_LISTEN_DONT_FIX } from './comm-listen-dont-fix';
 import { COMM_ANATOMY_APOLOGY } from './comm-anatomy-apology';
 import { COMM_DIGITAL_TONE } from './comm-digital-tone';
+import { LOVE_ROOMMATE_DRIFT } from './love-roommate-drift';
+import { LOVE_LONG_DISTANCE_MATH } from './love-long-distance-math';
+import { LOVE_ANXIOUS_AVOIDANT_DANCE } from './love-anxious-avoidant-dance';
 
 // HeartSync long-form corpus — genuinely written editorial pieces, added over
 // time in batches. Word target per article: ~2000 words. Never filler.
@@ -32,7 +35,10 @@ export const HEARTSYNC_ARTICLES: Post[] = [
   ...SELFLOVE_REST_IS_NOT_A_REWARD,
   ...COMM_LISTEN_DONT_FIX,
   ...COMM_ANATOMY_APOLOGY,
-  ...COMM_DIGITAL_TONE
+  ...COMM_DIGITAL_TONE,
+  ...LOVE_ROOMMATE_DRIFT,
+  ...LOVE_LONG_DISTANCE_MATH,
+  ...LOVE_ANXIOUS_AVOIDANT_DANCE
 ];
 
 // Crawler/sitemap-facing SEO projection of the in-code corpus. Kept lean (no
