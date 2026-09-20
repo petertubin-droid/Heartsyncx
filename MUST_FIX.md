@@ -83,12 +83,25 @@ Post-migration verification (all checked live):
       whole Cloud SQL path + SQL_* env group), `tuneSupabaseDatabase` no-op,
       unused routes (`/api/gemini/run-ai-feature`, `generate-page`, `summarize` if no
       caller), `public/_redirects`.
-- [ ] After live-DB verification: drop or archive ~35 unreferenced tables (legacy
-      `users`, `rss_*`, `ai_*`, `api_keys`, `api_logs`, `invoices`, `transactions`,
-      `premium_access`, `dashboard_stats`, `reading_statistics`, `testimonials`,
-      `banners`, `navigation`, `footer`, `seo_settings`, `ai_settings`,
-      `rewarded_unlock_*`, `email_history/events`, etc.) and the duplicate
-      `heartsync-media` storage bucket.
+- [x] DONE (2026-09-20): 42 unreferenced tables dropped from the live DB
+      (legacy `users`, `rss_*`, `ai_*`, `api_keys`, `api_logs`, `invoices`,
+      `transactions`, `premium_access`, `dashboard_stats`, `reading_statistics`,
+      `testimonials`, `banners`, `navigation`, `footer`, `seo_settings`,
+      `ai_settings`, `rewarded_unlock_*`, `email_history/events`,
+      `featured_posts`, `trending_posts`, `notifications`, `contact_messages`,
+      `cookie_preferences`, `search_index`, etc.). Verified zero app/server/SQL-sync
+      references first (word-boundary scan + false-positive triage); all dropped
+      RESTRICT (no hidden dependents; the `users` FKs all point at `auth.users`).
+      80 -> 38 tables. The orphaned `handle_new_user_signup()` (client-metadata
+      role trust, unattached) and dead `create_notification()` were dropped too.
+      The duplicate `heartsync-media` bucket is deleted (Storage API) and its
+      policies tightened to `bucket_id = 'media'`. Non-empty dropped-table rows
+      (featured_posts x2, trending_posts x2, seo/ai singleton seeds) are archived
+      at `supabase/archive/2026-09-20-phase4-dropped-tables.json`. schema.sql was
+      scrubbed of all dropped-table DDL (77 statements), gained DROP POLICY guards
+      for the last 2 unguarded CREATE POLICYs, and now reruns idempotently
+      against the live DB. `user_settings` + `user_sessions` KEPT (server.ts
+      account-merge writes both).
 - [ ] Category visibility: remove the hardcoded `VALID_RELATIONSHIP_SLUGS` whitelist in
       `src/store.ts` or make it admin-configurable (it hides DB categories).
 

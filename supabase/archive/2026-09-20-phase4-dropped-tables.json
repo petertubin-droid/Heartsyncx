@@ -1,0 +1,33 @@
+{
+  "archived": "2026-09-20",
+  "project": "pdtibsfasvicjptqirro",
+  "reason": "Phase 4: unreferenced legacy tables dropped; data preserved verbatim",
+  "data": {
+    "featured_posts": [
+      {
+        "row": "{\"post_id\":\"post-1\",\"position_index\":1,\"position\":0,\"created_at\":\"2026-09-20T07:05:49.601996+00:00\"}"
+      },
+      {
+        "row": "{\"post_id\":\"post-2\",\"position_index\":2,\"position\":0,\"created_at\":\"2026-09-20T07:05:49.601996+00:00\"}"
+      }
+    ],
+    "trending_posts": [
+      {
+        "row": "{\"post_id\":\"post-3\",\"score\":95,\"updated_at\":\"2026-07-23T15:33:01.118631+00:00\"}"
+      },
+      {
+        "row": "{\"post_id\":\"post-4\",\"score\":90,\"updated_at\":\"2026-07-23T15:33:01.118631+00:00\"}"
+      }
+    ],
+    "seo_settings": [
+      {
+        "row": "{\"id\":\"14826a81-704d-46f6-a3b9-13dc44f30351\",\"entity_type\":\"site\",\"entity_id\":\"global\",\"title\":null,\"description\":null,\"keywords\":[],\"og_image\":null,\"twitter_card\":null,\"canonical_url\":null,\"robots\":\"index, follow\",\"sitemap_priority\":0.5,\"created_at\":\"2026-09-20T07:07:06.555068+00:00\",\"updated_at\":\"2026-09-20T07:07:06.555068+00:00\",\"meta_title\":\"Heartsync - Clinical Relationship Insights\",\"meta_description\":\"Discover evidence-based research on adult attachment, intimacy, and romantic communication.\",\"robots_txt\":null,\"sitemap_enabled\":true}"
+      }
+    ],
+    "ai_settings": [
+      {
+        "row": "{\"id\":\"139407e8-f807-447f-a130-f3864ff96510\",\"model_preference\":null,\"created_at\":\"2026-09-20T07:07:06.555068+00:00\",\"default_provider\":\"gemini\",\"default_model\":\"gemini-2.1-pro\",\"api_keys\":{},\"system_prompt\":null,\"updated_at\":\"2026-09-20T07:07:06.555068+00:00\"}"
+      }
+    ]
+  }
+}

@@ -117,18 +117,6 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Legacy/Compatibility Users Table
-CREATE TABLE IF NOT EXISTS public.users (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  name TEXT,
-  role TEXT DEFAULT 'user',
-  avatar TEXT,
-  status TEXT DEFAULT 'active',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Admin Users Table
 CREATE TABLE IF NOT EXISTS public.admin_users (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -178,16 +166,6 @@ CREATE TABLE IF NOT EXISTS public.user_sessions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Activity Logs Table
-CREATE TABLE IF NOT EXISTS public.activity_logs (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id TEXT,
-  action TEXT NOT NULL,
-  details JSONB DEFAULT '{}'::jsonb,
-  ip_address TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Audit Logs Table
 CREATE TABLE IF NOT EXISTS public.audit_logs (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -219,67 +197,6 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   footer_text TEXT,
   social_links JSONB DEFAULT '{}'::jsonb,
   metadata JSONB DEFAULT '{}'::jsonb,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- SEO Settings Table
-CREATE TABLE IF NOT EXISTS public.seo_settings (
-  id TEXT PRIMARY KEY DEFAULT 'singleton',
-  meta_title TEXT,
-  meta_description TEXT,
-  keywords JSONB DEFAULT '[]'::jsonb,
-  og_image TEXT,
-  twitter_card TEXT DEFAULT 'summary_large_image',
-  canonical_url TEXT,
-  robots_txt TEXT,
-  sitemap_enabled BOOLEAN DEFAULT true,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- AI Settings Table
-CREATE TABLE IF NOT EXISTS public.ai_settings (
-  id TEXT PRIMARY KEY DEFAULT 'singleton',
-  default_provider TEXT DEFAULT 'gemini',
-  default_model TEXT DEFAULT 'gemini-2.1-pro',
-  system_prompt TEXT,
-  api_keys JSONB DEFAULT '{}'::jsonb,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Navigation Menu Table
-CREATE TABLE IF NOT EXISTS public.navigation (
-  id TEXT PRIMARY KEY DEFAULT 'main_header',
-  items JSONB DEFAULT '[]'::jsonb,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Footer Menu Table
-CREATE TABLE IF NOT EXISTS public.footer (
-  id TEXT PRIMARY KEY DEFAULT 'main_footer',
-  sections JSONB DEFAULT '[]'::jsonb,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Promotional Banners Table
-CREATE TABLE IF NOT EXISTS public.banners (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  title TEXT,
-  content TEXT,
-  image_url TEXT,
-  link_url TEXT,
-  is_active BOOLEAN DEFAULT true,
-  position TEXT DEFAULT 'top',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Cookie Preferences Table
-CREATE TABLE IF NOT EXISTS public.cookie_preferences (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id TEXT,
-  essential BOOLEAN DEFAULT true,
-  analytics BOOLEAN DEFAULT false,
-  marketing BOOLEAN DEFAULT false,
-  functional BOOLEAN DEFAULT false,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -345,38 +262,6 @@ CREATE TABLE IF NOT EXISTS public.posts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Featured Posts Junction / Position Table
-CREATE TABLE IF NOT EXISTS public.featured_posts (
-  post_id TEXT PRIMARY KEY REFERENCES public.posts(id) ON DELETE CASCADE,
-  position INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Trending Posts Table
-CREATE TABLE IF NOT EXISTS public.trending_posts (
-  post_id TEXT PRIMARY KEY REFERENCES public.posts(id) ON DELETE CASCADE,
-  score NUMERIC DEFAULT 0,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Related Posts Mapping Table
-CREATE TABLE IF NOT EXISTS public.related_posts (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  post_id TEXT NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
-  related_post_id TEXT NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Article Revisions Table
-CREATE TABLE IF NOT EXISTS public.article_revisions (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  post_id TEXT NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  revised_by TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Custom Pages Table
 CREATE TABLE IF NOT EXISTS public.pages (
   id TEXT PRIMARY KEY,
@@ -412,28 +297,6 @@ CREATE TABLE IF NOT EXISTS public.quizzes (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Testimonials Table
-CREATE TABLE IF NOT EXISTS public.testimonials (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  author_name TEXT NOT NULL,
-  author_role TEXT,
-  avatar_url TEXT,
-  quote TEXT NOT NULL,
-  rating INT DEFAULT 5,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Redirects Table
-CREATE TABLE IF NOT EXISTS public.redirects (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  source_path TEXT NOT NULL UNIQUE,
-  target_url TEXT NOT NULL,
-  redirect_type INT DEFAULT 301,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- ----------------------------------------------------------------------------
 -- 6. SUBSCRIPTIONS, MONETIZATION & BILLING
 -- ----------------------------------------------------------------------------
@@ -466,15 +329,6 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Subscription History Table
-CREATE TABLE IF NOT EXISTS public.subscription_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT NOT NULL,
-  action TEXT NOT NULL,
-  details JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Payments Table
 CREATE TABLE IF NOT EXISTS public.payments (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -485,40 +339,6 @@ CREATE TABLE IF NOT EXISTS public.payments (
   status TEXT DEFAULT 'completed',
   payment_method TEXT DEFAULT 'credit_card',
   transaction_id TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Invoices Table
-CREATE TABLE IF NOT EXISTS public.invoices (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id TEXT NOT NULL,
-  subscription_id TEXT REFERENCES public.subscriptions(id) ON DELETE SET NULL,
-  amount NUMERIC NOT NULL,
-  currency TEXT DEFAULT 'USD',
-  status TEXT DEFAULT 'paid',
-  pdf_url TEXT,
-  due_date TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Financial Transactions Table
-CREATE TABLE IF NOT EXISTS public.transactions (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id TEXT NOT NULL,
-  type TEXT NOT NULL,
-  amount NUMERIC NOT NULL,
-  status TEXT DEFAULT 'success',
-  metadata JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Premium Access Grants Table
-CREATE TABLE IF NOT EXISTS public.premium_access (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id TEXT NOT NULL,
-  feature_key TEXT NOT NULL,
-  expires_at TIMESTAMPTZ,
-  granted_by TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -553,35 +373,6 @@ CREATE TABLE IF NOT EXISTS public.ad_providers (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Advertisement Logs Table
-CREATE TABLE IF NOT EXISTS public.advertisement_logs (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  campaign_id TEXT,
-  event_type TEXT NOT NULL,
-  ip_address TEXT,
-  user_agent TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Rewarded Unlock Sessions Table
-CREATE TABLE IF NOT EXISTS public.rewarded_unlock_sessions (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id TEXT NOT NULL,
-  article_id TEXT,
-  ad_watched BOOLEAN DEFAULT false,
-  expires_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Rewarded Unlock History Table
-CREATE TABLE IF NOT EXISTS public.rewarded_unlock_history (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id TEXT NOT NULL,
-  article_id TEXT,
-  reward_type TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- ----------------------------------------------------------------------------
 -- 7. ENGAGEMENT & COMMUNICATIONS
 -- ----------------------------------------------------------------------------
@@ -594,27 +385,6 @@ CREATE TABLE IF NOT EXISTS public.subscribers (
   status TEXT DEFAULT 'active',
   source TEXT DEFAULT 'website',
   subscribed_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Contact Messages Table
-CREATE TABLE IF NOT EXISTS public.contact_messages (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  subject TEXT,
-  message TEXT NOT NULL,
-  is_read BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Admin Notifications Table
-CREATE TABLE IF NOT EXISTS public.admin_notifications (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  title TEXT NOT NULL,
-  message TEXT NOT NULL,
-  type TEXT DEFAULT 'info',
-  is_read BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Email Templates Table
@@ -642,25 +412,6 @@ CREATE TABLE IF NOT EXISTS public.email_campaigns (
   click_rate NUMERIC DEFAULT 0,
   scheduled_at TIMESTAMPTZ,
   sent_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Email History Table
-CREATE TABLE IF NOT EXISTS public.email_history (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  recipient_email TEXT NOT NULL,
-  subject TEXT NOT NULL,
-  template_id TEXT,
-  status TEXT DEFAULT 'sent',
-  sent_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Email Events Table
-CREATE TABLE IF NOT EXISTS public.email_events (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  campaign_id TEXT,
-  email TEXT NOT NULL,
-  event_type TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -712,27 +463,6 @@ CREATE TABLE IF NOT EXISTS public.integration_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- API Keys Table
-CREATE TABLE IF NOT EXISTS public.api_keys (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  name TEXT NOT NULL,
-  key_prefix TEXT NOT NULL,
-  key_hash TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- API Logs Table
-CREATE TABLE IF NOT EXISTS public.api_logs (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  key_id TEXT,
-  endpoint TEXT NOT NULL,
-  status_code INT NOT NULL,
-  response_time_ms INT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Webhook Logs Table
 CREATE TABLE IF NOT EXISTS public.webhook_logs (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -756,50 +486,6 @@ CREATE TABLE IF NOT EXISTS public.rss_feeds (
   last_sync TIMESTAMPTZ DEFAULT NOW()
 );
 
--- RSS Imported Articles Table
-CREATE TABLE IF NOT EXISTS public.rss_imported_articles (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  feed_id TEXT REFERENCES public.rss_feeds(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  source_url TEXT NOT NULL,
-  imported_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- RSS Import History Table
-CREATE TABLE IF NOT EXISTS public.rss_import_history (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  feed_id TEXT,
-  articles_imported INT DEFAULT 0,
-  status TEXT DEFAULT 'success',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- AI Providers Catalog
-CREATE TABLE IF NOT EXISTS public.ai_providers (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  status TEXT DEFAULT 'active',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- AI Content Generations History
-CREATE TABLE IF NOT EXISTS public.ai_generations (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  prompt TEXT NOT NULL,
-  response TEXT NOT NULL,
-  model_used TEXT,
-  tokens_used INT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- AI Prompt History
-CREATE TABLE IF NOT EXISTS public.ai_prompt_history (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  prompt TEXT NOT NULL,
-  category TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- ----------------------------------------------------------------------------
 -- 10. MEDIA & ANALYTICS
 -- ----------------------------------------------------------------------------
@@ -815,15 +501,6 @@ CREATE TABLE IF NOT EXISTS public.media (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Media Usage Junction Table
-CREATE TABLE IF NOT EXISTS public.media_usage (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  media_id TEXT REFERENCES public.media(id) ON DELETE CASCADE,
-  entity_type TEXT NOT NULL,
-  entity_id TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Traffic Analytics Table
 CREATE TABLE IF NOT EXISTS public.analytics (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -831,27 +508,6 @@ CREATE TABLE IF NOT EXISTS public.analytics (
   views INT DEFAULT 1,
   unique_visitors INT DEFAULT 1,
   date DATE DEFAULT CURRENT_DATE
-);
-
--- Dashboard Aggregated Stats Table
-CREATE TABLE IF NOT EXISTS public.dashboard_stats (
-  id TEXT PRIMARY KEY DEFAULT 'current',
-  total_users INT DEFAULT 0,
-  active_subscribers INT DEFAULT 0,
-  monthly_revenue NUMERIC DEFAULT 0,
-  total_articles INT DEFAULT 0,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Reading Statistics Table
-CREATE TABLE IF NOT EXISTS public.reading_statistics (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id TEXT,
-  post_id TEXT REFERENCES public.posts(id) ON DELETE CASCADE,
-  time_spent_seconds INT DEFAULT 0,
-  scroll_percentage INT DEFAULT 0,
-  completed BOOLEAN DEFAULT false,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ----------------------------------------------------------------------------
@@ -900,31 +556,13 @@ CREATE POLICY "Public read authors" ON public.authors FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Public read tags" ON public.tags;
 CREATE POLICY "Public read tags" ON public.tags FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Public read featured_posts" ON public.featured_posts;
-CREATE POLICY "Public read featured_posts" ON public.featured_posts FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Public read trending_posts" ON public.trending_posts;
-CREATE POLICY "Public read trending_posts" ON public.trending_posts FOR SELECT USING (true);
-
 -- Pages & Banners
 DROP POLICY IF EXISTS "Public read pages" ON public.pages;
 CREATE POLICY "Public read pages" ON public.pages FOR SELECT USING (is_deleted = false OR public.is_admin());
 
-DROP POLICY IF EXISTS "Public read banners" ON public.banners;
-CREATE POLICY "Public read banners" ON public.banners FOR SELECT USING (is_active = true OR public.is_admin());
-
 -- Site & SEO Settings
 DROP POLICY IF EXISTS "Public read site_settings" ON public.site_settings;
 CREATE POLICY "Public read site_settings" ON public.site_settings FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Public read seo_settings" ON public.seo_settings;
-CREATE POLICY "Public read seo_settings" ON public.seo_settings FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Public read navigation" ON public.navigation;
-CREATE POLICY "Public read navigation" ON public.navigation FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Public read footer" ON public.footer;
-CREATE POLICY "Public read footer" ON public.footer FOR SELECT USING (true);
 
 -- Plans & Sponsorships
 DROP POLICY IF EXISTS "Public read plans" ON public.plans;
@@ -936,15 +574,6 @@ CREATE POLICY "Public read sponsorship_campaigns" ON public.sponsorship_campaign
 -- Media
 DROP POLICY IF EXISTS "Public read media" ON public.media;
 CREATE POLICY "Public read media" ON public.media FOR SELECT USING (true);
-
--- ----------------------------------------------------------------------------
--- POLICIES: PUBLIC FORM SUBMISSIONS
--- Allow visitors to subscribe, submit contact forms, and post approved comments
--- ----------------------------------------------------------------------------
-
--- Contact Messages
-DROP POLICY IF EXISTS "Public insert contact_messages" ON public.contact_messages;
-CREATE POLICY "Public insert contact_messages" ON public.contact_messages FOR INSERT WITH CHECK (true);
 
 -- Subscribers
 DROP POLICY IF EXISTS "Public insert subscribers" ON public.subscribers;
@@ -1015,6 +644,7 @@ GRANT UPDATE (full_name, avatar_url, bio, website) ON public.profiles TO authent
 -- ----------------------------------------------------------------------------
 -- SECURITY FIX: users must be able to create their own user_settings rows
 -- ----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Users insert own settings" ON public.user_settings;
 CREATE POLICY "Users insert own settings" ON public.user_settings
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
@@ -1194,18 +824,19 @@ END $$;
 -- ----------------------------------------------------------------------------
 
 INSERT INTO storage.buckets (id, name, public) 
-VALUES ('media', 'media', true), ('heartsync-media', 'heartsync-media', true)
+VALUES ('media', 'media', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Public read access for media objects
 DROP POLICY IF EXISTS "Public Media View" ON storage.objects;
 CREATE POLICY "Public Media View" ON storage.objects 
-FOR SELECT USING (bucket_id IN ('media', 'heartsync-media'));
+FOR SELECT USING (bucket_id = 'media');
 
 -- Authenticated and Admin upload access for media objects
 DROP POLICY IF EXISTS "Admin & User Media Upload" ON storage.objects;
+DROP POLICY IF EXISTS "Admin Media Upload" ON storage.objects;
 CREATE POLICY "Admin Media Upload" ON storage.objects
-FOR INSERT WITH CHECK (bucket_id IN ('media', 'heartsync-media') AND public.is_admin());
+FOR INSERT WITH CHECK (bucket_id = 'media' AND public.is_admin());
 
 
 -- ------------------------------------------------------------------------
@@ -1227,10 +858,6 @@ ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DE
 ALTER TABLE public.authors ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE public.authors ADD COLUMN IF NOT EXISTS avatar TEXT;
 ALTER TABLE public.authors ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS content TEXT;
-ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS image_url TEXT;
-ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS position TEXT DEFAULT 'top';
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS parent_id TEXT REFERENCES public.categories(id) ON DELETE SET NULL;
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0;
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
@@ -1238,8 +865,6 @@ ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS author_name TEXT NOT NULL;
 ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS author_email TEXT;
 ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT true;
 ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS parent_id TEXT;
-ALTER TABLE public.contact_messages ADD COLUMN IF NOT EXISTS subject TEXT;
-ALTER TABLE public.contact_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false;
 ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS content TEXT NOT NULL;
 ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS target_audience TEXT DEFAULT 'all';
 ALTER TABLE public.email_campaigns ADD COLUMN IF NOT EXISTS sent_count INT DEFAULT 0;
@@ -1252,10 +877,6 @@ ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS body_html TEXT NOT N
 ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'transactional';
 ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS variables JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
-ALTER TABLE public.featured_posts ADD COLUMN IF NOT EXISTS position INT DEFAULT 0;
-ALTER TABLE public.featured_posts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
-ALTER TABLE public.footer ADD COLUMN IF NOT EXISTS sections JSONB DEFAULT '[]'::jsonb;
-ALTER TABLE public.footer ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.integration_logs ADD COLUMN IF NOT EXISTS action TEXT;
 ALTER TABLE public.integration_logs ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'success';
 ALTER TABLE public.integration_logs ADD COLUMN IF NOT EXISTS details TEXT;
@@ -1268,8 +889,6 @@ ALTER TABLE public.media ADD COLUMN IF NOT EXISTS url TEXT NOT NULL;
 ALTER TABLE public.media ADD COLUMN IF NOT EXISTS type TEXT;
 ALTER TABLE public.media ADD COLUMN IF NOT EXISTS size INT;
 ALTER TABLE public.media ADD COLUMN IF NOT EXISTS storage_path TEXT;
-ALTER TABLE public.navigation ADD COLUMN IF NOT EXISTS items JSONB DEFAULT '[]'::jsonb;
-ALTER TABLE public.navigation ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.pages ADD COLUMN IF NOT EXISTS page_type TEXT DEFAULT 'custom';
 ALTER TABLE public.pages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
 ALTER TABLE public.pages ADD COLUMN IF NOT EXISTS meta_title TEXT;
@@ -1286,10 +905,6 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'
 ALTER TABLE public.roles ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.rss_feeds ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Active';
 ALTER TABLE public.rss_feeds ADD COLUMN IF NOT EXISTS last_sync TIMESTAMPTZ DEFAULT NOW();
-ALTER TABLE public.seo_settings ADD COLUMN IF NOT EXISTS meta_title TEXT;
-ALTER TABLE public.seo_settings ADD COLUMN IF NOT EXISTS meta_description TEXT;
-ALTER TABLE public.seo_settings ADD COLUMN IF NOT EXISTS robots_txt TEXT;
-ALTER TABLE public.seo_settings ADD COLUMN IF NOT EXISTS sitemap_enabled BOOLEAN DEFAULT true;
 ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS tagline TEXT DEFAULT 'Scientific Relationship Guidance & Emotional Alignment';
 ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS favicon_url TEXT;
 ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS header_style TEXT DEFAULT 'blur';
@@ -1306,11 +921,6 @@ ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS gateway TEXT DEFAULT '
 ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS gateway_subscription_id TEXT;
 ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE public.tags ADD COLUMN IF NOT EXISTS color TEXT;
-ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS author_role TEXT;
-ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS avatar_url TEXT;
-ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS rating INT DEFAULT 5;
-ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE public.user_roles ADD COLUMN IF NOT EXISTS id TEXT DEFAULT gen_random_uuid()::text;
 ALTER TABLE public.user_roles ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'light';
@@ -1319,11 +929,6 @@ ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 
 ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS preferences JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE public.webhook_logs ADD COLUMN IF NOT EXISTS webhook_id TEXT;
 ALTER TABLE public.webhook_logs ADD COLUMN IF NOT EXISTS response_status INT;
-ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS default_provider TEXT DEFAULT 'gemini';
-ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS default_model TEXT DEFAULT 'gemini-2.1-pro';
-ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS api_keys JSONB DEFAULT '{}'::jsonb;
-ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS system_prompt TEXT;
-ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 
 -- ----------------------------------------------------------------------------
@@ -1333,17 +938,6 @@ ALTER TABLE public.ai_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ D
 INSERT INTO public.site_settings (id, site_name, tagline) 
 VALUES ('singleton', 'Heartsync Wellness', 'Scientific Relationship Guidance & Emotional Alignment')
 ON CONFLICT (id) DO NOTHING;
-
--- NOTE: on the live project seo_settings/ai_settings/plans have UUID PKs
--- (legacy shape). Seed with generated UUIDs, only when the table is empty,
--- so the statement stays idempotent and type-correct on both shapes.
-INSERT INTO public.seo_settings (id, entity_type, entity_id, meta_title, meta_description)
-SELECT gen_random_uuid(), 'site', 'global', 'Heartsync - Clinical Relationship Insights', 'Discover evidence-based research on adult attachment, intimacy, and romantic communication.'
-WHERE NOT EXISTS (SELECT 1 FROM public.seo_settings);
-
-INSERT INTO public.ai_settings (id, default_provider, default_model)
-SELECT gen_random_uuid(), 'gemini', 'gemini-2.1-pro'
-WHERE NOT EXISTS (SELECT 1 FROM public.ai_settings);
 
 INSERT INTO public.plans (id, name, price, billing_cycle, features)
 SELECT gen_random_uuid(), v.name, v.price, 'monthly', v.features::jsonb
