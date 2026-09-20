@@ -125,7 +125,12 @@ Post-migration verification (all checked live):
 - [ ] `GET /api/state` loads ~22 tables incl. full article bodies; add field
       projection / pagination.
 - [ ] Split the 16k-line AdminConsole out of the reader bundle (lazy import).
-- [ ] Avoid the double boot fetch (client loads /api/state AND direct Supabase sync).
+- [x] DONE (2026-09-20): double boot fetch eliminated. /api/state (fresh from
+      Supabase with a 5s TTL) is the single boot fetch — initSupabaseConnection
+      no longer fires a redundant full-table syncWithSupabase() on top of it.
+      syncWithSupabase stays for explicit re-syncs (admin login refresh).
+      Bonus: realtime postgres-change events (which arrive in bursts) now
+      debounced to one trailing /api/state refresh instead of one per event.
 - [ ] `posts.select('*')` in list views — project only list columns.
 
 ## PHASE 6 — SEO / PWA / a11y

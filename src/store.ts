@@ -946,7 +946,9 @@ export class HeartsyncStore {
         this.activeSupabaseUrl = url;
         this.activeSupabaseKey = key;
         console.log('🔌 Supabase initialized successfully as primary database store. URL:', url);
-        this.syncWithSupabase();
+        // Boot data comes from the single /api/state fetch (loadServerState,
+        // called from the constructor) — no duplicate full-table sync here.
+        // syncWithSupabase remains available for explicit re-syncs.
         this.restoreSupabaseSession();
         this.subscribeToRealtime();
       } catch (err) {
@@ -959,6 +961,20 @@ export class HeartsyncStore {
       this.activeSupabaseKey = null;
       console.log('🔌 Supabase connection credentials not configured or invalid. Running in local fallback state.');
     }
+  }
+
+  private serverStateRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Debounced /api/state refresh: realtime events arrive in bursts (a single
+   *  admin save fires many postgres change events) — collapse them into one
+   *  trailing full-state fetch. */
+  public queueServerStateRefresh(delayMs = 2000) {
+    if (typeof window === 'undefined') return;
+    if (this.serverStateRefreshTimer) clearTimeout(this.serverStateRefreshTimer);
+    this.serverStateRefreshTimer = setTimeout(() => {
+      this.serverStateRefreshTimer = null;
+      this.loadServerState();
+    }, delayMs);
   }
 
   public subscribeToRealtime() {
@@ -976,8 +992,8 @@ export class HeartsyncStore {
           'postgres_changes',
           { event: '*', schema: 'public' },
           (payload) => {
-            console.log('⚡ [REALTIME EVENT] Received postgres change event:', payload);
-            this.loadServerState();
+            console.log('⚡ [REALTIME EVENT] Received postgres change event:', payload.table, payload.eventType);
+            this.queueServerStateRefresh();
           }
         )
         .subscribe();
