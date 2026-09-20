@@ -11,6 +11,7 @@ import pg from 'pg';
 import jwt from 'jsonwebtoken';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { getArticleSeoData } from './src/utils/seoArticleData';
+import { HEARTSYNC_ARTICLE_SEO } from './src/utils/data/articles';
 import { Resend } from 'resend';
 
 // Load environmental parameters (both .env and .env.local)
@@ -6425,6 +6426,9 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
     { loc: `${baseUrl}/cookies`, lastmod: nowStr, changefreq: 'monthly', priority: '0.3' },
     { loc: `${baseUrl}/advertise`, lastmod: nowStr, changefreq: 'monthly', priority: '0.3' },
     { loc: `${baseUrl}/newsletter`, lastmod: nowStr, changefreq: 'monthly', priority: '0.4' },
+    { loc: `${baseUrl}/ai-copilot`, lastmod: nowStr, changefreq: 'weekly', priority: '0.7' },
+    { loc: `${baseUrl}/lovevault`, lastmod: nowStr, changefreq: 'weekly', priority: '0.6' },
+    { loc: `${baseUrl}/subscription`, lastmod: nowStr, changefreq: 'monthly', priority: '0.7' },
   ];
 
   let posts: any[] = [];
@@ -6486,6 +6490,15 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
 
   if (!isDbFetched && categories.length === 0 && serverCacheState && Array.isArray(serverCacheState.categories)) {
     categories = serverCacheState.categories.map((c: any) => ({ slug: c.slug }));
+  }
+
+  // Always include the in-code article corpus (not stored in the database)
+  const codeSlugs = new Set(posts.map((p: any) => p.slug));
+  for (const a of HEARTSYNC_ARTICLE_SEO) {
+    if (!codeSlugs.has(a.slug)) {
+      posts.push({ slug: a.slug, publish_date: a.publish_date });
+      codeSlugs.add(a.slug);
+    }
   }
 
   // Hardcode preloaded content fallbacks ONLY if database was not fetched and shared state is empty
@@ -6880,6 +6893,47 @@ async function handleDynamicHtml(req: Request, res: Response) {
   schemas.push(orgSchema);
   schemas.push(websiteSchema);
 
+  // BreadcrumbList schema for static pages so search engines render the
+  // site hierarchy trail (Home > Page) on result listings.
+  const STATIC_PAGE_LABELS: Record<string, string> = {
+    '/articles': 'Journal',
+    '/categories': 'Categories',
+    '/trending': 'Trending',
+    '/faq': 'FAQ',
+    '/about': 'About',
+    '/contact': 'Contact',
+    '/privacy': 'Privacy Policy',
+    '/disclaimer': 'Disclaimer',
+    '/terms': 'Terms of Service',
+    '/cookies': 'Cookie Policy',
+    '/advertise': 'Advertise',
+    '/newsletter': 'Newsletter',
+    '/subscription': 'Premium Membership',
+    '/ai-copilot': 'AI Guide',
+    '/lovevault': 'LoveVault'
+  };
+  const staticLabel = STATIC_PAGE_LABELS[req.path.replace(/\/$/, '')];
+  if (staticLabel && req.path !== '/') {
+    schemas.push({
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": `${baseUrl}/`
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": staticLabel,
+          "item": `${baseUrl}${req.path}`
+        }
+      ]
+    });
+  }
+
   // Query database or memory state for specific article or category info to populate dynamic meta tags
   if (!serverCacheState || Object.keys(serverCacheState).length === 0) {
     await initializeSharedState();
@@ -6943,6 +6997,31 @@ async function handleDynamicHtml(req: Request, res: Response) {
           post.category_name = catObj.name;
           post.category_slug = catObj.slug;
         }
+      }
+    }
+
+    // Articles that ship in the codebase (src/utils/data/articles) are not in
+    // the database — resolve them from the SEO projection so crawlers get
+    // real titles, descriptions, and BlogPosting/BreadcrumbList schemas.
+    if (slug && !post) {
+      const codeArticle = HEARTSYNC_ARTICLE_SEO.find((a) => a.slug === slug);
+      if (codeArticle) {
+        const catObj = Array.isArray(serverCacheState.categories)
+          ? serverCacheState.categories.find((c: any) => c.id === codeArticle.category_id)
+          : null;
+        post = {
+          slug: codeArticle.slug,
+          title: codeArticle.title,
+          excerpt: codeArticle.excerpt,
+          content: '', // body lives in the client bundle; wordCount falls back below
+          featured_image: codeArticle.featured_image,
+          publish_date: codeArticle.publish_date,
+          keywords: codeArticle.keywords,
+          seo_title: codeArticle.seo_title,
+          seo_description: codeArticle.seo_description,
+          category_name: catObj?.name || 'Relationship Science',
+          category_slug: catObj?.slug || 'relationship-science'
+        };
       }
     }
 

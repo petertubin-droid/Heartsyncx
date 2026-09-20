@@ -1563,6 +1563,64 @@ export default function App() {
               ['categories', 'category', 'articles', 'search', 'trending'].includes(currentTab) ? 'grid' :
               'home'
             }>
+              {/* Global breadcrumbs — every page except home/admin/auth keeps a
+                  crawlable Home trail; article/category views have their own richer trail. */}
+            {(() => {
+              const crumbs: { label: string; onClick?: () => void }[] = [{ label: 'Home', onClick: () => navigateTo('home') }];
+              const staticLabels: Record<string, string> = {
+                articles: 'Journal',
+                categories: 'Categories',
+                trending: 'Trending',
+                faq: 'FAQ',
+                about: 'About',
+                contact: 'Contact',
+                privacy: 'Privacy Policy',
+                disclaimer: 'Disclaimer',
+                terms: 'Terms of Service',
+                cookies: 'Cookie Policy',
+                advertise: 'Advertise',
+                newsletter: 'Newsletter',
+                subscription: 'Premium Membership',
+                ai_copilot: 'AI Guide',
+                lovevault: 'LoveVault',
+                search: 'Search'
+              };
+              if (currentTab === 'articles') {
+                crumbs.push({ label: 'Journal', onClick: () => navigateTo('articles') });
+              } else if (currentTab === 'categories') {
+                crumbs.push({ label: 'Categories', onClick: () => navigateTo('categories') });
+              } else if (currentTab === 'category') {
+                crumbs.push({ label: 'Categories', onClick: () => navigateTo('categories') });
+                const cat = heartsync.categories.find(c => c.slug === tabArg);
+                crumbs.push({ label: cat?.name || tabArg });
+              } else if (currentTab === 'author') {
+                crumbs.push({ label: 'Authors', onClick: () => navigateTo('articles') });
+                const author = heartsync.authors?.find((a: any) => a.slug === tabArg);
+                crumbs.push({ label: author?.name || tabArg });
+              } else if (staticLabels[currentTab]) {
+                crumbs.push({ label: staticLabels[currentTab] });
+              }
+
+              const showBreadcrumbs = currentTab !== 'home' && currentTab !== 'admin' && currentTab !== 'login' &&
+                currentTab !== 'error' && currentTab !== 'access-denied' && currentTab !== 'article';
+
+              if (!showBreadcrumbs || crumbs.length < 2) return null;
+              return (
+                <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[10px] text-zinc-400 dark:text-zinc-500 font-sans tracking-wide uppercase font-semibold mb-6 select-none">
+                  {crumbs.map((c, i) => (
+                    <span key={i} className="flex items-center gap-1.5">
+                      {i > 0 && <span aria-hidden="true">/</span>}
+                      {c.onClick ? (
+                        <button onClick={c.onClick} className="hover:text-rose-600 transition-colors">{c.label}</button>
+                      ) : (
+                        <span aria-current="page" className="text-zinc-600 dark:text-zinc-300">{c.label}</span>
+                      )}
+                    </span>
+                  ))}
+                </nav>
+              );
+            })()}
+
                {/* 1. HOMEPAGE */}
             {currentTab === 'home' && (() => {
               // Decoupled Draft vs Production Layout mapping

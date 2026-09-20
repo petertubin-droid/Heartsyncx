@@ -28,3 +28,34 @@ export const HEARTSYNC_ARTICLES: Post[] = [
   ...DATING_GREEN_FLAGS,
   ...SELFLOVE_REST_IS_NOT_A_REWARD
 ];
+
+// Crawler/sitemap-facing SEO projection of the in-code corpus. Kept lean (no
+// article bodies) so the server bundle stays small. Used by server-side meta
+// injection and the dynamic sitemap so these articles are fully indexable.
+export interface ArticleSeoProjection {
+  slug: string;
+  title: string;
+  excerpt: string;
+  publish_date: string;
+  featured_image: string;
+  read_time: number;
+  category_id: string;
+  tags: string[];
+  seo_title: string;
+  seo_description: string;
+  keywords: string[];
+}
+
+export const HEARTSYNC_ARTICLE_SEO: ArticleSeoProjection[] = HEARTSYNC_ARTICLES.map((p) => ({
+  slug: p.slug,
+  title: p.title,
+  excerpt: p.excerpt,
+  publish_date: p.publish_date,
+  featured_image: p.featured_image || '',
+  read_time: p.read_time || 10,
+  category_id: p.category_id || '',
+  tags: Array.isArray(p.tags) ? [...p.tags] : [],
+  seo_title: p.seo_title || p.title,
+  seo_description: p.seo_description || p.excerpt,
+  keywords: Array.isArray(p.keywords) ? [...p.keywords] : []
+}));
