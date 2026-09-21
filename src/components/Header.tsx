@@ -299,7 +299,7 @@ export default function Header({
         const { error } = await heartsync.supabase
           .from('profiles')
           .update({
-            name: profileName.trim(),
+            full_name: profileName.trim(),
             bio: profileBio.trim(),
             avatar_url: profileAvatar.trim()
           })

@@ -41,7 +41,7 @@ import {
   HelpCircle, AlertTriangle, User, Smile, PlusCircle, CheckCircle, 
   Trash2, ShieldAlert, BadgeInfo, BellRing, ChevronRight,
   BookmarkX, Award, AlertCircle, RefreshCw, Mail, Settings, Twitter, Facebook, Link as LinkIcon, Calendar, Clock,
-  HeartCrack, Brain, Flag, CircleDot, Lock, Play, Tv, Users, TrendingUp, Maximize2
+  HeartCrack, Brain, Flag, CircleDot, Lock, Play, Tv, Users, TrendingUp, Maximize2, ArrowRight
 } from 'lucide-react';
 
 export default function App() {
@@ -3754,28 +3754,29 @@ export default function App() {
                                 </>
                               )}
 
-                              {/* Indented Table of Contents Widget embedded in sticky region */}
+                              {/* Contents (TOC) Widget embedded in sticky region — Frelux-style */}
                               {siteSettings.article_table_of_contents_enabled !== false && headings.length > 0 && (
-                                <div className="pt-4 border-t border-zinc-200/50 dark:border-zinc-805/50 space-y-2 text-left">
-                                  <span className="text-[9px] font-mono tracking-widest text-zinc-400 uppercase font-bold block mb-1">Index Map</span>
-                                  <ul className="space-y-1.5 text-[11px] font-sans">
+                                <div className="pt-4 border-t border-zinc-200/50 dark:border-zinc-800/50 text-left">
+                                  <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                                    <BookOpen className="h-3.5 w-3.5" aria-hidden="true" /> Contents
+                                  </div>
+                                  <nav className="space-y-1 border-l border-zinc-200 dark:border-white/10">
                                     {headings.map((h) => (
-                                      <li key={h.id} className="leading-tight">
-                                        <a
-                                          href={`#${h.id}`}
-                                          className={`block transition-all hover:text-rose-500 ${
-                                            h.level === 3 ? 'pl-2 text-zinc-400 dark:text-zinc-500' : 'font-semibold'
-                                          } ${
-                                            activeHeadingId === h.id 
-                                              ? 'text-rose-505 border-l-2 border-rose-505 pl-1.5 font-bold' 
-                                              : 'text-zinc-550 dark:text-zinc-400'
-                                          }`}
-                                        >
-                                          {h.text}
-                                        </a>
-                                      </li>
+                                      <a
+                                        key={h.id}
+                                        href={`#${h.id}`}
+                                        className={`mt-2 block border-l-2 py-1.5 pl-3 text-xs transition-colors hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 ${
+                                          h.level === 3 ? 'text-zinc-400 dark:text-zinc-500' : 'font-semibold'
+                                        } ${
+                                          activeHeadingId === h.id
+                                            ? 'border-rose-500 text-rose-600 dark:text-rose-400'
+                                            : 'border-transparent text-zinc-500 dark:text-zinc-400'
+                                        }`}
+                                      >
+                                        {h.text}
+                                      </a>
                                     ))}
-                                  </ul>
+                                  </nav>
                                 </div>
                               )}
                             </div>
@@ -4203,6 +4204,47 @@ export default function App() {
                           </div>
                         </div>
                       )}
+
+                      {/* Previous / Next Article Navigation — Frelux-style */}
+                      {(() => {
+                        const sorted = [...publishedArticles].sort((a, b) =>
+                          new Date(a.publish_date || 0).getTime() -
+                          new Date(b.publish_date || 0).getTime());
+                        const idx = sorted.findIndex(a => a.id === activeArticle.id);
+                        if (idx === -1 || sorted.length < 2) return null;
+                        const prev = idx > 0 ? sorted[idx - 1] : null;
+                        const next = idx < sorted.length - 1 ? sorted[idx + 1] : null;
+                        if (!prev && !next) return null;
+                        const go = (slugOrId: string) => {
+                          navigateTo('article', slugOrId);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        };
+                        const cardCls = "group flex-1 min-w-0 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-5 text-left transition-all hover:border-rose-300 dark:hover:border-rose-500/40 hover:shadow-md";
+                        return (
+                          <div className="flex flex-col sm:flex-row items-stretch gap-4">
+                            {prev ? (
+                              <button onClick={() => go(prev.slug || prev.id)} className={cardCls}>
+                                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                                  <ArrowLeft className="h-3.5 w-3.5" /> Previous
+                                </span>
+                                <span className="mt-2 block truncate font-serif text-sm font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                                  {prev.title}
+                                </span>
+                              </button>
+                            ) : <div className="flex-1 hidden sm:block" />}
+                            {next ? (
+                              <button onClick={() => go(next.slug || next.id)} className={`${cardCls} sm:text-right`}>
+                                <span className="flex sm:justify-end items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                                  Next <ArrowRight className="h-3.5 w-3.5" />
+                                </span>
+                                <span className="mt-2 block truncate font-serif text-sm font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                                  {next.title}
+                                </span>
+                              </button>
+                            ) : <div className="flex-1 hidden sm:block" />}
+                          </div>
+                        );
+                      })()}
 
                       {/* Related Content Auto-Injected Block (or in sidebar per article_desktop_related_placement) */}
                       {!relatedInSidebar && (

@@ -5025,8 +5025,45 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
             console.warn('Supabase Auth signInWithPassword error:', signInError.message);
           }
 
+          // OWNER RECOVERY (2026-09-21): the email may already exist in Supabase
+          // Auth — most commonly the prior administrator demoted by the 2026-09
+          // ownership reset, whose auth.user row survives the demotion. When NO
+          // administrator exists, this wizard is the designated recovery path:
+          // reset the existing auth user's password via the service role and
+          // continue below so they are (re-)elected as THE first admin. Never
+          // triggered when an admin already exists (that path 403'd earlier),
+          // so this cannot be used to hijack a live admin account.
+          const looksLikeExistingUser = authErrorCode === 'user_already_exists'
+            || /already registered|already exists|user already/i.test(authErrorMessage || '')
+            || /invalid login credentials/i.test(signInError?.message || '');
+
+          if (!userId && looksLikeExistingUser && !existingAdmin) {
+            try {
+              const { data: recoveryProfile, error: recoveryErr } = await svc.from('profiles')
+                .select('id, email').ilike('email', cleanEmail).limit(1).maybeSingle();
+              if (!recoveryErr && recoveryProfile && recoveryProfile.id) {
+                const { error: resetErr } = await svc.auth.admin.updateUserById(recoveryProfile.id, {
+                  password: password,
+                  email_confirm: true
+                });
+                if (!resetErr) {
+                  userId = recoveryProfile.id;
+                  console.log(`♻️ Setup wizard recovery: password reset for existing auth user ${cleanEmail}; proceeding to first-admin election.`);
+                } else {
+                  console.warn('Setup wizard recovery password reset failed:', resetErr.message);
+                }
+              } else if (recoveryErr) {
+                console.warn('Setup wizard recovery lookup failed:', recoveryErr.message);
+              }
+            } catch (recoveryEx: any) {
+              console.warn('Setup wizard recovery error:', recoveryEx?.message || recoveryEx);
+            }
+          }
+
           // Check if failure is due to email rate limiting, unconfirmed email, or existing user
-          if (
+          if (userId) {
+            // recovery succeeded above — fall through to first-admin election below
+          } else if (
             authErrorCode === 'over_email_send_rate_limit' || 
             authStatus === 429 || 
             authErrorMessage?.toLowerCase().includes('rate limit') ||
