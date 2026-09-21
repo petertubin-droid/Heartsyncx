@@ -1030,13 +1030,7 @@ export default function AdminConsole({
     if (heartsync.rss_feeds && heartsync.rss_feeds.length > 0) return heartsync.rss_feeds;
     const saved = heartsync.getLocalStorage<string | null>('pn_rss_feeds', null);
     if (saved) return JSON.parse(saved);
-    return [
-      { id: 'rss-cnn', name: 'CNN World News', url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', status: 'Active', lastSync: '2026-05-26 14:22' },
-      { id: 'rss-bbc', name: 'BBC World News', url: 'https://feeds.bbci.co.uk/news/world/rss.xml', status: 'Active', lastSync: '2026-05-27 02:11' },
-      { id: 'rss-punch', name: 'Punch Nigeria Feed', url: 'https://punchng.com/feed/', status: 'Active', lastSync: '2026-05-27 06:05' },
-      { id: 'rss-vanguard', name: 'Vanguard News Group', url: 'https://www.vanguardngr.com/feed/', status: 'Active', lastSync: '2026-05-27 04:50' },
-      { id: 'rss-bellanaija', name: 'BellaNaija Gossip Hub', url: 'https://www.bellanaija.com/feed/', status: 'Active', lastSync: '2026-05-27 01:40' }
-    ];
+    return [];
   });
   const [newRssName, setNewRssName] = useState('');
   const [newRssUrl, setNewRssUrl] = useState('');
@@ -1138,11 +1132,7 @@ export default function AdminConsole({
     if (heartsync.campaigns && Array.isArray(heartsync.campaigns) && heartsync.campaigns.length > 0) {
       return heartsync.campaigns;
     }
-    return [
-      { id: 'camp-1', name: 'Attachment Style Mastery Masterclass', url: 'https://wellnesscouples.com/courses/attachment-mastery', impressions: 0, clicks: 0, status: 'Active' },
-      { id: 'camp-2', name: 'Gottman Intimacy Deck Companion', url: 'https://wellnesscouples.com/resources/intimacy-cards', impressions: 0, clicks: 0, status: 'Active' },
-      { id: 'camp-3', name: 'Couples Communication Retreat Promo', url: 'https://wellnesscouples.com/workshops/couples-retreat', impressions: 0, clicks: 0, status: 'Active' }
-    ];
+    return [];
   });
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newCampaignUrl, setNewCampaignUrl] = useState('');
@@ -9651,68 +9641,10 @@ export default function AdminConsole({
                         {/* PREMIUM EXPERT INTEGRATIONS & SOMATIC OPTIONS */}
                         <div className="space-y-3.5 bg-gradient-to-br from-rose-50/20 to-zinc-50 dark:from-zinc-950/40 dark:to-zinc-950/10 p-4 border border-rose-100/30 dark:border-zinc-800 rounded-2xl">
                           <label className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block border-b pb-1 font-sans border-rose-100/30 dark:border-zinc-800">
-                            Editor's Preface & Editorial Settings
+                            Reading Atmosphere & Layout Options
                           </label>
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between p-1">
-                              <div className="space-y-0.5">
-                                <strong className="block text-[10.5px] font-semibold text-zinc-800 dark:text-zinc-200">Enable Editor's Note & Preface Block</strong>
-                                <span className="text-[8.5px] text-zinc-400 block leading-tight">Displays handcrafted premium relationship editor notes on core reading modules.</span>
-                              </div>
-                              <input 
-                                type="checkbox" 
-                                checked={siteSettings.article_editorial_notes_enabled !== false}
-                                onChange={(e) => {
-                                  const updatedSettings = {
-                                    ...siteSettings,
-                                    article_editorial_notes_enabled: e.target.checked
-                                  };
-                                  setSiteSettings(updatedSettings);
-                                  heartsync.updateSettings(updatedSettings);
-                                  triggerToast(e.target.checked ? 'Editor\'s preface enabled.' : 'Editor\'s preface hidden.');
-                                }}
-                                className="w-4 h-4 text-rose-500 rounded cursor-pointer accent-rose-500 shrink-0" 
-                              />
-                            </div>
-
-                            {siteSettings.article_editorial_notes_enabled !== false && (
-                              <div className="space-y-2.5 pt-1.5 border-t border-dashed border-zinc-200 dark:border-zinc-800">
-                                <div className="space-y-0.5">
-                                  <label className="text-[8.5px] font-bold uppercase text-zinc-400">Editorial Signature Sign-off Title</label>
-                                  <input 
-                                    type="text" 
-                                    value={siteSettings.expert_reviewer_signature_text || ''}
-                                    onChange={(e) => {
-                                      const updatedSettings = {
-                                        ...siteSettings,
-                                        expert_reviewer_signature_text: e.target.value
-                                      };
-                                      setSiteSettings(updatedSettings);
-                                      heartsync.updateSettings(updatedSettings);
-                                    }}
-                                    placeholder="Reviewed and Approved by..."
-                                    className="w-full p-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl text-[9.5px] text-zinc-700 dark:text-zinc-300 font-sans"
-                                  />
-                                </div>
-                                <div className="space-y-0.5">
-                                  <label className="text-[8.5px] font-bold uppercase text-zinc-400">Editor Credentials / Bio Subtitle</label>
-                                  <input 
-                                    type="text" 
-                                    value={siteSettings.expert_reviewer_credentials_desc || ''}
-                                    onChange={(e) => {
-                                      const updatedSettings = {
-                                        ...siteSettings,
-                                        expert_reviewer_credentials_desc: e.target.value
-                                      };
-                                      setSiteSettings(updatedSettings);
-                                      heartsync.updateSettings(updatedSettings);
-                                    }}
-                                    placeholder="Credentials and specifications..."
-                                    className="w-full p-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl text-[9.5px] text-zinc-700 dark:text-zinc-300 font-sans"
-                                  />
-                                </div>
-                              </div>
-                            )}
+                            
 
                             <div className="border-t border-dashed border-zinc-200 dark:border-zinc-800 pt-2.5 flex items-center justify-between p-1">
                               <div className="space-y-0.5">
@@ -10441,8 +10373,7 @@ export default function AdminConsole({
                                 { key: 'article_prev_next_nav_enabled', title: 'Previous & Next Pagination Links', desc: 'Inserts quick-flick routing blocks directly inside the footer folds.' },
                                 { key: 'article_newsletter_box_enabled', title: 'In-Article Glowing Newsletter Sign-Up', desc: 'Injects customizable relationship blog subscription lead traps into paragraph folds.' },
                                 { key: 'article_comments_enabled', title: 'Comment Discussions Registry', desc: 'Permits verified user threads below publication content.' },
-                                { key: 'article_social_sharing_enabled', title: 'Copy Link & Printing Actions', desc: 'Supports direct printer styles and local clipboard integrations.' }
-                              ].map((item) => {
+                                                              ].map((item) => {
                                 const val = !!siteSettings[item.key as keyof SiteSettings];
                                 return (
                                   <div key={item.key} className="flex justify-between items-center py-2.5 border-b last:border-b-0 border-zinc-100 dark:border-zinc-800">
@@ -13085,14 +13016,7 @@ export default function AdminConsole({
                     <div className="space-y-2">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Quick Recommended Expandable Feature Flags (Click to Add)</span>
                       <div className="flex flex-wrap gap-2">
-                        {[
-                          { key: 'enable_maintenance_mode', label: 'Maintenance Mode Banner', type: 'boolean', defaultVal: false },
-                          { key: 'enable_holiday_theme', label: 'Holiday Festive Accent Theme', type: 'boolean', defaultVal: true },
-                          { key: 'holiday_banner_text', label: 'Holiday Top Announcement Text', type: 'string', defaultVal: '🎉 Special Relationship Coaching Discount: Use code HEARTSYNC26!' },
-                          { key: 'comment_moderation_auto', label: 'Auto-Moderate Comments (AI)', type: 'boolean', defaultVal: true },
-                          { key: 'max_articles_per_page', label: 'Max Articles Per Page', type: 'number', defaultVal: 12 },
-                          { key: 'enable_partner_directory', label: 'Affiliate Partner Directory', type: 'boolean', defaultVal: true }
-                        ].map(preset => {
+                        {[                                                                                                      ].map(preset => {
                           const exists = siteSettings[preset.key] !== undefined;
                           return (
                             <button

@@ -657,3 +657,12 @@ html.dark, html.dark body {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Admin: Modern Premium Magazine Layout (article_magazine_mode) - widen the reading body */
+.article-magazine-mode #heartsync-premium-article-reading-body { max-width: 100%; }
+.article-magazine-mode .markdown-body { max-width: 100% !important; }
+
+/* Admin: Disable All Reader Border Edges (article_borderless_mode) */
+.article-borderless-mode #heartsync-premium-article-reading-body,
+.article-borderless-mode #heartsync-premium-article-reading-body * { border-color: transparent !important; }

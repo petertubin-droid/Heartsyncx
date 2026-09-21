@@ -3302,7 +3302,7 @@ export default function App() {
                 ? 'article-headings-sans' : 'article-headings-serif';
 
               return (
-              <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 ${siteSettings.article_atmospheric_linen ? 'article-linen rounded-2xl' : ''}`}>
+              <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 ${siteSettings.article_atmospheric_linen ? 'article-linen rounded-2xl' : ''} ${siteSettings.article_magazine_mode ? 'article-magazine-mode' : ''} ${siteSettings.article_borderless_mode ? 'article-borderless-mode' : ''}`}>
                 <div className={`col-span-12 ${mainSpanClass} ${sidebarLeft && showArtSidebar ? 'lg:order-2' : ''} space-y-6 min-w-0`}>
                 
                 {/* 1. Sticky Reading Progress Indicator Bar */}
@@ -3323,8 +3323,6 @@ export default function App() {
                   />,
                   document.body
                 )}
-
-                <ArticleTTS content={activeArticle.content} />
 
                 {mobileShareStyle === 'inline' && (
                   <div className="md:hidden flex items-center justify-center py-3 border-b border-zinc-150 dark:border-zinc-800/60">
@@ -3428,6 +3426,21 @@ export default function App() {
                           )}
 
                           {/* Right: Date and Reading Time */}
+                          {(siteSettings.article_meta_updated_date_enabled === true) && (activeArticle as any).updated_date && (
+                            <span className="flex items-center gap-1.5" title="Content actively vetted and revised">
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              Updated {new Date((activeArticle as any).updated_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          )}
+                          {(siteSettings.article_meta_categories_enabled === true) && matchedCat && (
+                            <button
+                              type="button"
+                              onClick={() => navigateTo('category', matchedCat.slug)}
+                              className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors"
+                            >
+                              {matchedCat.name}
+                            </button>
+                          )}
                           <div className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-400 dark:text-zinc-500 font-bold sm:text-right">
                             {(siteSettings.article_meta_date_enabled !== false) && (
                               <span className="flex items-center gap-1.5">
@@ -3687,17 +3700,9 @@ export default function App() {
 
 
 
-                  {/* Editor's review badge (article_editorial_notes_enabled + expert_reviewer_* settings) */}
-                  {siteSettings.article_editorial_notes_enabled !== false && (siteSettings.expert_reviewer_signature_text || siteSettings.expert_reviewer_credentials_desc) && (
-                    <div className="flex items-start gap-3 p-4 bg-rose-50/60 dark:bg-zinc-900/60 border border-rose-100 dark:border-zinc-800 rounded-2xl">
-                      <Heart className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                      <div className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">
-                        <span className="font-bold">Editor's review.</span>{' '}
-                        {siteSettings.expert_reviewer_signature_text && <>{siteSettings.expert_reviewer_signature_text}  - </>}
-                        {siteSettings.expert_reviewer_credentials_desc}
-                      </div>
-                    </div>
-                  )}
+                {/* Listen-to-article player: professional placement below the
+                    header/hero area, above the reading body (moved from page top) */}
+                <ArticleTTS content={activeArticle.content} />
 
                   {/* 4. MAIN ARTICLE GRID: Floating Share Rail, Body, and Sidebar */}
                   {(() => {
@@ -3788,6 +3793,7 @@ export default function App() {
 
                       {/* DYNAMIC ARTICLE AUTHOR PROFILE STRIP (Requirement: display before start of content, screenshot format) */}
                       {(() => {
+                        if (siteSettings.article_author_box_enabled === false) return null;
                         const articleAuthor = getAuthors().find(a => a.id === activeArticle.author_id) || getAuthors()[0];
                         const spotlight = (articleAuthor || { id: activeArticle.author_id || 'editorial', name: 'Editorial Board', role_tag: 'Editorial Staff', bio: 'Heartsync Editorial Team', avatar_url: '' }) as any;
                         
@@ -4205,8 +4211,21 @@ export default function App() {
                         </div>
                       )}
 
+                      {/* Topic Tag Registry (article_meta_tags_enabled) */}
+                      {siteSettings.article_meta_tags_enabled === true && (activeArticle.tags?.length ?? 0) > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 pt-2">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Topics</span>
+                          {activeArticle.tags.slice(0, 8).map((tag) => (
+                            <span key={tag} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/60 text-[10px] font-semibold text-zinc-600 dark:text-zinc-300">
+                              #{String(tag).replace(/\s+/g, '-').toLowerCase()}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Previous / Next Article Navigation  - Frelux-style */}
                       {(() => {
+                        if (siteSettings.article_prev_next_nav_enabled === false) return null;
                         const sorted = [...publishedArticles].sort((a, b) =>
                           new Date(a.publish_date || 0).getTime() -
                           new Date(b.publish_date || 0).getTime());
@@ -4247,7 +4266,7 @@ export default function App() {
                       })()}
 
                       {/* Related Content Auto-Injected Block (or in sidebar per article_desktop_related_placement) */}
-                      {!relatedInSidebar && (
+                      {siteSettings.article_related_carousel_enabled !== false && !relatedInSidebar && (
                       <RelatedContentBlock 
                         currentPost={activeArticle}
                         onNavigate={(tab, arg) => {
@@ -4417,7 +4436,7 @@ export default function App() {
                       })()}
 
                       {/* Threaded Nested Comments Frame */}
-                      {activeArticle.allow_comments && (
+                      {activeArticle.allow_comments && siteSettings.article_comments_enabled !== false && (
                         <div className="space-y-6 pt-6 border-t border-zinc-200 dark:border-zinc-800">
                           <h3 className="font-serif font-bold text-lg text-zinc-900 dark:text-white flex items-center gap-2">
                             <MessageSquare className="w-5 h-5 text-rose-500" />
@@ -4719,7 +4738,7 @@ export default function App() {
                 {showArtSidebar && (
                 <div className={`col-span-12 ${sidebarSpanClass} ${sidebarLeft ? 'lg:order-1 lg:pr-6 lg:border-r' : 'lg:order-2 lg:pl-6 lg:border-l'} border-t lg:border-t-0 border-rose-100/30 dark:border-zinc-850 pt-8 lg:pt-0`}>
                   <div className={siteSettings.article_desktop_sidebar_sticky ? 'lg:sticky lg:top-24' : ''}>
-                    {relatedInSidebar && (
+                    {relatedInSidebar && siteSettings.article_related_carousel_enabled !== false && (
                       <div className="mb-6">
                       {/* Related Content Auto-Injected Block */}
                       <RelatedContentBlock 
