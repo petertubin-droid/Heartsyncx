@@ -37,7 +37,7 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
 
   const footerStyleSet = siteSettings.footer_style || 'luxury';
 
-  let footerBgClass = "w-full border-t relative overflow-hidden transition-colors duration-300 ";
+  let footerBgClass = "w-full border-t relative overflow-hidden transition-colors duration-300 dark:border-rose-500/20 dark:shadow-[0_-8px_30px_-14px_rgba(244,63,94,0.15)] ";
   let titleClass = "text-xs font-bold uppercase tracking-widest text-zinc-100 font-mono";
   let textClass = "text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400";
   let descClass = "text-zinc-400";
@@ -343,6 +343,8 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
       </div>
 
       {/* AdSense Compliance Disclosures and Copyright panel */}
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-rose-500/40 to-transparent dark:opacity-60 opacity-30" aria-hidden="true" />
+
       <div className={`${botBg} py-6 px-6 transition-colors duration-300`}>
         <div className={layoutWidthSetting === 'wide' ? "w-full flex flex-col lg:flex-row items-center justify-between gap-4" : "max-w-[1536px] mx-auto flex flex-col lg:flex-row items-center justify-between gap-4"}>
           

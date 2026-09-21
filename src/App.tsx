@@ -31,6 +31,7 @@ import { HeartsyncLoader, LoadingProgressBar, HeartsyncSuspense, HeartsyncImage 
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { preprocessMarkdownImages, MarkdownImageElement } from './utils/markdownImage';
+import { LEGAL_DOCS } from './utils/legalContent';
 import { Language, getSavedLanguage, getTranslation } from './utils/i18n';
 import { getArticleSeoData } from './utils/seoArticleData';
 import { getCategoryIcon } from './utils/categoryIcons';
@@ -229,10 +230,10 @@ export default function App() {
       case 'fade':
       default:
         return {
-          initial: { opacity: 0 },
-          animate: { opacity: 1 },
-          exit: { opacity: 0 },
-          transition: { duration: 0.15, ease: 'easeOut' }
+          initial: { opacity: 0, y: 14 },
+          animate: { opacity: 1, y: 0 },
+          exit: { opacity: 0, y: -8 },
+          transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
         } as any;
     }
   }, [animationSetting]);
@@ -3100,8 +3101,12 @@ export default function App() {
                               const categoryName = cat.name.toUpperCase();
 
                               return (
-                                <div 
+                                <motion.div 
                                   key={item.id || idx}
+                                  initial={{ opacity: 0, y: 18 }}
+                                  whileInView={{ opacity: 1, y: 0 }}
+                                  viewport={{ once: true, margin: '-30px' }}
+                                  transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: (idx % 6) * 0.05 }}
                                   onClick={() => {
                                     if (item.slug) {
                                       navigateTo('article', item.slug);
@@ -3112,7 +3117,7 @@ export default function App() {
                                   className="group cursor-pointer space-y-3 flex flex-col items-stretch animate-fadeIn text-left h-full"
                                 >
                                   {/* Aspect Ratio Box with Hot badge */}
-                                  <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-900 border border-zinc-100/30 dark:border-zinc-850/30 shadow-sm shrink-0">
+                                  <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-900 border border-zinc-100/30 dark:border-zinc-850/30 dark:group-hover:border-rose-500/40 dark:group-hover:shadow-[0_0_28px_-8px_rgba(244,63,94,0.4)] shadow-sm shrink-0 transition-all duration-300">
                                     <HeartsyncImage 
                                       src={item.featured_image || "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=400"} 
                                       alt={item.title}
@@ -3143,7 +3148,7 @@ export default function App() {
                                       {metaText}
                                     </span>
                                   </div>
-                                </div>
+                                </motion.div>
                               );
                             })}
                           </div>
@@ -3205,7 +3210,11 @@ export default function App() {
 
                       return (
                         <section key={sec.id} className="py-10 border-t border-rose-100/10">
-                          <div className="w-full bg-[#D2F57B] dark:bg-zinc-950 text-zinc-950 dark:text-white rounded-[2.5rem] p-6 sm:p-10 md:p-12 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 border border-zinc-950 dark:border-rose-500/20 shadow-md dark:shadow-[0_0_30px_rgba(244,63,94,0.15)]">
+                          <div className="w-full bg-[#D2F57B] dark:bg-zinc-950 text-zinc-950 dark:text-white rounded-[2.5rem] p-6 sm:p-10 md:p-12 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 border border-zinc-950 dark:border-rose-500/35 shadow-md dark:shadow-[0_0_55px_-12px_rgba(244,63,94,0.35)]">
+                            <div className="hidden dark:block absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+                              <div className="absolute -top-20 -right-14 w-64 h-64 rounded-full bg-rose-500/15 blur-3xl animate-float-soft" />
+                              <div className="absolute -bottom-24 -left-16 w-72 h-72 rounded-full bg-fuchsia-500/10 blur-3xl animate-float-soft-slow" />
+                            </div>
                             <div className="space-y-4 max-w-xl text-left">
                               <span className="inline-block px-2.5 py-1 bg-zinc-950 dark:bg-rose-500/10 text-[#D2F57B] dark:text-rose-400 text-[9px] font-sans font-extrabold rounded uppercase tracking-wider dark:border dark:border-rose-500/20">
                                 ANNUAL ACCESS MEMBERSHIP
@@ -5403,7 +5412,7 @@ export default function App() {
 
             {/* 12-15 LEGAL PAGES (Dynamic Overrides and Custom Slack URLs support) */}
             {['privacy', 'terms', 'cookies', 'disclaimer'].includes(currentTab) && (
-              <div className="max-w-3xl mx-auto space-y-6 font-sans text-xs text-zinc-650 leading-relaxed">
+              <div className="max-w-4xl mx-auto space-y-8 font-sans text-sm text-zinc-650 dark:text-zinc-350 leading-relaxed py-6">
                 {(() => {
                   const customPage = heartsync.pages.find(p => !p.is_deleted && (p.page_type === currentTab || p.slug === currentTab || p.slug === tabArg || (currentTab === 'cookies' && p.page_type === 'cookie')));
                   if (customPage) {
@@ -5428,149 +5437,44 @@ export default function App() {
                     );
                   }
 
-                  if (currentTab === 'privacy') {
+                  {
+                    const doc = LEGAL_DOCS[currentTab as 'privacy' | 'terms' | 'disclaimer' | 'cookies'];
                     return (
-                      <>
-                        <h1 className="font-serif font-extrabold text-2xl text-zinc-950 dark:text-white pb-3 border-b">Privacy Policy Statement</h1>
-                        <p><strong>Effective Date: May 21, 2026</strong></p>
-                        <p>At Heartsync (accessible from Heartsync.com), one of our main priorities is the privacy of our visitors. This Privacy Policy document contains types of information that is collected and recorded by Heartsync and how we use it.</p>
-                        <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">Log Files & Cookies</h3>
-                        <p>Heartsync follows a standard procedure of using log files. These files log visitors when they visit websites. All hosting companies do this and a part of hosting services' analytics. The information collected by log files include internet protocol (IP) addresses, browser type, Internet Service Provider (ISP), date and time stamp, referring/exit pages, and possibly the number of clicks.</p>
-                        <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">Google DoubleClick DART Cookie</h3>
-                        <p>Google is one of a third-party vendor on our site. It also uses cookies, known as DART cookies, to serve ads to our site visitors based upon their visit to our site and other sites on the internet.</p>
-<p>You may opt out of personalized advertising at any time via Google's Ads Settings (<a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer" className="underline text-rose-600">https://www.google.com/settings/ads</a>), and you can review how Google handles data for its advertising products at <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer" className="underline text-rose-600">Google's Advertising Policies page</a>. Your consent choice on our cookie banner additionally controls whether personalized or non-personalized ads are requested on this site.</p>
-                      </>
-                    );
-                  }
-
-                  if (currentTab === 'disclaimer') {
-                    return (
-                      <>
-                        <h1 className="font-serif font-extrabold text-2xl text-zinc-950 dark:text-white pb-3 border-b border-rose-100">Disclaimer Policy Disclosure</h1>
-                        <p>The information on this website is for general educational and informational purposes only as a relationship and dating tips and emotional wellness blog. Heartsync does not provide professional therapy, relationship diagnosis, medical counsel, or professional evaluations.</p>
-                        <p>Any reliance you place on such information is strictly at your own risk. Always consult licensed psychologists, family medical practitioners, or professional counselors regarding severe attachment concerns or severe couples stressors.</p>
-                      </>
-                    );
-                  }
-
-                  if (currentTab === 'terms') {
-                    return (
-                      <>
-                        <h1 className="font-serif font-extrabold text-2xl text-zinc-950 dark:text-white pb-3 border-b border-rose-100">Terms of Service agreement</h1>
-                        <p>Welcome to Heartsync. By accessing our relationship blog resources, you agree to comply with our modern user guidelines, including respectful comment boarding and whitelisted browser behaviors.</p>
-                        <p>You agree not to scrape, distribute, or copy our human-authored emotional wellness outline templates without obtaining written syndicate permission from Heartsync leadership.</p>
-                      </>
-                    );
-                  }
-
-                  if (currentTab === 'cookies') {
-                    return (
-                      <div className="space-y-8 animate-fadeIn">
-                        <div className="border-b border-zinc-150 dark:border-zinc-800 pb-5">
-                          <h1 className="font-serif font-extrabold text-3xl text-zinc-950 dark:text-white tracking-tight font-display">
-                            Heartsync Cookie Policy
+                      <div className="space-y-10">
+                        <div className="pb-6 border-b border-zinc-150 dark:border-zinc-800 dark:border-rose-500/15">
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-sans tracking-widest text-[#CE2B5E] uppercase font-bold">
+                            <span className="w-6 h-[2px] bg-rose-500 rounded-full" />
+                            {doc.kicker}
+                          </span>
+                          <h1 className="font-serif font-extrabold text-3xl sm:text-4xl text-zinc-950 dark:text-white mt-2 tracking-tight">
+                            {doc.title}
                           </h1>
-                          <p className="text-[10px] text-zinc-400 font-mono mt-1 uppercase tracking-wider">
-                            Last Updated: May 26, 2026
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2 uppercase tracking-wider">
+                            Last reviewed: {doc.updated}
                           </p>
                         </div>
-                        
-                        <div className="prose prose-sm dark:prose-invert max-w-none space-y-5 text-zinc-650 dark:text-zinc-350 text-xs leading-relaxed">
-                          <p>
-                            To make Heartsync (accessible via Heartsync.com) feel safe, welcoming, and intuitive, we utilize cookies and other tracking technologies. This Cookie Policy explains how these components operate, why we use them, and how you can exercise your privacy controls in alignment with Google AdSense and global privacy laws.
-                          </p>
 
-                          <div className="bg-rose-50/50 dark:bg-rose-950/10 p-4 rounded-2xl border border-rose-500/10 space-y-2">
-                            <h3 className="font-serif font-bold text-sm text-rose-950 dark:text-rose-200">
-                              Our Privacy Commitment
-                            </h3>
-                            <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
-                              Heartsync supports the Google Consent Mode v2 framework. Non-essential cookies, Google Analytics tracking, and customized Google AdSense advertisements remain denied and loaded with default-denied states. Only after you grant explicit consent by clicking "Accept Cookies" do we activate personalized insights and campaigns.
-                            </p>
-                          </div>
+                        <div className="space-y-8">
+                          {doc.sections.map((section, i) => (
+                            <section key={i} className="space-y-3">
+                              <h2 className="font-sans font-bold text-sm sm:text-[15px] text-zinc-900 dark:text-zinc-100 tracking-tight">
+                                {section.heading}
+                              </h2>
+                              {section.paragraphs.map((para, j) => (
+                                <p key={j} className="leading-relaxed">{para}</p>
+                              ))}
+                            </section>
+                          ))}
+                        </div>
 
-                          <div className="space-y-2">
-                            <h3 className="font-serif font-bold text-base text-zinc-900 dark:text-zinc-100">
-                              1. What are Cookies?
-                            </h3>
-                            <p>
-                              A cookie is a small text file placed onto your desktop or mobile browser by websites you visit. They are widely used to make websites work more efficiently, personalize layouts, track system preferences (like dark mode and language choices), and report anonymous campaign metrics to web operators.
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h3 className="font-serif font-bold text-base text-zinc-900 dark:text-zinc-100">
-                              2. How Heartsync Uses Cookies
-                            </h3>
-                            <p>
-                              We split our cookies into functional categories. Each level is detailed below:
-                            </p>
-                            <ul className="list-disc pl-5 space-y-1">
-                              <li>
-                                <strong className="text-zinc-900 dark:text-zinc-100 font-bold">Strictly Necessary Cookies:</strong> Required to operate authentic user logging, remember active administrator credentials, and preserve standard state selections.
-                              </li>
-                              <li>
-                                <strong className="text-zinc-900 dark:text-zinc-100 font-bold">Performance & Analytics:</strong> Provided by Google Analytics to capture aggregate statistics (page click retention, article reading time) without tracking your individual metadata.
-                              </li>
-                              <li>
-                                <strong className="text-zinc-900 dark:text-zinc-100 font-bold">Advertising Cookies:</strong> Provided by Google AdSense. In compliance with advertising policies, these match behavioral standards so advertisements displayed relate to relationships, lifestyle, wellness, and self-care interests.
-                              </li>
-                            </ul>
-                          </div>
-
-                          <div className="space-y-4">
-                            <h3 className="font-serif font-bold text-base text-zinc-900 dark:text-zinc-100">
-                              3. Google AdSense & Analytics Compliance
-                            </h3>
-                            <p>
-                              Heartsync serves non-obtrusive, high-trust ads to keep our relationship resources free and accessible. We enforce strict AdSense rules:
-                            </p>
-                            <ul className="list-disc pl-5 space-y-1">
-                              <li>
-                                Google and third-party vendors use DART cookies to serve ads based on prior visits.
-                              </li>
-                              <li>
-                                If you wish to opt-out of personalized AdSense marketing globally, edit your configurations at Google's <a href="https://adssettings.google.com" target="_blank" rel="noreferrer" className="text-rose-500 hover:underline">Ads Settings page</a>.
-                              </li>
-                              <li>
-                                Analytics and campaign scripts only activate on Heartsync after physical clicking of the "Accept Cookies" container button.
-                              </li>
-                            </ul>
-                          </div>
-
-                          <div className="space-y-2">
-                            <h3 className="font-serif font-bold text-base text-zinc-900 dark:text-zinc-100">
-                              4. User Privacy & Right to Refuse
-                            </h3>
-                            <p>
-                              Your consent can be modified at any point. Simply clear your browser's local cache or click the Cookie Preferences triggers in our page margins. If cookies are deactivated, rest assured that Heartsync's emotional guidance essays remain fully browsable.
-                            </p>
-                            <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                              <button
-                                type="button"
-                                onClick={() => window.dispatchEvent(new Event('heartsync-open-cookie-preferences'))}
-                                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#CE2B5E]/10 hover:bg-[#CE2B5E]/25 text-[#CE2B5E] font-semibold text-xs tracking-wide uppercase transition-colors cursor-pointer border border-[#CE2B5E]/20 focus:outline-none focus:ring-2 focus:ring-[#CE2B5E]"
-                              >
-                                <Settings className="w-4 h-4" />
-                                Manage Cookie Preferences
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  resetConsent();
-                                  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                                }}
-                                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 font-semibold text-xs tracking-wide uppercase transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500"
-                              >
-                                Reset Consent Decisions
-                              </button>
-                            </div>
-                          </div>
+                        <div className="pt-6 border-t border-zinc-150 dark:border-zinc-800 text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                          Questions about this document? Write to our editorial team from the{' '}
+                          <button onClick={() => navigateTo('contact')} className="text-rose-600 dark:text-rose-400 underline cursor-pointer">Contact</button>
+                          {' '}page and we will respond within thirty days.
                         </div>
                       </div>
                     );
                   }
-
                   return null;
                 })()}
               </div>

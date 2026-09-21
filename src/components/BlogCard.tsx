@@ -78,8 +78,13 @@ export default function BlogCard({ post, onClick, onNavigate, layout = 'vertical
                     e.stopPropagation();
                     onNavigate('category', category.slug);
                   }}
-                  className="text-[10px] sm:text-[11px] font-sans font-extrabold uppercase tracking-widest text-[#CE2B5E] hover:underline"
+                  className="text-[10px] sm:text-[11px] font-sans font-extrabold uppercase tracking-widest text-[#CE2B5E] hover:underline inline-flex items-center gap-1.5"
                 >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0 dark:shadow-[0_0_6px_rgba(244,63,94,0.8)]"
+                    style={{ backgroundColor: category.color || '#CE2B5E' }}
+                    aria-hidden="true"
+                  />
                   {category.name}
                 </span>
               </div>
@@ -227,8 +232,13 @@ export default function BlogCard({ post, onClick, onNavigate, layout = 'vertical
                   e.stopPropagation();
                   onNavigate('category', category.slug);
                 }}
-                className="text-[10px] sm:text-[11px] font-sans font-extrabold uppercase tracking-widest text-[#CE2B5E] hover:underline"
+                className="text-[10px] sm:text-[11px] font-sans font-extrabold uppercase tracking-widest text-[#CE2B5E] hover:underline inline-flex items-center gap-1.5"
               >
+                <span
+                  className="w-1.5 h-1.5 rounded-full shrink-0 dark:shadow-[0_0_6px_rgba(244,63,94,0.8)]"
+                  style={{ backgroundColor: category.color || '#CE2B5E' }}
+                  aria-hidden="true"
+                />
                 {category.name}
               </span>
             </div>
