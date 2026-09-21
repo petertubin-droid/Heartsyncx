@@ -178,11 +178,12 @@ Post-migration verification (all checked live):
       runtime (no hardcoded heartsyncxhub.vercel.app in served responses).
       Outbound-email links (footer CTA + unsubscribe) now flow through
       getPublicSiteUrl() — env-driven (PUBLIC_SITE_URL). OWNER DECISION
-      SETTLED (2026-09-20): the canonical public domain is
-      https://heartsyncxhub.vercel.app (owner-confirmed) — the
-      getPublicSiteUrl() default now matches, as does the sitemap fallback.
+      UPDATED (2026-09-21): the canonical public domain is now
+      https://heartsyncx.netlify.app (owner-confirmed) — the getPublicSiteUrl()
+      default, sitemap generator default, robots.txt, static sitemap.xml and
+      index.html canonical/OG tags all match it.
       Recommended (not required): still set PUBLIC_SITE_URL/SITE_URL in the
-      Vercel env so preview deploys stay consistent. Email from-address
+      host env so preview deploys stay consistent. Email from-address
       (editorial@heartsync.com) still open.
 - [x] DONE (2026-09-20): accessibility pass. New src/utils/a11y.ts implements the
       WAI-ARIA dialog pattern (Escape closes, Tab/Shift+Tab trapped, focus lands
@@ -469,8 +470,8 @@ NOT in the Redirect URL allow-list), so the phone shows a desktop-styled
 Vercel page and login never completes. Verified: authorize endpoint is
 healthy, Google accepts the callback URI — only the redirect target is wrong.
 OWNER ACTION (Supabase Dashboard → Authentication → URL Configuration):
-1. Site URL: https://heartsyncxhub.vercel.app
-2. Redirect URLs: add https://heartsyncxhub.vercel.app/**
+1. Site URL: https://heartsyncx.netlify.app
+2. Redirect URLs: add https://heartsyncx.netlify.app/** (and keep any still-live hosts)
 (Agent could not apply it: the saved Supabase management token returns 401.)
 
 ### Code changes this round

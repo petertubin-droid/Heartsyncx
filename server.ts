@@ -654,7 +654,7 @@ app.post('/api/cicd/check', adminAuthMiddleware, async (req: Request, res: Respo
  *  Env-driven so staging/prod can differ; the canonical public domain is the
  *  default. Runtime canonical/OG tags already derive from the request host. */
 function getPublicSiteUrl(): string {
-  return (process.env.PUBLIC_SITE_URL || 'https://heartsyncxhub.vercel.app').replace(/\/+$/, '');
+  return (process.env.PUBLIC_SITE_URL || 'https://heartsyncx.netlify.app').replace(/\/+$/, '');
 }
 
 function mapDiagnosticRow(r: any) {

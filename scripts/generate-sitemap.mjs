@@ -9,12 +9,12 @@
  * touch the database.
  *
  * Base URL resolution: SITE_URL env var wins (useful for preview deploys),
- * otherwise https://heartsyncxhub.vercel.app.
+ * otherwise https://heartsyncx.netlify.app.
  */
 import { readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import path from 'path';
 
-const BASE_URL = (process.env.SITE_URL || 'https://heartsyncxhub.vercel.app').replace(/\/+$/, '');
+const BASE_URL = (process.env.SITE_URL || 'https://heartsyncx.netlify.app').replace(/\/+$/, '');
 const TODAY = new Date().toISOString().split('T')[0];
 
 // Static top-level pages (mirrors the Express sitemap route list)
