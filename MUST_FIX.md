@@ -431,3 +431,29 @@ resources, no empty slots). robots.txt already only blocks /admin /api /login
   CSS-variable theme refactor)
 - homepage_categories_columns_mobile / card_style / premium_enabled
 - alert() in LiveChatWidget + RichTextEditor
+
+## ROUND 5 (2026-09-21): automatic in-article ad density + TTS reader revived
+
+### Automatic in-article ad slots (ArticleBodyWithInserts)
+Word-count-driven density, evenly spaced between paragraphs (never first/last):
+- < 2000 words -> 3 in-article units
+- 2000-4000 words -> 4 in-article units
+- > 4000 words -> 5 in-article units
+Plus the existing sidebar + article-bottom slots (so >= 3 always on every
+article page). All units reuse the adsense_slot_in_article unit id; each
+mounted <ins> pushes its own adsbygoogle activation. Crawler-visible per
+Round 4 (markup renders regardless of consent).
+Admin: new "Automatic In-Article Ad Density" toggle in Admin > Ads
+(in_article_ads_auto_enabled, default ON; off = single mid-article unit).
+
+### TTS reader (ArticleTTS.tsx) — revived
+"Listen to this article" button under every article headline. Chunks the
+markdown (images/code stripped, sentence-boundary splits under the server's
+1500-char cap), calls the existing /api/tts endpoint with the admin-configured
+voice, plays chunks sequentially with stop control and honest error states.
+
+### Remaining revives
+- Digital storefront page (digital_products table + CRUD exist server-side)
+- brand_button_radius/heading_weight/hover_animation/glow_accent (CSS-var theme refactor)
+- homepage_categories_columns_mobile / card_style / premium_enabled
+- alert() in LiveChatWidget + RichTextEditor

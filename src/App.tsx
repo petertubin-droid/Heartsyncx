@@ -21,6 +21,7 @@ import { useCookieConsent } from './components/useCookieConsent';
 import LiveChatWidget from './components/LiveChatWidget';
 import SubscriptionPage from './components/SubscriptionPage';
 import ArticleBodyWithInserts from './components/ArticleBodyWithInserts';
+import ArticleTTS from './components/ArticleTTS';
 import OfflineReaderBanner from './components/OfflineReaderBanner';
 import { AdPlacement } from './components/AdPlacement';
 import { AdNetworkScripts } from './components/AdNetworkScripts';
@@ -3487,6 +3488,8 @@ export default function App() {
                   />,
                   document.body
                 )}
+
+                <ArticleTTS content={activeArticle.content} />
 
                 {mobileShareStyle === 'inline' && (
                   <div className="md:hidden flex items-center justify-center py-3 border-b border-zinc-150 dark:border-zinc-800/60">

@@ -4,6 +4,7 @@ import { Brain, Heart, CheckCircle2, BookOpen, ArrowRight, Lightbulb, Compass, S
 import { InArticleInsertsConfig, InArticleInsertItem } from '../types';
 import { preprocessMarkdownImages } from '../utils/markdownImage';
 import { AdPlacement } from './AdPlacement';
+import { heartsync } from '../store';
 
 interface ArticleBodyWithInsertsProps {
   content: string;
@@ -183,11 +184,23 @@ export default function ArticleBodyWithInserts({
     );
   }
 
-  const adInsertIndex = useMemo(() => {
-    if (blocks.length <= 1) return 0;
-    if (blocks.length <= 3) return 1;
-    return Math.floor(blocks.length / 2);
-  }, [blocks.length]);
+  // AUTOMATIC IN-ARTICLE AD DENSITY (admin toggle: in_article_ads_auto_enabled).
+  // Word-count-driven, AdSense content-ratio best practice:
+  //   < 2000 words -> 3 units | 2000-4000 -> 4 units | > 4000 -> 5 units
+  // Units are spaced evenly between paragraphs (never the first or last block).
+  const adInsertIndices = useMemo(() => {
+    const autoEnabled = (heartsync.site_settings as Record<string, unknown>).in_article_ads_auto_enabled !== false;
+    const words = (content || '').trim().split(/\s+/).filter(Boolean).length;
+    const count = !autoEnabled ? 1 : words > 4000 ? 5 : words >= 2000 ? 4 : 3;
+    if (blocks.length <= 1) return [] as number[];
+    const out: number[] = [];
+    for (let i = 1; i <= count; i++) {
+      const idx = Math.floor((blocks.length * i) / (count + 1));
+      const clamped = Math.max(1, Math.min(blocks.length - 2, idx));
+      if (!out.includes(clamped)) out.push(clamped);
+    }
+    return out;
+  }, [blocks.length, content]);
 
   return (
     <div className={className}>
@@ -204,7 +217,7 @@ export default function ArticleBodyWithInserts({
             ))}
 
             {/* Seamless In-Article Ad Placement (Google AdSense, Monetag, or Adsterra) */}
-            {idx === adInsertIndex && (
+            {adInsertIndices.includes(idx) && (
               <AdPlacement slot="in_article" className="my-6" />
             )}
           </React.Fragment>

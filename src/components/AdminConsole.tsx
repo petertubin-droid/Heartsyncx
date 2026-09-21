@@ -5537,6 +5537,22 @@ export default function AdminConsole({
                           />
                           <span className="text-[8.5px] text-zinc-400 block leading-tight">Paste your AdSense loader tag from the AdSense dashboard. It is injected into every page for the Google crawler to read. Per-slot unit ids are configured below.</span>
                         </div>
+                        <div className="flex items-center justify-between p-2 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                          <div className="space-y-0.5 pr-3">
+                            <strong className="text-[10.5px] font-semibold text-zinc-800 dark:text-zinc-200 block">Automatic In-Article Ad Density</strong>
+                            <span className="text-[8.5px] text-zinc-400 block leading-tight">Auto-placed between paragraphs based on article length: 3 units under 2000 words, 4 units for 2000-4000 words, 5 units above 4000 words (plus the sidebar and article-bottom slots). Toggle off for a single mid-article unit.</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={siteSettings.in_article_ads_auto_enabled !== false}
+                            onChange={(e) => {
+                              const updated = { ...siteSettings, in_article_ads_auto_enabled: e.target.checked };
+                              setSiteSettings(updated);
+                              heartsync.updateSettings(updated);
+                            }}
+                            className="w-4 h-4 text-rose-500 rounded cursor-pointer accent-rose-500 shrink-0"
+                          />
+                        </div>
 
                         <div className="space-y-2">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">AdSense global state</span>
