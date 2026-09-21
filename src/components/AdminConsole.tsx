@@ -1142,16 +1142,8 @@ export default function AdminConsole({
   const [adsenseAutoCode, setAdsenseAutoCode] = useState(() => String(siteSettings.adsense_active ?? heartsync.site_settings.adsense_active ?? true));
   const [adsenseAutoScript, setAdsenseAutoScript] = useState(() => siteSettings.adsense_auto_script || heartsync.site_settings.adsense_auto_script || '');
   
-  const [placementHeader, setPlacementHeader] = useState(() => siteSettings.placement_header ?? heartsync.site_settings.placement_header ?? true);
-  const [placementSidebar, setPlacementSidebar] = useState(() => siteSettings.placement_sidebar ?? heartsync.site_settings.placement_sidebar ?? true);
-  const [placementInfeed, setPlacementInfeed] = useState(() => siteSettings.placement_infeed ?? heartsync.site_settings.placement_infeed ?? true);
-  const [placementFooter, setPlacementFooter] = useState(() => siteSettings.placement_footer ?? heartsync.site_settings.placement_footer ?? true);
   
   // NEW: Finer details for article and homepage ad layouts
-  const [placementInArticles, setPlacementInArticles] = useState(() => siteSettings.placement_in_articles ?? heartsync.site_settings.placement_in_articles ?? true);
-  const [placementHomepage, setPlacementHomepage] = useState(() => siteSettings.placement_homepage ?? heartsync.site_settings.placement_homepage ?? true);
-  const [placementCategory, setPlacementCategory] = useState(() => siteSettings.placement_category ?? heartsync.site_settings.placement_category ?? true);
-  const [placementFaq, setPlacementFaq] = useState(() => siteSettings.placement_faq ?? heartsync.site_settings.placement_faq ?? true);
 
   const [bannerHeaderEnabled, setBannerHeaderEnabled] = useState(() => siteSettings.banner_header_enabled ?? heartsync.site_settings.banner_header_enabled ?? true);
   const [bannerSidebarEnabled, setBannerSidebarEnabled] = useState(() => siteSettings.banner_sidebar_enabled ?? heartsync.site_settings.banner_sidebar_enabled ?? true);
@@ -1162,51 +1154,13 @@ export default function AdminConsole({
   const [monetagActive, setMonetagActive] = useState(() => siteSettings.monetag_active ?? heartsync.site_settings.monetag_active ?? true);
   const [monetagZoneId, setMonetagZoneId] = useState(() => siteSettings.monetag_zone_id ?? heartsync.site_settings.monetag_zone_id ?? '275352');
   const [monetagScriptCode, setMonetagScriptCode] = useState(() => siteSettings.monetag_script_code ?? heartsync.site_settings.monetag_script_code ?? '<script src="https://alwingulla.com/88/tag.min.js" data-zone="275352" async data-cfasync="false"></script>');
-  const [monetagFormat, setMonetagFormat] = useState(() => siteSettings.monetag_format ?? heartsync.site_settings.monetag_format ?? 'multitag');
 
   // Adsterra Ad Network State
   const [adsterraActive, setAdsterraActive] = useState(() => siteSettings.adsterra_active ?? heartsync.site_settings.adsterra_active ?? true);
-  const [adsterraKeyId, setAdsterraKeyId] = useState(() => siteSettings.adsterra_key_id ?? heartsync.site_settings.adsterra_key_id ?? '883921');
-  const [adsterraScriptCode, setAdsterraScriptCode] = useState(() => siteSettings.adsterra_script_code ?? heartsync.site_settings.adsterra_script_code ?? '<script type="text/javascript" src="//www.highperformanceformat.com/883921/invoke.js"></script>');
-  const [adsterraFormat, setAdsterraFormat] = useState(() => siteSettings.adsterra_format ?? heartsync.site_settings.adsterra_format ?? 'social_bar');
 
   // Ad Networks configuration sub-tab inside Monetization pane
   const [adNetworkActiveSubTab, setAdNetworkActiveSubTab] = useState<'adsense' | 'monetag' | 'adsterra' | 'placements'>('adsense');
 
-  // NEW: Enterprise Ad Providers configured dynamically with advanced CPM, Geo-Target, consent features
-  const [adProviders, setAdProviders] = useState<{ 
-    id: string; 
-    name: string; 
-    type: string; 
-    pubId: string; 
-    scriptCode: string; 
-    slot: string; 
-    active: boolean; 
-    cpmEstimate?: string;
-    lazyLoadDelay?: string;
-    geoTarget?: string;
-    isConsentCompliant?: boolean;
-    customSize?: string;
-    format?: string;
-  }[]>(() => {
-    if (heartsync.ad_providers && Array.isArray(heartsync.ad_providers) && heartsync.ad_providers.length > 0) {
-      return heartsync.ad_providers;
-    }
-    // Honest absence: empty until real providers are configured in the console.
-    return [];
-  });
-  const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
-  const [newProvName, setNewProvName] = useState('');
-  const [newProvType, setNewProvType] = useState('adsense');
-  const [newProvPubId, setNewProvPubId] = useState('');
-  const [newProvCode, setNewProvCode] = useState('');
-  const [newProvSlot, setNewProvSlot] = useState('all');
-  const [newProvActive, setNewProvActive] = useState(true);
-  const [newProvCpmEstimate, setNewProvCpmEstimate] = useState('$12.50');
-  const [newProvLazyLoadDelay, setNewProvLazyLoadDelay] = useState('none');
-  const [newProvGeoTarget, setNewProvGeoTarget] = useState('worldwide');
-  const [newProvIsConsentCompliant, setNewProvIsConsentCompliant] = useState(true);
-  const [newProvCustomSize, setNewProvCustomSize] = useState('Responsive (Fluid)');
 
   // NEW: Dynamic Admin & Author Staff Users management representation
   const [staffUsers, setStaffUsers] = useState<{ id: string; name: string; email: string; role: 'Administrator' | 'Editor' | 'Moderator' | 'Relationship Author' | 'Contributor'; bio: string; avatar: string; status: 'Active' | 'Inactive'; }[]>(() => {
@@ -1241,12 +1195,6 @@ export default function AdminConsole({
   const [isIndexingIndex, setIsIndexingIndex] = useState<number | null>(null);
   const [isIndexingAll, setIsIndexingAll] = useState(false);
 
-  useEffect(() => {
-    if (adProviders && adProviders.length > 0) {
-      heartsync.ad_providers = adProviders;
-      heartsync.saveState();
-    }
-  }, [adProviders]);
 
   useEffect(() => {
     heartsync.setLocalStorage('pn_staff_users', JSON.stringify(staffUsers));
@@ -2394,7 +2342,7 @@ export default function AdminConsole({
     // MONETIZATION & ADS
     { id: 'billing', label: 'Subscriptions & E-Store', icon: CreditCard, badge: 'SAAS' },
     { id: 'rewarded_access', label: 'Rewarded Ad Unlocks', icon: Crown, badge: 'CPM' },
-    { id: 'ads', label: 'Google AdSense Placements', icon: DollarSign },
+    { id: 'adsense_settings', label: 'Ad Monetization', icon: DollarSign, badge: 'ADSENSE PRIMARY' },
     
     // SYSTEM INFRASTRUCTURE
     { id: 'feature_manager', label: 'Feature Manager', icon: Layers, badge: 'MODULES' },
@@ -2426,7 +2374,7 @@ export default function AdminConsole({
     { title: 'ENGAGEMENT & MODERATION', itemIds: ['comments', 'live_chat', 'quiz_manager'] },
     { title: 'SUBSCRIBERS & COMMUNICATIONS', itemIds: ['newsletter', 'subscribers', 'email_marketing'] },
     { title: 'ACCOUNTS & PERMISSIONS', itemIds: ['users', 'roles_permissions'] },
-    { title: 'MONETIZATION & ADS', itemIds: ['billing', 'rewarded_access', 'ads'] },
+    { title: 'MONETIZATION & ADS', itemIds: ['billing', 'rewarded_access', 'adsense_settings'] },
     { title: 'SYSTEM INFRASTRUCTURE', itemIds: ['feature_manager', 'cicd', 'integrations', 'webhooks', 'security', 'settings', 'site_branding'] }
   ];
 
@@ -2595,72 +2543,6 @@ export default function AdminConsole({
       triggerToast(`Bulk indexing error: ${err.message || 'Server error'}`);
     } finally {
       setIsIndexingAll(false);
-    }
-  };
-
-  // Ad Providers CRUD
-  const handleProviderSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProvName.trim()) {
-      triggerToast('Provider name is required!');
-      return;
-    }
-    const provData = {
-      id: editingProviderId || 'ap-' + Date.now(),
-      name: newProvName.trim(),
-      type: newProvType,
-      pubId: newProvPubId.trim() || 'N/A',
-      scriptCode: newProvCode.trim() || '<!-- Integrated -->',
-      slot: newProvSlot,
-      active: newProvActive,
-      cpmEstimate: newProvCpmEstimate,
-      lazyLoadDelay: newProvLazyLoadDelay,
-      geoTarget: newProvGeoTarget,
-      isConsentCompliant: newProvIsConsentCompliant,
-      customSize: newProvCustomSize
-    };
-
-    if (editingProviderId) {
-      setAdProviders(adProviders.map(p => p.id === editingProviderId ? provData : p));
-      triggerToast(`Ad provider '${newProvName}' synchronized!`);
-    } else {
-      setAdProviders([...adProviders, provData]);
-      triggerToast(`New ad provider '${newProvName}' deployed!`);
-    }
-
-    setEditingProviderId(null);
-    setNewProvName('');
-    setNewProvPubId('');
-    setNewProvCode('');
-    setNewProvSlot('all');
-    setNewProvActive(true);
-    setNewProvCpmEstimate('$12.50');
-    setNewProvLazyLoadDelay('none');
-    setNewProvGeoTarget('worldwide');
-    setNewProvIsConsentCompliant(true);
-    setNewProvCustomSize('Responsive (Fluid)');
-  };
-
-  const handleEditProvider = (p: typeof adProviders[0]) => {
-    setEditingProviderId(p.id);
-    setNewProvName(p.name);
-    setNewProvType(p.type);
-    setNewProvPubId(p.pubId);
-    setNewProvCode(p.scriptCode);
-    setNewProvSlot(p.slot);
-    setNewProvActive(p.active);
-    setNewProvCpmEstimate(p.cpmEstimate || '$12.50');
-    setNewProvLazyLoadDelay(p.lazyLoadDelay || 'none');
-    setNewProvGeoTarget(p.geoTarget || 'worldwide');
-    setNewProvIsConsentCompliant(p.isConsentCompliant !== false);
-    setNewProvCustomSize(p.customSize || 'Responsive (Fluid)');
-    triggerToast(`Editing provider ${p.name}`);
-  };
-
-  const handleDeleteProvider = (id: string, name: string) => {
-    if (confirm(`Delete ad provider configuration for '${name}'?`)) {
-      setAdProviders(adProviders.filter(p => p.id !== id));
-      triggerToast(`Ad provider '${name}' discarded.`);
     }
   };
 
@@ -3133,7 +3015,7 @@ export default function AdminConsole({
                       { id: 'comments', label: 'Comment Moderation', icon: MessageSquare },
                       { id: 'analytics', label: 'Detailed Traffic Reports', icon: BarChart2 },
                       { id: 'seo', label: 'Search Rankings & SEO', icon: Search },
-                      { id: 'ads', label: 'AdSense Placements', icon: DollarSign },
+                      { id: 'adsense_settings', label: 'Ad Monetization', icon: DollarSign },
                       { id: 'email_marketing', label: 'Email Marketing', icon: Mail },
                       { id: 'users', label: 'Staff & Authors', icon: Users },
                       { id: 'settings', label: 'Global Blog Settings', icon: Settings },
@@ -3277,7 +3159,7 @@ export default function AdminConsole({
                     {activePane === 'live_chat' && 'Live Support Chat Desk'}
                     {activePane === 'analytics' && 'Detailed Traffic Reports'}
                     {activePane === 'seo' && 'Search Rankings Control'}
-                    {activePane === 'ads' && 'AdSense Placements'}
+                    {activePane === 'ads' && 'Ad Monetization'}
                     {activePane === 'email_marketing' && 'Email Marketing Console'}
                     {activePane === 'billing' && 'Group 1: Membership Tiers & E-Commerce Digital Products'}
                     {activePane === 'rewarded_access' && 'Rewarded Ad Unlock Configuration'}
@@ -3324,7 +3206,7 @@ export default function AdminConsole({
                     {activePane === 'live_chat' && 'Interact with relationship seekers, moderate live visitor tickets, and manage instant customer care.'}
                     {activePane === 'analytics' && 'Programmatic graph outlines covering viewer interactions and likes distributions.'}
                     {activePane === 'seo' && 'Verify Google indexing meta descriptions, crawling rules, and robot files.'}
-                    {activePane === 'ads' && 'Manage high-CPM Google AdSense responsive blocks and view sticky sidebar codes.'}
+                    {activePane === 'ads' && 'AdSense, Monetag and Adsterra — AdSense is the primary provider.'}
                     {activePane === 'email_marketing' && 'Dispatch custom campaigns, filter active newsletter directories, configure Resend webhooks.'}
                     {activePane === 'billing' && 'Configure SaaS membership tier pricing, publish digital e-books & worksheets, track order fulfillment, and synchronize payment gateways.'}
                     {activePane === 'rewarded_access' && 'Manage programmatic ad unlock rules, customize durations, monitor active readers, and track CPM earnings.'}
@@ -5319,292 +5201,6 @@ export default function AdminConsole({
                   </div>
                 </div>
               )}
-              {/* ADS Placements CRM */}
-              {activePane === 'ads' && (
-                <div className="space-y-6">
-                  {/* Monetag provider settings  - MultiTag covers OnClick Popunder, Push Notifications, In-Page Push and Vignette Banner */}
-                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4 font-sans text-xs">
-                    <h3 className="font-bold text-sm">Monetag MultiTag Settings</h3>
-                    <p className="text-[10px] text-zinc-500 leading-relaxed">
-                      Create a MultiTag zone in your Monetag dashboard and paste its code below. One tag serves all four Monetag formats:
-                      OnClick Popunder, Push Notifications, In-Page Push and Vignette Banner. (For Push Notifications over HTTPS, also
-                      host the sw.js file Monetag provides at your site root.) Scripts inject only after a visitor consents to marketing cookies.
-                    </p>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={siteSettings.monetag_active === true}
-                          onChange={(e) => setSiteSettings({ ...siteSettings, monetag_active: e.target.checked })}
-                          className="cursor-pointer"
-                        />
-                        <span className="font-semibold">Monetag active</span>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">MultiTag Zone ID</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 275352"
-                          value={siteSettings.monetag_zone_id || ''}
-                          onChange={(e) => setSiteSettings({ ...siteSettings, monetag_zone_id: e.target.value })}
-                          className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-mono text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Full MultiTag Snippet (from dashboard  - overrides the zone-id loader)</label>
-                        <textarea
-                          rows={3}
-                          placeholder="&lt;script src=... data-zone=... async data-cfasync=false&gt;&lt;/script&gt;"
-                          value={siteSettings.monetag_script_code || ''}
-                          onChange={(e) => setSiteSettings({ ...siteSettings, monetag_script_code: e.target.value })}
-                          className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-mono text-[10px]"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          heartsync.updateSettings({
-                            monetag_active: siteSettings.monetag_active,
-                            monetag_zone_id: siteSettings.monetag_zone_id,
-                            monetag_script_code: siteSettings.monetag_script_code
-                          });
-                          triggerToast('Monetag settings saved!');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-bold hover:bg-rose-600 transition-all"
-                      >
-                        Save Monetag Settings
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Adsterra provider settings  - per-slot banner keys + site-wide format snippets */}
-                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4 font-sans text-xs">
-                    <h3 className="font-bold text-sm">Adsterra Settings</h3>
-                    <p className="text-[10px] text-zinc-500 leading-relaxed">
-                      Two integration paths. (1) Display/banner units: create a Native Banner or Banner unit per placement in your Adsterra
-                      dashboard and paste its key into the matching slot below  - header renders 728x90, sidebar/in-article/homepage/article-bottom
-                      300x250, footer 468x60. (2) Site-wide formats (Popunder, Social Bar, Interstitial, In-Page Push): paste each format's full
-                      code from the dashboard into its snippet field. Everything injects only after marketing-cookie consent.
-                    </p>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={siteSettings.adsterra_active === true}
-                          onChange={(e) => setSiteSettings({ ...siteSettings, adsterra_active: e.target.checked })}
-                          className="cursor-pointer"
-                        />
-                        <span className="font-semibold">Adsterra active</span>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Per-Slot Banner Keys</label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {([
-                            ['adsterra_key_header', 'Header 728x90'],
-                            ['adsterra_key_sidebar', 'Sidebar 300x250'],
-                            ['adsterra_key_in_article', 'In-article 300x250'],
-                            ['adsterra_key_footer', 'Footer 468x60'],
-                            ['adsterra_key_homepage', 'Homepage 300x250'],
-                            ['adsterra_key_article_bottom', 'Article bottom 300x250']
-                          ] as const).map(([field, label]) => (
-                            <div key={field} className="space-y-0.5">
-                              <span className="text-[9px] text-zinc-400">{label}</span>
-                              <input
-                                type="text"
-                                value={(siteSettings as Record<string, string>)[field] || ''}
-                                onChange={(e) => setSiteSettings({ ...siteSettings, [field]: e.target.value })}
-                                className="w-full p-2 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 font-mono text-[11px]"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      {([
-                        ['adsterra_popunder_script', 'Popunder code'],
-                        ['adsterra_social_bar_script', 'Social Bar code'],
-                        ['adsterra_interstitial_script', 'Interstitial code'],
-                        ['adsterra_inpage_push_script', 'In-Page Push code']
-                      ] as const).map(([field, label]) => (
-                        <div key={field} className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{label} (full snippet from dashboard)</label>
-                          <textarea
-                            rows={2}
-                            value={(siteSettings as Record<string, string>)[field] || ''}
-                            onChange={(e) => setSiteSettings({ ...siteSettings, [field]: e.target.value })}
-                            className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 font-mono text-[10px]"
-                          />
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          heartsync.updateSettings({
-                            adsterra_active: siteSettings.adsterra_active,
-                            adsterra_key_header: siteSettings.adsterra_key_header,
-                            adsterra_key_sidebar: siteSettings.adsterra_key_sidebar,
-                            adsterra_key_in_article: siteSettings.adsterra_key_in_article,
-                            adsterra_key_footer: siteSettings.adsterra_key_footer,
-                            adsterra_key_homepage: siteSettings.adsterra_key_homepage,
-                            adsterra_key_article_bottom: siteSettings.adsterra_key_article_bottom,
-                            adsterra_popunder_script: siteSettings.adsterra_popunder_script,
-                            adsterra_social_bar_script: siteSettings.adsterra_social_bar_script,
-                            adsterra_interstitial_script: siteSettings.adsterra_interstitial_script,
-                            adsterra_inpage_push_script: siteSettings.adsterra_inpage_push_script
-                          });
-                          triggerToast('Adsterra settings saved!');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-bold hover:bg-rose-600 transition-all"
-                      >
-                        Save Adsterra Settings
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Google AdSense client code options */}
-                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4 font-sans text-xs">
-                    <h3 className="font-bold text-sm">AdSense Layer Settings</h3>
-                    <form 
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        heartsync.updateSettings({
-                          adsense_client_id: siteSettings.adsense_client_id,
-                          adsense_auto_script: siteSettings.adsense_auto_script,
-                          adsense_active: siteSettings.adsense_active,
-                          adsense_slot_header: siteSettings.adsense_slot_header,
-                          adsense_slot_sidebar: siteSettings.adsense_slot_sidebar,
-                          adsense_slot_in_article: siteSettings.adsense_slot_in_article,
-                          adsense_slot_footer: siteSettings.adsense_slot_footer,
-                          adsense_slot_homepage: siteSettings.adsense_slot_homepage,
-                          adsense_slot_article_bottom: siteSettings.adsense_slot_article_bottom
-                        });
-                        triggerToast('Google AdSense settings successfully saved!');
-                      }}
-                      className="space-y-4"
-                    >
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">AdSense Unit Slot IDs (one per placement  - create the units in your AdSense account)</label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {([
-                            ['adsense_slot_header', 'Header'],
-                            ['adsense_slot_sidebar', 'Sidebar'],
-                            ['adsense_slot_in_article', 'In-article'],
-                            ['adsense_slot_footer', 'Footer'],
-                            ['adsense_slot_homepage', 'Homepage feed'],
-                            ['adsense_slot_article_bottom', 'Article bottom']
-                          ] as const).map(([field, label]) => (
-                            <div key={field} className="space-y-0.5">
-                              <span className="text-[9px] text-zinc-400">{label}</span>
-                              <input
-                                type="text"
-                                placeholder="1234567890"
-                                value={(siteSettings as Record<string, string>)[field] || ''}
-                                onChange={(e) => setSiteSettings({ ...siteSettings, [field]: e.target.value })}
-                                className="w-full p-2 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-mono text-[11px]"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">AdSense Client ID Code</label>
-                          <input 
-                            type="text" 
-                            placeholder="ca-pub-XXXXXXXXXXXXXXXX"
-                            value={siteSettings.adsense_client_id || ''}
-                            onChange={(e) => setSiteSettings({ ...siteSettings, adsense_client_id: e.target.value })}
-                            className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-mono text-xs" 
-                          />
-                        </div>
-<div className="space-y-1.5">
-                          <label className="text-[10.5px] font-semibold text-zinc-800 dark:text-zinc-200">AdSense Auto Script (loader snippet, auto-injected on every page)</label>
-                          <textarea
-                            rows={3}
-                            value={siteSettings.adsense_auto_script || ''}
-                            onChange={(e) => setSiteSettings({ ...siteSettings, adsense_auto_script: e.target.value })}
-                            placeholder='<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>'
-                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 font-mono text-[10px] focus:outline-none focus:ring-1 focus:ring-rose-500"
-                          />
-                          <span className="text-[8.5px] text-zinc-400 block leading-tight">Paste your AdSense loader tag from the AdSense dashboard. It is injected into every page for the Google crawler to read. Per-slot unit ids are configured below.</span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                          <div className="space-y-0.5 pr-3">
-                            <strong className="text-[10.5px] font-semibold text-zinc-800 dark:text-zinc-200 block">Automatic In-Article Ad Density</strong>
-                            <span className="text-[8.5px] text-zinc-400 block leading-tight">Auto-placed between paragraphs based on article length: 3 units under 2000 words, 4 units for 2000-4000 words, 5 units above 4000 words (plus the sidebar and article-bottom slots). Toggle off for a single mid-article unit.</span>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={siteSettings.in_article_ads_auto_enabled !== false}
-                            onChange={(e) => {
-                              const updated = { ...siteSettings, in_article_ads_auto_enabled: e.target.checked };
-                              setSiteSettings(updated);
-                              heartsync.updateSettings(updated);
-                            }}
-                            className="w-4 h-4 text-rose-500 rounded cursor-pointer accent-rose-500 shrink-0"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">AdSense global state</span>
-                          <div className="flex justify-between items-center p-2.5 bg-zinc-50 dark:bg-zinc-950 border rounded-xl">
-                            <div>
-                              <strong>Activate ad slots</strong>
-                              <span className="text-[10px] text-zinc-400 block leading-tight mt-0.5">Renders leaderboards across the frontend blog.</span>
-                            </div>
-                            <input 
-                              type="checkbox" 
-                              checked={siteSettings.adsense_active}
-                              onChange={(e) => {
-                                setSiteSettings({ ...siteSettings, adsense_active: e.target.checked });
-                              }}
-                              className="w-4.5 h-4.5 text-rose-500 rounded focus:ring-rose-400 cursor-pointer"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2">
-                        <button 
-                          type="submit" 
-                          className="px-5 py-2.5 hover:opacity-90 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold text-[11px] uppercase tracking-wider rounded-xl cursor-pointer hover:shadow-sm"
-                        >
-                          Save AdSense Settings
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* Active Ad units listings */}
-                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4">
-                    <h3 className="font-bold text-sm">Active CPM & Rewarded Google AdSense Placements ({heartsync.ad_zones?.length || 0})</h3>
-                    <div className="space-y-3.5">
-                      {(heartsync.ad_zones || []).map(unit => (
-                        <div key={unit.id} className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-150 relative text-xs flex justify-between items-center gap-4">
-                          <div>
-                            <div className="flex items-center gap-1.5 font-bold">
-                              <span>{unit.name}</span>
-                              <span className="text-[9px] font-mono font-bold bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-500">
-                                {unit.slot}
-                              </span>
-                              {unit.slot === 'rewarded_unlock' && (
-                                <span className="text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-600 px-1.5 py-0.5 rounded">
-                                  REWARDED
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-zinc-400 block mt-1">Size label: <strong>{unit.size_label}</strong> • Pricing scale: <strong>{unit.pricing}</strong></span>
-                          </div>
-                          <div className="font-mono text-zinc-400 text-right">
-                            <div>Impressions: <strong className="text-zinc-700 dark:text-zinc-300">{unit.impressions || 0}</strong></div>
-                            <div>Clicks: <strong className="text-zinc-700 dark:text-zinc-300">{unit.clicks || 0}</strong></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* TAGS CONSOLE */}
               {activePane === 'tags' && (
                 <div className="space-y-6">
@@ -6779,335 +6375,6 @@ export default function AdminConsole({
                     </div>
                   </div>
 
-                  {/* AD NETWORK PROVIDERS INTEGRATION HUB */}
-                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4">
-                    <div className="flex justify-between items-center border-b pb-3">
-                      <div>
-                        <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Third-Party Commercial Networks & Ad Providers</h3>
-                        <p className="text-[10px] text-zinc-400 mt-0.5">Integrate and toggle programmatic header scripts, matching Google and premium networks requirements.</p>
-                      </div>
-                      <span className="p-1 px-2.5 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold uppercase tracking-wider font-mono">
-                        {adProviders.length} Total Networks
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      
-                      {/* PROVIDERS DIRECTORY LIST */}
-                      <div className="lg:col-span-2 space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                          {adProviders.map(p => (
-                            <div key={p.id} className="p-4 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-150 dark:border-zinc-800 rounded-2xl flex flex-col justify-between space-y-3 shadow-none hover:border-indigo-200 dark:hover:border-zinc-750 transition-all duration-200">
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between">
-                                  <span className="p-0.5 px-2 bg-indigo-50 border border-indigo-100 dark:bg-zinc-800 dark:border-zinc-750 rounded-full text-[8px] font-bold tracking-wider font-mono uppercase text-indigo-600 dark:text-indigo-350">
-                                    {p.type}
-                                  </span>
-                                  <span className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold font-mono ${p.active ? 'text-emerald-500' : 'text-zinc-400'}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${p.active ? 'bg-emerald-500' : 'bg-zinc-450'}`} />
-                                    {p.active ? 'Active Placement' : 'Suspended'}
-                                  </span>
-                                </div>
-                                <h4 className="font-bold text-zinc-900 dark:text-zinc-100 text-xs mt-1">{p.name}</h4>
-                                <div className="text-[9px] text-zinc-400 font-mono space-y-0.5">
-                                  <div>Zone ID: <strong className="text-zinc-650 dark:text-zinc-350">{p.pubId}</strong></div>
-                                  <div>Target Slot: <strong className="text-rose-500 uppercase">{p.slot}</strong></div>
-                                  
-                                  {/* Enhanced display attributes */}
-                                  <div className="grid grid-cols-2 gap-x-2 mt-1.5 pt-1.5 border-t border-zinc-200/50 dark:border-zinc-800/40 text-[8px]">
-                                    <div>Est CPM: <strong className="text-emerald-600 dark:text-emerald-450">{p.cpmEstimate || '$12.50'}</strong></div>
-                                    <div>Size Limit: <strong className="text-zinc-600 dark:text-zinc-300">{p.customSize || 'Responsive'}</strong></div>
-                                    <div>Lazy Load: <strong className="text-purple-600 dark:text-purple-400">{p.lazyLoadDelay === 'none' ? 'Immediate' : p.lazyLoadDelay === 'scroll_100' ? 'Scroll 100px' : p.lazyLoadDelay === 'scroll_300' ? 'Scroll 300px' : 'Lazy'}</strong></div>
-                                    <div>Geo: <strong className="text-indigo-600 dark:text-indigo-400 uppercase">{p.geoTarget || 'Worldwide'}</strong></div>
-                                  </div>
-                                  <div className="text-[8px] text-zinc-450 mt-1">
-                                    GDPR Consent Framework: <strong className={p.isConsentCompliant !== false ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>{p.isConsentCompliant !== false ? 'ACTIVE (Compliant)' : 'DISABLED'}</strong>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="bg-zinc-100 dark:bg-zinc-950 p-2 rounded-xl text-[9px] font-mono text-zinc-400 max-h-16 overflow-y-auto break-all border border-zinc-150 dark:border-zinc-850">
-                                {p.scriptCode}
-                              </div>
-
-                              <div className="flex justify-end gap-1.5 border-t dark:border-zinc-850 pt-2 text-[10px] font-bold">
-                                <button 
-                                  onClick={() => {
-                                    const updated = adProviders.map(item => item.id === p.id ? { ...item, active: !item.active } : item);
-                                    setAdProviders(updated);
-                                    triggerToast(`Status updated for '${p.name}'`);
-                                  }}
-                                  className="p-1 px-2.5 rounded-lg border bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-650 cursor-pointer text-[9px]"
-                                >
-                                  Toggle Active
-                                </button>
-                                <button 
-                                  onClick={() => handleEditProvider(p)}
-                                  className="p-1 px-2 rounded-lg border bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-880 text-zinc-700 hover:text-indigo-500 hover:border-indigo-150 cursor-pointer text-[9px]"
-                                >
-                                  Edit Layout
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setAdProviders(adProviders.filter(item => item.id !== p.id));
-                                    triggerToast(`Network discared successfully.`);
-                                  }}
-                                  className="p-1 px-2 rounded-lg border border-red-100 bg-red-50/40 text-red-600 hover:bg-red-50 cursor-pointer text-[9px]"
-                                >
-                                  Discard
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* ADD / EDIT PROVIDER FORM WITH MORE OPTIONS */}
-                      <div className="p-4 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-150 dark:border-zinc-850 rounded-2xl space-y-3 h-fit text-zinc-805 dark:text-zinc-200">
-                        <div className="flex justify-between items-center border-b pb-2">
-                          <h4 className="font-extrabold text-zinc-800 dark:text-white text-xs">
-                            {editingProviderId ? '⚠️ Update Network Config' : '➕ Configure New Ad Network'}
-                          </h4>
-                          {editingProviderId && (
-                            <button 
-                              onClick={() => {
-                                setEditingProviderId(null);
-                                setNewProvName('');
-                                setNewProvPubId('');
-                                setNewProvCode('');
-                                setNewProvSlot('all');
-                                setNewProvActive(true);
-                                setNewProvCpmEstimate('$12.50');
-                                setNewProvLazyLoadDelay('none');
-                                setNewProvGeoTarget('worldwide');
-                                setNewProvIsConsentCompliant(true);
-                                setNewProvCustomSize('Responsive (Fluid)');
-                                triggerToast('Canceled editing ad network configuration.');
-                              }}
-                              className="text-[9px] font-bold text-rose-500 hover:underline"
-                            >
-                              Cancel
-                            </button>
-                          )}
-                        </div>
-
-                        {/* QUICK ONE-CLICK PRESET TEMPLATES */}
-                        <div className="p-2.5 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-150 dark:border-rose-900/40 rounded-xl space-y-1.5">
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block">⚡ 1-Click Fast Network Presets:</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setNewProvName('Google AdSense Responsive Unit');
-                                setNewProvType('adsense');
-                                const tplAdsenseId = (siteSettings.adsense_client_id || heartsync.site_settings.adsense_client_id || '').trim();
-                                setNewProvPubId(tplAdsenseId ? tplAdsenseId.replace('ca-pub-', 'pub-') : 'pub-XXXXXXXXXXXXXXXX');
-                                setNewProvCode(`<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${tplAdsenseId || 'ca-pub-XXXXXXXXXXXXXXXX'}" crossorigin="anonymous"></script>`);
-                                setNewProvSlot('header');
-                                setNewProvCpmEstimate('$14.10');
-                                setNewProvCustomSize('Responsive (Fluid)');
-                                triggerToast('Google AdSense template loaded!');
-                              }}
-                              className="px-2 py-1 text-[9px] font-bold bg-white dark:bg-zinc-800 border rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-300"
-                            >
-                              + Google AdSense
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setNewProvName('Monetag MultiTag Smart Placement');
-                                setNewProvType('monetag');
-                                setNewProvPubId('275352');
-                                setNewProvCode('<script src="https://alwingulla.com/88/tag.min.js" data-zone="275352" async data-cfasync="false"></script>');
-                                setNewProvSlot('header');
-                                setNewProvCpmEstimate('$16.80');
-                                setNewProvCustomSize('MultiTag / Vignette');
-                                triggerToast('Monetag MultiTag template loaded!');
-                              }}
-                              className="px-2 py-1 text-[9px] font-bold bg-white dark:bg-zinc-800 border rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 text-blue-600 dark:text-blue-300"
-                            >
-                              + Monetag MultiTag
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setNewProvName('Adsterra Social Bar & Native');
-                                setNewProvType('adsterra');
-                                setNewProvPubId('883921');
-                                setNewProvCode('<script type="text/javascript" src="//www.highperformanceformat.com/883921/invoke.js"></script>');
-                                setNewProvSlot('sidebar');
-                                setNewProvCpmEstimate('$14.50');
-                                setNewProvCustomSize('Social Bar / 300x250');
-                                triggerToast('Adsterra Social Bar template loaded!');
-                              }}
-                              className="px-2 py-1 text-[9px] font-bold bg-white dark:bg-zinc-800 border rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 text-amber-600 dark:text-amber-300"
-                            >
-                              + Adsterra Social Bar
-                            </button>
-                          </div>
-                        </div>
-
-                        <form onSubmit={handleProviderSubmit} className="space-y-3">
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Provider Placement Name</label>
-                            <input 
-                              type="text" 
-                              required
-                              placeholder="e.g. Mediavine Premium Footer Block"
-                              value={newProvName}
-                              onChange={(e) => setNewProvName(e.target.value)}
-                              className="w-full p-2 rounded-xl border bg-transparent font-sans" 
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Network Type</label>
-                              <select 
-                                value={newProvType}
-                                onChange={(e) => setNewProvType(e.target.value)}
-                                className="w-full p-2 rounded-xl border bg-transparent text-zinc-750 dark:text-zinc-300"
-                              >
-                                <option value="adsense">Google AdSense</option>
-                                <option value="monetag">Monetag (MultiTag / In-Page)</option>
-                                <option value="adsterra">Adsterra (Social Bar / Native)</option>
-                                <option value="ezoic">Ezoic AI</option>
-                                <option value="mediavine">Mediavine</option>
-                                <option value="adthrive">AdThrive</option>
-                                <option value="taboola">Taboola Outmost</option>
-                                <option value="outbrain">Outbrain Widget</option>
-                                <option value="custom">Custom Ad Code</option>
-                              </select>
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Target Slot</label>
-                              <select 
-                                value={newProvSlot}
-                                onChange={(e) => setNewProvSlot(e.target.value)}
-                                className="w-full p-2 rounded-xl border bg-transparent text-zinc-700 dark:text-zinc-300"
-                              >
-                                <option value="all">Unify Auto ads</option>
-                                <option value="header">Header Banner</option>
-                                <option value="sidebar">Right Sidebar</option>
-                                <option value="footer">Lower Footer</option>
-                                <option value="in_articles">Inside Articles</option>
-                                <option value="homepage">Homepage Feed</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Publisher ID / Zone ID</label>
-                              <input 
-                                type="text" 
-                                placeholder="e.g. ca-pub-XXXXXXXXXXXXXXXX"
-                                value={newProvPubId}
-                                onChange={(e) => setNewProvPubId(e.target.value)}
-                                className="w-full p-2 rounded-xl border bg-transparent font-mono" 
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Estimated Avg CPM</label>
-                              <input 
-                                type="text" 
-                                placeholder="e.g. $18.50"
-                                value={newProvCpmEstimate}
-                                onChange={(e) => setNewProvCpmEstimate(e.target.value)}
-                                className="w-full p-2 rounded-xl border bg-transparent font-mono" 
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Dimensions size tag</label>
-                              <input 
-                                type="text" 
-                                placeholder="e.g. 336x280 Rectangle"
-                                value={newProvCustomSize}
-                                onChange={(e) => setNewProvCustomSize(e.target.value)}
-                                className="w-full p-2 rounded-xl border bg-transparent font-sans" 
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Lazy Loading Trigger</label>
-                              <select 
-                                value={newProvLazyLoadDelay}
-                                onChange={(e) => setNewProvLazyLoadDelay(e.target.value)}
-                                className="w-full p-2 rounded-xl border bg-transparent text-zinc-700 dark:text-zinc-300"
-                              >
-                                <option value="none">Immediate Render</option>
-                                <option value="scroll_100">Delay 100px Scroll</option>
-                                <option value="scroll_300">Delay 300px Scroll</option>
-                                <option value="delay_1s">Delay 1s after load</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Audience Geo-Targeting</label>
-                            <select 
-                              value={newProvGeoTarget}
-                              onChange={(e) => setNewProvGeoTarget(e.target.value)}
-                              className="w-full p-2 rounded-xl border bg-transparent text-zinc-700 dark:text-zinc-300"
-                            >
-                              <option value="worldwide">Worldwide Traffic (All Geos)</option>
-                              <option value="us_eu">US & Europe High-Tier CPM Only</option>
-                              <option value="asia">Asia Pacific Geos Only</option>
-                              <option value="latam">Latin America Traffic</option>
-                            </select>
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-450 block">Integration Script HTML Tag</label>
-                            <textarea 
-                              rows={3}
-                              placeholder="<script async src='https://...'></script>"
-                              value={newProvCode}
-                              onChange={(e) => setNewProvCode(e.target.value)}
-                              className="w-full p-2 rounded-xl border bg-transparent font-mono text-[10px]" 
-                            />
-                          </div>
-
-                          <div className="flex flex-col gap-2 py-1">
-                            <div className="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                id="prov-active-check"
-                                checked={newProvActive}
-                                onChange={(e) => setNewProvActive(e.target.checked)}
-                                className="w-3.5 h-3.5 accent-rose-500 rounded border cursor-pointer" 
-                              />
-                              <label htmlFor="prov-active-check" className="text-[10px] font-medium text-zinc-500 cursor-pointer">Activate placement script instantly</label>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                id="prov-consent-check"
-                                checked={newProvIsConsentCompliant}
-                                onChange={(e) => setNewProvIsConsentCompliant(e.target.checked)}
-                                className="w-3.5 h-3.5 accent-rose-500 rounded border cursor-pointer" 
-                              />
-                              <label htmlFor="prov-consent-check" className="text-[10px] font-medium text-zinc-500 cursor-pointer">Respect GDPR & CCPA User Consent</label>
-                            </div>
-                          </div>
-
-                          <button 
-                            type="submit" 
-                            className="w-full py-2 rounded-xl text-white font-extrabold bg-gradient-to-r from-indigo-500 to-violet-600 hover:scale-101 transform transition-all cursor-pointer text-[10px]"
-                          >
-                            {editingProviderId ? 'Sync Network Configuration' : 'Deploy Ad Network'}
-                          </button>
-                        </form>
-                      </div>
-
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -7186,10 +6453,11 @@ export default function AdminConsole({
                       <div className="flex items-center justify-between border-b pb-3">
                         <div className="space-y-0.5">
                           <h4 className="font-extrabold text-sm text-zinc-900 dark:text-white flex items-center gap-2">
-                            <span>🔴</span> Google AdSense Official Integration
+                            <span>🔴</span> Google AdSense — Primary Provider
                           </h4>
                           <p className="text-[11px] text-zinc-400">
-                            Automatic ad injection, crawler compliance verification, and responsive auto ads script.
+                            Primary provider with first claim on every placement slot. Monetag and Adsterra coexist until
+                            AdSense approves the site; per-slot AdSense units serve once your publisher ID and slot IDs are configured.
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -7297,22 +6565,9 @@ export default function AdminConsole({
                           <span className="text-[10px] text-zinc-400 block">Monetag publisher dashboard &gt; Zones &gt; Zone ID.</span>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
-                            Monetag Ad Format Mode
-                          </label>
-                          <select
-                            value={monetagFormat}
-                            onChange={(e) => setMonetagFormat(e.target.value)}
-                            className="w-full p-2.5 rounded-xl border bg-transparent text-zinc-800 dark:text-zinc-200 font-sans"
-                          >
-                            <option value="multitag">MultiTag (All Formats with AI Auto-Optimization)</option>
-                            <option value="in_page_push">In-Page Push (Native notification box)</option>
-                            <option value="popunder">Popunder / OnClick (High CPM)</option>
-                            <option value="vignette">Vignette Banner (Full-screen article transition)</option>
-                            <option value="rewarded">Rewarded Interstitial Ad</option>
-                          </select>
-                          <span className="text-[10px] text-zinc-400 block">MultiTag automatically selects highest-yielding format per visitor.</span>
+                        <div className="p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/70 dark:border-blue-900/30 text-[10px] leading-relaxed text-blue-800 dark:text-blue-300 space-y-1">
+                          <strong className="text-zinc-800 dark:text-zinc-200">MultiTag serves all formats from one tag.</strong>
+                          <span className="block">One MultiTag script covers OnClick Popunder, Push Notifications, In-Page Push and Vignette Banner — there is no format switch to configure. For Push Notifications over HTTPS, also host the sw.js file Monetag provides at your site root.</span>
                         </div>
                       </div>
 
@@ -7354,20 +6609,12 @@ export default function AdminConsole({
                         />
                       </div>
 
-                      {/* Monetag Quick Metrics */}
-                      <div className="grid grid-cols-3 gap-3 p-3 bg-blue-50/40 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl">
-                        <div>
-                          <span className="text-[9px] uppercase tracking-wider font-bold text-zinc-400 block">Fill Rate</span>
-                          <span className="font-extrabold text-blue-600 dark:text-blue-400 text-sm">99.4%</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] uppercase tracking-wider font-bold text-zinc-400 block">Est. CPM</span>
-                          <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">$16.80</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] uppercase tracking-wider font-bold text-zinc-400 block">Geo-Reach</span>
-                          <span className="font-extrabold text-zinc-700 dark:text-zinc-300 text-sm">Global (195+)</span>
-                        </div>
+                      <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl text-[10px] leading-relaxed text-zinc-500">
+                        <strong className="text-zinc-700 dark:text-zinc-200">Compliance status: coexisting until AdSense approval.</strong>{' '}
+                        AdSense is the primary provider but has not approved the site yet, so Monetag is NOT blocked. Once AdSense approves and
+                        serves ads, Google Program policies require the popunder / vignette / in-page-push formats to be turned off on pages
+                        carrying AdSense code (no pop-ups or pop-unders, and the publisher is responsible that no other ad network uses such
+                        methods there). Scripts inject only after marketing-cookie consent.
                       </div>
                     </div>
                   )}
@@ -7381,13 +6628,13 @@ export default function AdminConsole({
                             <span>🟠</span> Adsterra Ad Network
                           </h4>
                           <p className="text-[11px] text-zinc-400">
-                            Social Bar rich push units, responsive Native Banners, Display 728x90 / 300x250, and Popunders.
+                            Per-slot banner units plus optional site-wide formats (Popunder, Social Bar, Interstitial, In-Page Push).
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                            adsterraActive 
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400' 
+                            adsterraActive
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
                               : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
                           }`}>
                             {adsterraActive ? '● ADSTERRA ACTIVE' : '○ DEACTIVATED'}
@@ -7395,76 +6642,91 @@ export default function AdminConsole({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
-                            Adsterra Key ID / Placement Auth Key
-                          </label>
-                          <input 
-                            type="text" 
-                            placeholder="e.g. 883921" 
-                            value={adsterraKeyId}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setAdsterraKeyId(val);
-                              if (val.trim()) {
-                                setAdsterraScriptCode(`<script type="text/javascript" src="//www.highperformanceformat.com/${val.trim()}/invoke.js"></script>`);
-                              }
-                            }}
-                            className="w-full p-2.5 rounded-xl border bg-transparent font-mono" 
-                          />
-                          <span className="text-[10px] text-zinc-400 block">Adsterra Publisher dashboard &gt; Websites &gt; Placement Key.</span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
-                            Adsterra Ad Format Mode
-                          </label>
-                          <select
-                            value={adsterraFormat}
-                            onChange={(e) => setAdsterraFormat(e.target.value)}
-                            className="w-full p-2.5 rounded-xl border bg-transparent text-zinc-800 dark:text-zinc-200 font-sans"
-                          >
-                            <option value="social_bar">Social Bar (Push notifications &amp; rich interactive media)</option>
-                            <option value="native_banner">Native Banner (4:1 Responsive editorial block)</option>
-                            <option value="banner_728x90">Display 728x90 Leaderboard (Header)</option>
-                            <option value="banner_300x250">Display 300x250 Medium Rectangle (Sidebar)</option>
-                            <option value="popunder">Popunder / Direct Link (High traffic)</option>
-                          </select>
-                          <span className="text-[10px] text-zinc-400 block">Social Bar delivers up to 30x higher CTR than standard banners.</span>
-                        </div>
+                      <div className="p-3 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/30 text-[10px] leading-relaxed text-amber-800 dark:text-amber-300">
+                        <strong>AdSense approval pending — Adsterra keeps serving.</strong>{' '}
+                        AdSense is the primary provider but has not approved the site yet, so Adsterra is NOT blocked. Once AdSense approves
+                        and serves ads, Google Program policies require the intrusive site-wide formats (Popunder, Social Bar, Interstitial,
+                        In-Page Push) to be turned off here: pop-ups, pop-unders and interstitials are prohibited on pages carrying AdSense
+                        code, and the publisher is responsible that no other ad network uses such methods there. Compliant display banners
+                        from other networks may stay if clearly labelled.
                       </div>
 
                       <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl flex items-center justify-between">
                         <div>
-                          <strong className="block leading-tight text-zinc-800 dark:text-zinc-100">Activate Adsterra Ad Network</strong>
-                          <span className="text-[10px] text-zinc-400 block mt-0.5">Serves Adsterra Social Bar and native units across site pages.</span>
+                          <strong className="block leading-tight text-zinc-800 dark:text-zinc-100">Adsterra active</strong>
+                          <span className="text-[10px] text-zinc-400 block mt-0.5">Master switch for every Adsterra unit below. Everything injects only after marketing-cookie consent.</span>
                         </div>
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={adsterraActive}
                           onChange={(e) => setAdsterraActive(e.target.checked)}
-                          className="w-4.5 h-4.5 text-amber-600 rounded cursor-pointer" 
+                          className="w-4.5 h-4.5 text-amber-600 rounded cursor-pointer"
                         />
                       </div>
 
-                      
-
-                      {/* Adsterra Quick Metrics */}
-                      <div className="grid grid-cols-3 gap-3 p-3 bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-2xl">
-                        <div>
-                          <span className="text-[9px] uppercase tracking-wider font-bold text-zinc-400 block">Fill Rate</span>
-                          <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">98.9%</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] uppercase tracking-wider font-bold text-zinc-400 block">Est. CPM</span>
-                          <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">$14.50</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] uppercase tracking-wider font-bold text-zinc-400 block">Safety</span>
-                          <span className="font-extrabold text-zinc-700 dark:text-zinc-300 text-sm">100% Clean Anti-Malware</span>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Per-Slot Banner Keys (create one Native Banner / Banner unit per placement in your Adsterra dashboard)</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {([
+                            ['adsterra_key_header', 'Header 728x90'],
+                            ['adsterra_key_sidebar', 'Sidebar 300x250'],
+                            ['adsterra_key_in_article', 'In-article 300x250'],
+                            ['adsterra_key_footer', 'Footer 468x60'],
+                            ['adsterra_key_homepage', 'Homepage 300x250'],
+                            ['adsterra_key_article_bottom', 'Article bottom 300x250']
+                          ] as const).map(([field, label]) => (
+                            <div key={field} className="space-y-0.5">
+                              <span className="text-[9px] text-zinc-400">{label}</span>
+                              <input
+                                type="text"
+                                value={(siteSettings as Record<string, string>)[field] || ''}
+                                onChange={(e) => setSiteSettings({ ...siteSettings, [field]: e.target.value })}
+                                className="w-full p-2 rounded-xl border bg-transparent outline-none focus:border-amber-500 text-zinc-900 dark:text-zinc-100 font-mono text-[11px]"
+                              />
+                            </div>
+                          ))}
                         </div>
                       </div>
+
+                      {([
+                        ['adsterra_popunder_script', 'Popunder code'],
+                        ['adsterra_social_bar_script', 'Social Bar code'],
+                        ['adsterra_interstitial_script', 'Interstitial code'],
+                        ['adsterra_inpage_push_script', 'In-Page Push code']
+                      ] as const).map(([field, label]) => (
+                        <div key={field} className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{label} (full snippet from dashboard)</label>
+                          <textarea
+                            rows={2}
+                            value={(siteSettings as Record<string, string>)[field] || ''}
+                            onChange={(e) => setSiteSettings({ ...siteSettings, [field]: e.target.value })}
+                            className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-amber-500 text-zinc-900 dark:text-zinc-100 font-mono text-[10px]"
+                          />
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          heartsync.updateSettings({
+                            adsterra_active: adsterraActive,
+                            adsterra_key_header: siteSettings.adsterra_key_header,
+                            adsterra_key_sidebar: siteSettings.adsterra_key_sidebar,
+                            adsterra_key_in_article: siteSettings.adsterra_key_in_article,
+                            adsterra_key_footer: siteSettings.adsterra_key_footer,
+                            adsterra_key_homepage: siteSettings.adsterra_key_homepage,
+                            adsterra_key_article_bottom: siteSettings.adsterra_key_article_bottom,
+                            adsterra_popunder_script: siteSettings.adsterra_popunder_script,
+                            adsterra_social_bar_script: siteSettings.adsterra_social_bar_script,
+                            adsterra_interstitial_script: siteSettings.adsterra_interstitial_script,
+                            adsterra_inpage_push_script: siteSettings.adsterra_inpage_push_script
+                          });
+                          triggerToast('Adsterra settings saved!');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600 transition-all"
+                      >
+                        Save Adsterra Settings
+                      </button>
                     </div>
                   )}
 
@@ -7482,118 +6744,9 @@ export default function AdminConsole({
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Primary Display Containers</span>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                          <div className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl">
-                            <div>
-                              <strong className="block leading-tight">Header Leaderboard Banner (728x90)</strong>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5">Anchored directly below navigation headers.</span>
-                            </div>
-                            <input 
-                              type="checkbox" 
-                              checked={placementHeader}
-                              onChange={(e) => setPlacementHeader(e.target.checked)}
-                              className="w-4.5 h-4.5 text-rose-550 rounded cursor-pointer" 
-                            />
-                          </div>
-
-                          <div className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl">
-                            <div>
-                              <strong className="block leading-tight">Sidebar Column Square (300x250)</strong>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5">Inside desktop floating sidebar widget slots.</span>
-                            </div>
-                            <input 
-                              type="checkbox" 
-                              checked={placementSidebar}
-                              onChange={(e) => setPlacementSidebar(e.target.checked)}
-                              className="w-4.5 h-4.5 text-rose-550 rounded cursor-pointer" 
-                            />
-                          </div>
-
-                          <div className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl">
-                            <div>
-                              <strong className="block leading-tight">In-Articles Ad Display (Auto-Injection)</strong>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5">Embeds responsive ads inside article content blocks.</span>
-                            </div>
-                            <input 
-                              type="checkbox" 
-                              checked={placementInArticles}
-                              onChange={(e) => setPlacementInArticles(e.target.checked)}
-                              className="w-4.5 h-4.5 text-rose-550 rounded cursor-pointer" 
-                            />
-                          </div>
-
-                          <div className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl">
-                            <div>
-                              <strong className="block leading-tight">Floating Sticky Anchor Footer Ad</strong>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5">Hangs overlayed at the very bottom on screens.</span>
-                            </div>
-                            <input 
-                              type="checkbox" 
-                              checked={placementFooter}
-                              onChange={(e) => setPlacementFooter(e.target.checked)}
-                              className="w-4.5 h-4.5 text-rose-550 rounded cursor-pointer" 
-                            />
-                          </div>
-
-                          <div className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl">
-                            <div>
-                              <strong className="block leading-tight">Homepage Feed Ad Display</strong>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5">Injects leaderboard banners directly into the homepage feed loop.</span>
-                            </div>
-                            <input 
-                              type="checkbox" 
-                              checked={placementHomepage}
-                              onChange={(e) => setPlacementHomepage(e.target.checked)}
-                              className="w-4.5 h-4.5 text-rose-550 rounded cursor-pointer" 
-                            />
-                          </div>
-
-                          <div className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl">
-                            <div>
-                              <strong className="block leading-tight">In-Feed Native Ads Layout (Responsive)</strong>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5">Spawns dynamically inside long structured text blocks.</span>
-                            </div>
-                            <input 
-                              type="checkbox" 
-                              checked={placementInfeed}
-                              onChange={(e) => setPlacementInfeed(e.target.checked)}
-                              className="w-4.5 h-4.5 text-rose-550 rounded cursor-pointer" 
-                            />
-                          </div>
-
-                          <div className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl">
-                            <div>
-                              <strong className="block leading-tight">Category Page Display</strong>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5">Shows medium banner placements on specialized category screens.</span>
-                            </div>
-                            <input 
-                              type="checkbox" 
-                              checked={placementCategory}
-                              onChange={(e) => setPlacementCategory(e.target.checked)}
-                              className="w-4.5 h-4.5 text-rose-550 rounded cursor-pointer" 
-                            />
-                          </div>
-
-                          <div className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl">
-                            <div>
-                              <strong className="block leading-tight">Help &amp; FAQ Page Placements</strong>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5">Embeds non-intrusive informational links and display ads in FAQ lists.</span>
-                            </div>
-                            <input 
-                              type="checkbox" 
-                              checked={placementFaq}
-                              onChange={(e) => setPlacementFaq(e.target.checked)}
-                              className="w-4.5 h-4.5 text-rose-550 rounded cursor-pointer" 
-                            />
-                          </div>
-                        </div>
-                      </div>
-
                       {/* Explicit Layout Banner Toggles */}
                       <div className="space-y-2 pt-2 border-t">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">AdPlacement Component Global Visibility Controls</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Live frontend ad-slot switches (these directly toggle the rendered AdPlacement slots)</span>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <label className="p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-xl flex items-center justify-between cursor-pointer">
                             <span className="text-xs font-semibold">Header Banner</span>
@@ -7657,18 +6810,17 @@ export default function AdminConsole({
                           monetag_active: monetagActive,
                           monetag_zone_id: monetagZoneId,
                           monetag_script_code: monetagScriptCode,
-                          monetag_format: monetagFormat,
                           adsterra_active: adsterraActive,
-                          adsterra_key_id: adsterraKeyId,
-                          adsterra_format: adsterraFormat,
-                          placement_header: placementHeader,
-                          placement_sidebar: placementSidebar,
-                          placement_infeed: placementInfeed,
-                          placement_footer: placementFooter,
-                          placement_in_articles: placementInArticles,
-                          placement_homepage: placementHomepage,
-                          placement_category: placementCategory,
-                          placement_faq: placementFaq,
+                          adsterra_key_header: siteSettings.adsterra_key_header,
+                          adsterra_key_sidebar: siteSettings.adsterra_key_sidebar,
+                          adsterra_key_in_article: siteSettings.adsterra_key_in_article,
+                          adsterra_key_footer: siteSettings.adsterra_key_footer,
+                          adsterra_key_homepage: siteSettings.adsterra_key_homepage,
+                          adsterra_key_article_bottom: siteSettings.adsterra_key_article_bottom,
+                          adsterra_popunder_script: siteSettings.adsterra_popunder_script,
+                          adsterra_social_bar_script: siteSettings.adsterra_social_bar_script,
+                          adsterra_interstitial_script: siteSettings.adsterra_interstitial_script,
+                          adsterra_inpage_push_script: siteSettings.adsterra_inpage_push_script,
                           banner_header_enabled: bannerHeaderEnabled,
                           banner_sidebar_enabled: bannerSidebarEnabled,
                           banner_footer_enabled: bannerFooterEnabled,

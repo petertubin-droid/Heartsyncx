@@ -21,6 +21,21 @@ import { useCookieConsent } from './useCookieConsent';
  * Everything is consent-gated: nothing injects until the visitor has
  * consented and accepted marketing cookies. Nothing renders when the
  * corresponding setting is empty or the provider is inactive.
+ *
+ * ADSENSE IS PRIMARY, OTHERS COEXIST FOR NOW (owner decision 2026-09-22):
+ * AdSense has NOT yet approved the site, so Monetag/Adsterra keep serving —
+ * they are the only live revenue and must NOT be blocked. AdSense takes
+ * first claim on every placement slot (see AdPlacement.tsx); the other
+ * networks fill whatever AdSense cannot serve yet.
+ *
+ * COMPLIANCE HEADS-UP (Google AdSense Program policies) for once AdSense is
+ * approved and serving: pop-ups/pop-unders/interstitials and floating-box
+ * formats are prohibited on pages carrying AdSense code, and the publisher
+ * is responsible that no other ad network uses such methods to direct
+ * traffic to those pages. At approval time the site-wide intrusive formats
+ * (Monetag popunder/vignette/in-page push, Adsterra popunder/social bar/
+ * interstitial) must be turned off in the admin portal. The portal shows
+ * this warning on the Monetag/Adsterra tabs.
  */
 export const AdNetworkScripts: React.FC = () => {
   const injectedRef = useRef(false);
@@ -55,7 +70,7 @@ export const AdNetworkScripts: React.FC = () => {
     : [];
 
   const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
-  const shouldInject = hasConsented && marketingConsent && (hasConsented) && (monetagSnippet || adsterraSnippets.length > 0);
+  const shouldInject = hasConsented && marketingConsent && (monetagSnippet || adsterraSnippets.length > 0);
 
   // Revived feature: adsense_auto_script  - the site-owner's own AdSense
   // loader snippet, injected on mount WITHOUT a consent gate (the loader is

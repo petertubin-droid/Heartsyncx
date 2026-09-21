@@ -504,10 +504,10 @@ const isBlockedDatabaseCacheKey = (key: string): boolean => {
     'hs_posts', 'hs_categories', 'hs_comments', 'hs_ad_zones', 'hs_subscribers', 'hs_quizzes',
     'hs_site_settings', 'hs_analytics', 'hs_audit_logs', 'hs_media_library', 'hs_authors', 'hs_pages',
     'hs_plans', 'hs_subscriptions', 'hs_payments', 'hs_all_users', 'hs_global_premium_locked', 'hs_tags',
-    'hs_podcasts', 'hs_rss_feeds', 'hs_ad_providers', 'hs_webhook_targets', 'hs_webhook_logs',
+    'hs_podcasts', 'hs_rss_feeds', 'hs_webhook_targets', 'hs_webhook_logs',
     'hs_email_campaigns', 'hs_email_templates', 'hs_num_sentiment', 'pn_staff_users', 'hs_current_user',
     'hs_integrations_config', 'hs_bookmarks', 'hs_bookmarked_articles', 'pn_campaigns', 'hs_sponsorship_campaigns',
-    'hs_digital_products', 'hs_rewarded_ad_config', 'pn_ad_providers', 'pn_tags', 'pn_podcasts',
+    'hs_digital_products', 'hs_rewarded_ad_config', 'pn_tags', 'pn_podcasts',
     'pn_rss_feeds', 'pn_moder_comments', 'pn_generated_sitemaps', 'pn_metadata_list'
   ];
   return BLOCKED_KEYS.includes(key) || key.startsWith('pn_brand_') || key.startsWith('pn_');
@@ -895,7 +895,6 @@ export class HeartsyncStore {
   public tags: any[] = [];
   public podcasts: any[] = [];
   public rss_feeds: any[] = [];
-  public ad_providers: any[] = [];
   public campaigns: any[] = [];
   public sponsorship_campaigns: any[] = [];
   public webhook_targets: any[] = [];
@@ -1804,7 +1803,6 @@ export class HeartsyncStore {
     // Honest absence: no provider is preconfigured. Admins add their own real
     // publisher/zone/key credentials via the Admin Console  - fake demo IDs must
     // never ship (AdSense policy risk + misleading admin defaults).
-    this.ad_providers = getLocalStorage<any[]>('hs_ad_providers', []);
     const defaultCampaigns = [
       { id: 'camp-1', name: 'Attachment Style Mastery Masterclass', url: 'https://wellnesscouples.com/courses/attachment-mastery', impressions: 0, clicks: 0, status: 'Active' },
       { id: 'camp-2', name: 'Gottman Intimacy Deck Companion', url: 'https://wellnesscouples.com/resources/intimacy-cards', impressions: 0, clicks: 0, status: 'Active' },
@@ -1926,7 +1924,6 @@ export class HeartsyncStore {
           if (data.tags) this.tags = data.tags;
           if (data.podcasts) this.podcasts = data.podcasts;
           if (data.rss_feeds) this.rss_feeds = data.rss_feeds;
-          if (data.ad_providers) this.ad_providers = data.ad_providers;
           if (data.sponsorship_campaigns || data.campaigns) {
             this.sponsorship_campaigns = data.sponsorship_campaigns || data.campaigns;
             this.campaigns = this.sponsorship_campaigns;
@@ -2022,7 +2019,6 @@ export class HeartsyncStore {
             tags: this.tags,
             podcasts: this.podcasts,
             rss_feeds: this.rss_feeds,
-            ad_providers: this.ad_providers,
             sponsorship_campaigns: this.sponsorship_campaigns,
             campaigns: this.campaigns,
             webhook_targets: this.webhook_targets,
@@ -2100,7 +2096,6 @@ export class HeartsyncStore {
       tags: this.tags,
       podcasts: this.podcasts,
       rss_feeds: this.rss_feeds,
-      ad_providers: this.ad_providers,
       sponsorship_campaigns: this.sponsorship_campaigns,
       campaigns: this.campaigns,
       webhook_targets: this.webhook_targets,

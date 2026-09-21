@@ -155,10 +155,15 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
   const toggle = toggleField[slot];
   const slotHiddenByToggle = !!(toggle && settings()[toggle] === false);
 
+  // AdSense is the PRIMARY ad provider. adsense_active === false is the one
+  // switch that hands slots to the fallback networks (Adsterra banners) —
+  // while AdSense is active it always takes precedence per slot.
+  const adsenseActive = settings().adsense_active !== false;
+
   const publisherId = resolvePublisherId();
   const adsenseSlotId = str(settings()[ADSENSE_FIELD[slot]]) || (ADSENSE_ENV[slot] || '').trim();
   const adsterraKey = str(settings()[`adsterra_key_${slot}`]);
-  const adsenseConfigured = !!(publisherId && /^\d{9,16}$/.test(adsenseSlotId));
+  const adsenseConfigured = !!(adsenseActive && publisherId && /^\d{9,16}$/.test(adsenseSlotId));
   const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
 
   // All hooks must run before any early return so the hook order stays
