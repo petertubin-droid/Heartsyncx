@@ -337,3 +337,31 @@ admin cannot log in. Findings, verified live against the Hearty project
 - CookieBanner/LiveChat/MobileMenu/Lightbox/LoadingSystem fixed-position
   elements render OUTSIDE the transformed wrapper — unaffected by the
   containing-block bug.
+
+## UI / UX AUDIT — FIX ROUND 2 (2026-09-21)
+
+### WIRED (previously dead settings, now functional)
+- Article layout: article_layout (narrow = centered no-sidebar), article_desktop_sidebar_visible,
+  article_desktop_sidebar_width (col-span mapping), article_sidebar_position (left/right),
+  article_desktop_sidebar_sticky (true sticky via stretched column), article_desktop_related_placement
+  (bottom grid vs sidebar widget), article_atmospheric_linen (linen canvas CSS)
+- Typography: article_line_height, article_paragraph_spacing, article_content_width,
+  article_desktop_content_width, article_heading_styles (serif/sans CSS classes)
+- Mobile: article_mobile_share_style (dock / inline / floating bubble w/ native share),
+  article_mobile_sticky_actions (gates dock + bubble), article_mobile_progress_bar (mobile gate),
+  article_mobile_image_height, article_mobile_header_spacing
+- SEO: og_title / og_description now override og:title / og:description meta tags
+- Table of Connections sidebar widget now actually navigates to the article
+- Fake "Aura Meditation App" sponsor ad replaced with honest "Free Access" 15-second unlock
+  copy (no fake sponsor/branding anywhere)
+- alert() -> triggerToast() in AdminConsole (category save, newsletter send)
+- 5 console.log statements removed from AdminLogin (they logged admin emails to the console)
+
+### STILL DEAD — needs removal from AdminConsole (settings that lie)
+TTS panel (tts_*), security panel (security_2fa/max_attempts/session_timeout),
+newsletter_subject/template, expert_reviewer_*, monetag_format, adsterra_script_code,
+adsense_auto_script, rewarded_ad_config, ai_model_selected, ai_prompt_prefix,
+digital_products, homepage_categories_* (shadowed by the working homepage_topics_* settings),
+brand_* (needs a real CSS-variable theme system to wire honestly),
+article_editorial_notes_enabled (no editor-note data field exists to gate).
+Also remaining: alert() in LiveChatWidget + RichTextEditor, newsletter template href="#" placeholder.

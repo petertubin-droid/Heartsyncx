@@ -323,3 +323,19 @@ html.dark, html.dark body {
     background: rgba(255, 255, 255, 0.02);
   }
 }
+
+
+/* Wired article design settings (AdminConsole > Article Design) */
+.article-linen {
+  background-color: #faf6f0;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(120, 100, 80, 0.035) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(120, 100, 80, 0.035) 0 1px, transparent 1px 3px);
+}
+.dark .article-linen { background-color: #12100d; }
+.article-headings-serif h1, .article-headings-serif h2, .article-headings-serif h3, .article-headings-serif h4 {
+  font-family: "Playfair Display", Georgia, serif;
+}
+.article-headings-sans h1, .article-headings-sans h2, .article-headings-sans h3, .article-headings-sans h4 {
+  font-family: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+}

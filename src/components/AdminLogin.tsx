@@ -132,7 +132,6 @@ export default function AdminLogin({ onNavigate, onSuccess }: AdminLoginProps) {
 
       // 2. Perform authentic client-side login session establishment via Supabase Auth
       if (heartsync.supabase) {
-        console.log('🔄 First-run setup: establishing active auth session for', cleanEmail);
         let activeUserId: string | null = resData.user?.id || null;
         let profile = null;
 
@@ -249,22 +248,15 @@ export default function AdminLogin({ onNavigate, onSuccess }: AdminLoginProps) {
 
     if (heartsync.supabase) {
       try {
-        console.log('🔄 Initiating signInWithPassword for:', cleanEmail);
         const { data, error } = await heartsync.supabase.auth.signInWithPassword({
           email: cleanEmail,
           password: password
-        });
-
-        console.log('🔑 signInWithPassword result:', {
-          user: data?.user ? { id: data.user.id, email: data.user.email } : null,
-          error: error ? { message: error.message } : null
         });
 
         if (error) throw error;
         if (!data.session || !data.user) throw new Error('Could not establish an active session.');
 
         // Sync & verify profile with authoritative backend
-        console.log('🔄 Syncing user profile with backend...');
         const syncRes = await fetch('/api/auth/sync-profile', {
           method: 'POST',
           headers: { 
@@ -380,7 +372,6 @@ export default function AdminLogin({ onNavigate, onSuccess }: AdminLoginProps) {
 
     if (heartsync.supabase) {
       try {
-        console.log('🔄 Registering administrator:', cleanEmail);
         const { data, error } = await heartsync.supabase.auth.signUp({
           email: cleanEmail,
           password: password,

@@ -1000,8 +1000,8 @@ export default function App() {
     }
     
     // Open Graph
-    setMetaTag('property', 'og:title', title, true);
-    setMetaTag('property', 'og:description', description, true);
+    setMetaTag('property', 'og:title', siteSettings.og_title || title, true);
+    setMetaTag('property', 'og:description', siteSettings.og_description || description, true);
     setMetaTag('property', 'og:image', ogImage, true);
     setMetaTag('property', 'og:type', ogType, true);
     setMetaTag('property', 'og:site_name', siteSettings.og_site_name || siteSettings.site_name || 'Heartsync', true);
@@ -3442,9 +3442,32 @@ export default function App() {
               </div>
             )}
             {/* 3. SINGLE ARTICLE DETAIL PAGE VIEW */}
-            {currentTab === 'article' && activeArticle && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                <div className="col-span-12 lg:col-span-8 space-y-6">
+            {currentTab === 'article' && activeArticle && (() => {
+              // Wired article design settings (AdminConsole > Article Design) — previously dead
+              const artLayout = siteSettings.article_layout || 'standard';
+              const sidebarWidthRaw = siteSettings.article_desktop_sidebar_width || 'w-80';
+              const sidebarSpanClass = sidebarWidthRaw === 'w-96' ? 'lg:col-span-5'
+                : (sidebarWidthRaw === 'w-64' || sidebarWidthRaw === 'w-72') ? 'lg:col-span-3'
+                : 'lg:col-span-4';
+              const showArtSidebar = artLayout !== 'narrow' && siteSettings.article_desktop_sidebar_visible !== false;
+              const mainSpanClass = !showArtSidebar ? 'lg:col-span-12'
+                : sidebarSpanClass === 'lg:col-span-5' ? 'lg:col-span-7'
+                : sidebarSpanClass === 'lg:col-span-3' ? 'lg:col-span-9'
+                : 'lg:col-span-8';
+              const sidebarLeft = (siteSettings.article_sidebar_position || 'right') === 'left';
+              const relatedInSidebar = (siteSettings.article_desktop_related_placement || 'bottom') === 'sidebar';
+              const mobileShareStyle = siteSettings.article_mobile_share_style || 'dock';
+              const showMobileDock = mobileShareStyle === 'dock' && siteSettings.article_mobile_sticky_actions !== false;
+              const bodyWidthClass = siteSettings.article_desktop_content_width || siteSettings.article_content_width || 'max-w-none';
+              const lineHeightMap: Record<string, string> = { normal: 'leading-normal', relaxed: 'leading-relaxed', loose: 'leading-loose', snug: 'leading-snug' };
+              const lineHeightClass = lineHeightMap[siteSettings.article_line_height || 'relaxed'] || 'leading-relaxed';
+              const spacingClass = siteSettings.article_paragraph_spacing || 'space-y-5';
+              const headingsClass = (siteSettings.article_heading_styles || 'serif-bold') === 'sans-black'
+                ? 'article-headings-sans' : 'article-headings-serif';
+
+              return (
+              <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 ${siteSettings.article_atmospheric_linen ? 'article-linen rounded-2xl' : ''}`}>
+                <div className={`col-span-12 ${mainSpanClass} ${sidebarLeft && showArtSidebar ? 'lg:order-2' : ''} space-y-6`}>
                 
                 {/* 1. Sticky Reading Progress Indicator Bar */}
                 {/* Portalled straight to document.body: the page-transition wrapper above
@@ -3456,13 +3479,19 @@ export default function App() {
                     entirely and restores true viewport-fixed behavior. */}
                 {(siteSettings.article_reading_progress_enabled ?? true) && createPortal(
                   <div 
-                    className="fixed top-0 left-0 h-1.5 z-50 w-full transition-all duration-300" 
+                    className={`fixed top-0 left-0 h-1.5 z-50 w-full transition-all duration-300 ${siteSettings.article_mobile_progress_bar === false ? 'hidden md:block' : ''}`} 
                     style={{ 
                       width: `${scrollPercent}%`, 
                       backgroundColor: siteSettings.article_reading_progress_color || '#e11d48' 
                     }}
                   />,
                   document.body
+                )}
+
+                {mobileShareStyle === 'inline' && (
+                  <div className="md:hidden flex items-center justify-center py-3 border-b border-zinc-150 dark:border-zinc-800/60">
+                    <ArticleShareRow title={activeArticle.title} />
+                  </div>
                 )}
 
                 {/* Floating Back Control & Main Section wrapper with premium comfort reading toolbar */}
@@ -3748,7 +3777,7 @@ export default function App() {
                       return (
                         <div className="space-y-4">
                           {renderBreadcrumbs()}
-                          <div className="relative rounded-2xl md:rounded-[2rem] overflow-hidden aspect-video sm:aspect-[2.4] mb-4 group shadow-xl">
+                          <div className={`relative rounded-2xl md:rounded-[2rem] overflow-hidden ${siteSettings.article_mobile_image_height && siteSettings.article_mobile_image_height !== 'h-auto' ? siteSettings.article_mobile_image_height : 'aspect-video'} sm:aspect-[2.4] mb-4 group shadow-xl`}>
                             <img 
                               src={activeArticle.featured_image || 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200'} 
                               alt={activeArticle.title} 
@@ -3806,7 +3835,7 @@ export default function App() {
 
                     if (articleHeroStyle === 'minimalist') {
                       return (
-                        <div className="py-6 border-b border-zinc-200/50 dark:border-zinc-800/50 space-y-4 max-w-4xl border-dashed">
+                        <div className={`${siteSettings.article_mobile_header_spacing || 'py-6'} md:py-6 border-b border-zinc-200/50 dark:border-zinc-800/50 space-y-4 max-w-4xl border-dashed`}>
                           {renderBreadcrumbs()}
                           <div className="space-y-3">
                             <div className="flex items-center gap-2">
@@ -3912,7 +3941,7 @@ export default function App() {
                     
                     let bodyColSpan = "lg:col-span-2";
                     if (!showLeftRail && !showRightSidebar) {
-                      bodyColSpan = "lg:col-span-4 max-w-4xl mx-auto w-full";
+                      bodyColSpan = `lg:col-span-4 ${siteSettings.article_desktop_content_width || siteSettings.article_content_width || 'max-w-4xl'} mx-auto w-full`;
                     } else if (!showLeftRail) {
                       bodyColSpan = "lg:col-span-3";
                     } else if (!showRightSidebar) {
@@ -4286,7 +4315,7 @@ export default function App() {
                                           siteSettings.article_font_family === 'JetBrains Mono' ? '"JetBrains Mono", monospace' :
                                           '"Inter", sans-serif'
                             }}
-                            className={`markdown-body prose dark:prose-invert max-w-none text-zinc-850 dark:text-zinc-200 leading-relaxed space-y-5 ${
+                            className={`markdown-body prose dark:prose-invert ${bodyWidthClass}${bodyWidthClass !== 'max-w-none' ? ' mx-auto' : ''} text-zinc-850 dark:text-zinc-200 ${lineHeightClass} ${spacingClass} ${headingsClass} ${
                               siteSettings.article_font_size === 'sm' ? 'text-xs sm:text-sm' :
                               siteSettings.article_font_size === 'lg' ? 'text-sm sm:text-lg leading-extra-relaxed' :
                               siteSettings.article_font_size === 'xl' ? 'text-sm sm:text-xl leading-extra-relaxed' :
@@ -4297,7 +4326,7 @@ export default function App() {
                               content={activeArticle.content}
                               inserts={activeArticle.in_article_inserts}
                               markdownComponents={markdownComponents}
-                              className={`markdown-body prose dark:prose-invert max-w-none text-zinc-850 dark:text-zinc-200 leading-relaxed space-y-5 ${
+                              className={`markdown-body prose dark:prose-invert ${bodyWidthClass}${bodyWidthClass !== 'max-w-none' ? ' mx-auto' : ''} text-zinc-850 dark:text-zinc-200 ${lineHeightClass} ${spacingClass} ${headingsClass} ${
                                 siteSettings.article_font_size === 'sm' ? 'text-xs sm:text-sm' :
                                 siteSettings.article_font_size === 'lg' ? 'text-sm sm:text-lg leading-extra-relaxed' :
                                 siteSettings.article_font_size === 'xl' ? 'text-sm sm:text-xl leading-extra-relaxed' :
@@ -4410,7 +4439,8 @@ export default function App() {
                         </div>
                       )}
 
-                      {/* Related Content Auto-Injected Block */}
+                      {/* Related Content Auto-Injected Block (or in sidebar per article_desktop_related_placement) */}
+                      {!relatedInSidebar && (
                       <RelatedContentBlock 
                         currentPost={activeArticle}
                         onNavigate={(tab, arg) => {
@@ -4423,6 +4453,7 @@ export default function App() {
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                       />
+                      )}
 
                       {/* Article-bottom ad slot (Google AdSense, lazy) */}
                       <AdPlacement slot="article_bottom" className="my-8" lazy />
@@ -4757,7 +4788,14 @@ export default function App() {
                           <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-150/40 dark:border-zinc-800 space-y-3 font-sans text-xs">
                             <h4 className="font-bold uppercase tracking-wider text-zinc-400 text-[10px] block pb-1 border-b border-zinc-50 dark:border-zinc-800">Table of Connections</h4>
                             <ul className="space-y-2 text-zinc-650 dark:text-zinc-350 text-left">
-                              <li className="flex gap-2 items-center hover:text-rose-500 cursor-pointer">
+                              <li
+                                className="flex gap-2 items-center hover:text-rose-500 cursor-pointer"
+                                title="Read: The Triad of Relationship Attachment Styles"
+                                onClick={() => {
+                                  const target = posts.find(p => p.status === 'published' && p.title === 'The Triad of Relationship Attachment Styles');
+                                  if (target) navigateTo('article', target.slug);
+                                }}
+                              >
                                 <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
                                 <span>The Triad of Relationship Attachment Styles</span>
                               </li>
@@ -4781,7 +4819,7 @@ export default function App() {
                       containing block for `position: fixed` descendants, which made this dock fixed
                       relative to the animated page wrapper instead of the viewport -- so it scrolled
                       away with the article instead of staying pinned to the bottom of the screen. */}
-                  {createPortal(
+                  {showMobileDock && createPortal(
                   <div className="fixed bottom-0 inset-x-0 bg-white/95 dark:bg-zinc-950/95 border-t border-zinc-200/80 dark:border-zinc-850 p-2.5 z-40 flex items-center justify-around md:hidden shadow-2xl backdrop-blur-md">
                     <button
                       type="button"
@@ -4845,14 +4883,59 @@ export default function App() {
                   document.body
                   )}
 
+                  {/* Floating share bubble (article_mobile_share_style = floating) */}
+                  {mobileShareStyle === 'floating' && siteSettings.article_mobile_sticky_actions !== false && createPortal(
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          if (navigator.share) {
+                            navigator.share({ title: activeArticle.title, url: window.location.href });
+                          } else {
+                            navigator.clipboard.writeText(window.location.href);
+                            setCopyFeedbackToast(true);
+                            setTimeout(() => setCopyFeedbackToast(false), 2000);
+                          }
+                        } catch (_) {}
+                      }}
+                      className="fixed bottom-20 right-4 z-40 md:hidden w-12 h-12 rounded-full bg-rose-600 text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
+                      aria-label="Share article"
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>,
+                    document.body
+                  )}
+
                 </div>
                 </div>
 
-                <div className="col-span-12 lg:col-span-4 lg:pl-6 border-t lg:border-t-0 lg:border-l border-rose-100/30 dark:border-zinc-850 pt-8 lg:pt-0">
-                  {renderSidebar()}
+                {showArtSidebar && (
+                <div className={`col-span-12 ${sidebarSpanClass} ${sidebarLeft ? 'lg:order-1 lg:pr-6 lg:border-r' : 'lg:order-2 lg:pl-6 lg:border-l'} border-t lg:border-t-0 border-rose-100/30 dark:border-zinc-850 pt-8 lg:pt-0`}>
+                  <div className={siteSettings.article_desktop_sidebar_sticky ? 'lg:sticky lg:top-24' : ''}>
+                    {relatedInSidebar && (
+                      <div className="mb-6">
+                      {/* Related Content Auto-Injected Block */}
+                      <RelatedContentBlock 
+                        currentPost={activeArticle}
+                        onNavigate={(tab, arg) => {
+                          setCurrentTab(tab as any);
+                          setTabArg(arg || '');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        onPostClick={(post) => {
+                          setActiveArticle(post);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                      />
+                      </div>
+                    )}
+                    {renderSidebar()}
+                  </div>
                 </div>
+                )}
               </div>
-            )}
+              );
+            })()}
             
             {/* 4. COMPREHENSIVE CATEGORIES INDEX */}
             {currentTab === 'categories' && (
@@ -5775,10 +5858,10 @@ export default function App() {
               </div>
               <div>
                 <span className="text-[10px] font-mono uppercase text-rose-500 font-bold tracking-wider">
-                  Heartsync Ad Exchange
+                  Heartsync Free Access
                 </span>
                 <h3 className="font-serif font-bold text-sm text-zinc-100">
-                  Sponsor Content Gateway
+                  Temporary Access Gateway
                 </h3>
               </div>
             </div>
@@ -5786,14 +5869,8 @@ export default function App() {
             {adStep === 'intro' && (
               <div className="space-y-5">
                 <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800 space-y-2">
-                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider block">Featured Sponsor Integration</span>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500 text-lg font-bold font-serif">A</div>
-                    <div>
-                      <h4 className="text-xs font-bold text-zinc-200">Aura Meditation App</h4>
-                      <p className="text-[10px] text-zinc-400">Deep breath, mindful relationships.</p>
-                    </div>
-                  </div>
+                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider block">How Free Access Works</span>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">Stay on this screen for a short 15-second moment. No sponsor, no payment — this brief wait helps keep Heartsync's coaching content free to run.</p>
                 </div>
 
                 <div className="space-y-2 text-xs text-zinc-300 leading-relaxed">
@@ -5801,7 +5878,7 @@ export default function App() {
                     You are accessing <span className="font-bold text-white">"{adTarget.title}"</span> ({adTarget.type === 'category' ? 'Premium Topic Pillar' : 'Premium Article'}).
                   </p>
                   <p className="text-zinc-400">
-                    Watching this short, high-fidelity 15-second sponsor message supports free relationship coaching and instantly unlocks <span className="text-rose-400 font-bold">3 hours of unrestricted access</span>.
+                    Waiting this short 15-second moment helps keep Heartsync free for everyone and instantly unlocks <span className="text-rose-400 font-bold">3 hours of unrestricted access</span>.
                   </p>
                 </div>
 
@@ -5822,7 +5899,7 @@ export default function App() {
                     className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
                   >
                     <Play className="w-3.5 h-3.5 fill-current" />
-                    Play Sponsor Ad (15s)
+                    Start 15-Second Unlock
                   </button>
                 </div>
               </div>
@@ -5830,7 +5907,7 @@ export default function App() {
 
             {adStep === 'watching' && (
               <div className="space-y-6">
-                {/* Simulated High-fidelity Video Player Screen */}
+                {/* Calm 15-second unlock timer screen */}
                 <div className="aspect-video bg-zinc-950 rounded-2xl border border-zinc-800 relative overflow-hidden flex flex-col justify-between p-4 shadow-inner">
                   {/* Glowing background shapes */}
                   <div className="absolute inset-0 bg-radial-gradient from-rose-500/5 via-transparent to-transparent pointer-events-none" />
@@ -5838,7 +5915,7 @@ export default function App() {
                   {/* Live Ad Header */}
                   <div className="flex items-center justify-between relative z-10">
                     <span className="text-[9px] font-mono bg-zinc-900/90 text-zinc-400 px-2 py-0.5 rounded-md border border-zinc-800/50">
-                      SPONSOR STREAM LIVE
+                      FREE ACCESS TIMER
                     </span>
                     <span className="text-[9px] font-mono bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-md font-bold">
                       {adSecondsLeft}s remaining
@@ -5850,7 +5927,7 @@ export default function App() {
                     {adSecondsLeft > 10 ? (
                       <>
                         <h4 className="font-serif italic text-sm text-zinc-200">"Take a long, deep breath in..."</h4>
-                        <p className="text-[10px] text-zinc-400 font-sans">Partner: Aura Mindfulness and Connection Guide</p>
+                        <p className="text-[10px] text-zinc-400 font-sans">Heartsync free access moment</p>
                       </>
                     ) : adSecondsLeft > 5 ? (
                       <>
@@ -5859,7 +5936,7 @@ export default function App() {
                       </>
                     ) : (
                       <>
-                        <h4 className="font-serif italic text-sm text-zinc-200">"Aura • Find your secure relational space."</h4>
+                        <h4 className="font-serif italic text-sm text-zinc-200">"Your access is almost ready..."</h4>
                         <p className="text-[10px] text-rose-400 font-sans">Nearly complete. Hold tight for secure access...</p>
                       </>
                     )}
@@ -5874,7 +5951,7 @@ export default function App() {
                       />
                     </div>
                     <div className="flex justify-between text-[8px] text-zinc-500 font-mono">
-                      <span>SECURE PLAYER • BUFFERED</span>
+                      <span>UNLOCK IN PROGRESS</span>
                       <span>15 SECS TOTAL</span>
                     </div>
                   </div>

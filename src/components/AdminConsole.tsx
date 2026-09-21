@@ -2162,7 +2162,7 @@ export default function AdminConsole({
   const handleSaveCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (!catName.trim()) {
-      alert('Please enter a category name');
+      triggerToast('Please enter a category name');
       return;
     }
 
@@ -8085,11 +8085,11 @@ export default function AdminConsole({
                                 if (res.ok && data.success) {
                                   triggerToast('Newsletter dispatched successfully via Resend API!');
                                 } else {
-                                  alert(`[${data.error || 'Newsletter Error'}]\n\n${data.details || data.error || 'The newsletter engine failed.'}`);
+                                  triggerToast(`Newsletter failed: ${data.details || data.error || 'The newsletter engine failed.'}`);
                                 }
                               } catch (err: any) {
                                 setIsDispatching(false);
-                                alert(`Failed to contact Newsletter Server: ${err.message}`);
+                                triggerToast(`Failed to contact newsletter server: ${err.message}`);
                               }
                             }}
                             disabled={isDispatching}
