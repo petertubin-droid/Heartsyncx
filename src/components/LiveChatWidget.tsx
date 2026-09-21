@@ -38,6 +38,18 @@ export default function LiveChatWidget() {
     return () => clearTimeout(timer);
   }, []);
 
+  // The floating launcher was removed (cluttered the viewport on mobile).
+  // The hamburger menu's "Live Chat" item dispatches this event to open
+  // the chat window instead.
+  useEffect(() => {
+    const openChat = () => {
+      setIsVisible(true);
+      setIsOpen(true);
+    };
+    window.addEventListener('heartsync-open-live-chat', openChat);
+    return () => window.removeEventListener('heartsync-open-live-chat', openChat);
+  }, []);
+
   // Sync store updates
   useEffect(() => {
     const cb = () => {
@@ -230,7 +242,7 @@ export default function LiveChatWidget() {
   const isOfflineMode = !storeState.current_user && storeState.chat_conversations.length > 5;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none" id="heartsync-live-chat">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none" id="heartsync-live-chat" aria-hidden={!isOpen}>
       {/* CHAT WINDOW */}
       <AnimatePresence>
         {isVisible && isOpen && (
@@ -481,98 +493,6 @@ export default function LiveChatWidget() {
         )}
       </AnimatePresence>
 
-      {/* FLOATING BUTTON */}
-      <AnimatePresence>
-        {isVisible && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0, y: 30 }}
-            animate={{ 
-              scale: 1, 
-              opacity: 1, 
-              y: isOpen ? 0 : [0, -8, 0] 
-            }}
-            exit={{ scale: 0, opacity: 0, y: 30 }}
-            transition={{
-              scale: { type: 'spring', stiffness: 260, damping: 20 },
-              opacity: { duration: 0.3 },
-              y: isOpen 
-                ? { type: 'spring', stiffness: 260, damping: 20 } 
-                : { repeat: Infinity, repeatType: 'reverse', duration: 3, ease: 'easeInOut' }
-            }}
-            className="pointer-events-auto"
-          >
-            <motion.button
-              layout
-              onClick={() => setIsOpen(!isOpen)}
-              whileHover={{ 
-                scale: 1.05,
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.15)'
-              }}
-              whileTap={{ scale: 0.95 }}
-              className={`shadow-2xl flex items-center relative cursor-pointer focus:outline-none border border-white/10 dark:border-zinc-800/20 ${
-                isOpen 
-                  ? 'w-14 h-14 rounded-full justify-center' 
-                  : 'h-[54px] w-[138px] rounded-full justify-between pl-4 pr-1.5'
-              }`}
-              style={{ backgroundColor: primaryColor }}
-              id="heartsync-live-chat-toggle"
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            >
-              <AnimatePresence mode="wait">
-                {isOpen ? (
-                  <motion.div
-                    key="close"
-                    initial={{ rotate: -90, opacity: 0, scale: 0.8 }}
-                    animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                    exit={{ rotate: 90, opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                    className="flex items-center justify-center text-white"
-                  >
-                    <X size={24} />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="chat"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.2 }}
-                    className="w-full h-full flex items-center justify-between relative"
-                  >
-                    <span className="text-white font-semibold text-[15px] select-none tracking-wider">
-                      Chat
-                    </span>
-                    
-                    {/* Speech Bubble Icon Circle (Slightly darker shade overlay) */}
-                    <div className="w-10 h-10 bg-black/15 hover:bg-black/25 rounded-full flex items-center justify-center shadow-inner transition-colors">
-                      <MessageCircle size={20} className="text-white fill-white" />
-                    </div>
-
-                    {/* Green Active Dot overlapping the bottom-left of the pill button */}
-                    <div className="absolute -bottom-[6px] -left-[10px] w-4.5 h-4.5 rounded-full bg-emerald-500 border-[3px] border-white dark:border-zinc-950 shadow-md flex items-center justify-center">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Pulse badge for unread/active alerts */}
-              {hasUnread && !isOpen && (
-                <motion.span 
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 flex h-4 w-4"
-                >
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border border-white text-[8px] items-center justify-center font-bold text-white leading-none">
-                    !
-                  </span>
-                </motion.span>
-              )}
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

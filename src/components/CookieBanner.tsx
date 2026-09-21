@@ -350,17 +350,9 @@ export const CookieBanner: React.FC<CookieBannerProps> = ({ onLearnMore }) => {
         )}
       </AnimatePresence>
 
-      {/* Floating Cookie button to reopen cookie preferences at any time */}
-      {hasConsented && (
-        <button
-          onClick={handleOpenModal}
-          className="fixed bottom-5 left-5 z-[99990] w-10 h-10 rounded-full bg-white/95 backdrop-blur-md dark:bg-zinc-900/95 shadow-md hover:shadow-lg border border-zinc-200 dark:border-zinc-800 text-rose-600 hover:text-rose-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer group"
-          title="Cookie Preferences"
-          aria-label="Manage cookie consent preferences"
-        >
-          <Cookie className="w-5 h-5 transition-transform group-hover:rotate-12 text-rose-600" />
-        </button>
-      )}
+      {/* The floating cookie button was moved to the footer: Footer.tsx's
+          "Cookie Settings" link dispatches 'heartsync-open-cookie-preferences',
+          which the listener above catches to reopen this modal. */}
     </>
   );
 };

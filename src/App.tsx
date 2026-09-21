@@ -39,9 +39,9 @@ import { clearUnauthorizedStorageKeys } from './utils/storageAudit';
 import { 
   Heart, BookOpen, MessageSquare, Copy, ArrowLeft, Send, 
   HelpCircle, AlertTriangle, User, Smile, PlusCircle, CheckCircle, 
-  Trash2, ShieldAlert, BadgeInfo, BellRing, Bookmark, ChevronRight,
+  Trash2, ShieldAlert, BadgeInfo, BellRing, ChevronRight,
   BookmarkX, Award, AlertCircle, RefreshCw, Mail, Settings, Twitter, Facebook, Link as LinkIcon, Calendar, Clock,
-  HeartCrack, Brain, Flag, CircleDot, Lock, Play, Tv, Users, TrendingUp, Printer, Maximize2
+  HeartCrack, Brain, Flag, CircleDot, Lock, Play, Tv, Users, TrendingUp, Maximize2
 } from 'lucide-react';
 
 export default function App() {
@@ -129,15 +129,6 @@ export default function App() {
   const [activeArticleState, setActiveArticle] = useState<Post | null>(null);
 
   // Premium Comfort Reading, Indicator Metrics & Anchor states
-  const [readingTheme, setReadingTheme] = useState<'light' | 'dark' | 'sepia' | 'contrast'>(() => {
-    try {
-      const saved = heartsync.getLocalStorage('hs_reading_theme', 'light');
-      if (saved === 'light' || saved === 'dark' || saved === 'sepia' || saved === 'contrast') {
-        return saved as any;
-      }
-    } catch (_) {}
-    return 'light'; // Default cozy book paper feel
-  });
   const [scrollPercent, setScrollPercent] = useState(0);
   const [activeHeadingId, setActiveHeadingId] = useState('');
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
@@ -162,14 +153,9 @@ export default function App() {
     };
   }, []);
 
-  const toggleBookmark = (postId: string) => {
-    heartsync.toggleBookmark(postId);
-  };
-
   const paragraphCountRef = useRef(0);
 
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string; caption?: string } | null>(null);
-  const [textSize, setTextSize] = useState<'sm' | 'base' | 'lg' | 'xl'>('base');
 
 
   useEffect(() => {
@@ -253,13 +239,6 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Sync localized reading theme preferences
-  const handleReadingThemeToggle = (theme: 'light' | 'dark' | 'sepia' | 'contrast') => {
-    setReadingTheme(theme);
-    try {
-      heartsync.setLocalStorage('hs_reading_theme', theme);
-    } catch (_) {}
-  };
 
   // Translation engine states
   const [translatedPosts, setTranslatedPosts] = useState<Post[]>([]);
@@ -3331,7 +3310,7 @@ export default function App() {
 
               return (
               <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 ${siteSettings.article_atmospheric_linen ? 'article-linen rounded-2xl' : ''}`}>
-                <div className={`col-span-12 ${mainSpanClass} ${sidebarLeft && showArtSidebar ? 'lg:order-2' : ''} space-y-6`}>
+                <div className={`col-span-12 ${mainSpanClass} ${sidebarLeft && showArtSidebar ? 'lg:order-2' : ''} space-y-6 min-w-0`}>
                 
                 {/* 1. Sticky Reading Progress Indicator Bar */}
                 {/* Portalled straight to document.body: the page-transition wrapper above
@@ -3361,7 +3340,7 @@ export default function App() {
                 )}
 
                 {/* Article header bar: back control + reader settings */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-200 dark:border-zinc-800/60 font-sans">
+                <div className="pb-4 border-b border-zinc-200 dark:border-zinc-800/60 font-sans">
                   <button 
                     onClick={() => navigateTo('articles')}
                     className="inline-flex items-center gap-1.5 hover:text-rose-600 text-xs font-semibold text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors duration-200 w-fit"
@@ -3371,87 +3350,6 @@ export default function App() {
                     All Articles
                   </button>
 
-                  {/* READER SETTINGS TOOLBAR */}
-                  <div className="flex items-center gap-2 sm:gap-3 bg-zinc-50 dark:bg-zinc-900/60 py-1.5 px-2 sm:px-2.5 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80">
-                    {/* Reading theme swatches */}
-                    <div className="flex items-center gap-1.5">
-                      {(['light', 'sepia', 'dark', 'contrast'] as const).map((t) => {
-                        const swatch = t === 'light' ? 'bg-white border-zinc-300'
-                          : t === 'sepia' ? 'bg-amber-100 border-amber-200'
-                          : t === 'dark' ? 'bg-zinc-800 border-zinc-700'
-                          : 'bg-black border-black';
-                        return (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => {
-                              setReadingTheme(t);
-                              try { heartsync.setLocalStorage('hs_reading_theme', t); } catch (_) {}
-                            }}
-                            aria-label={`${t} reading theme`}
-                            title={`${t[0].toUpperCase()}${t.slice(1)} theme`}
-                            className={`w-5 h-5 rounded-full border cursor-pointer transition-all duration-200 ${swatch} ${
-                              readingTheme === t 
-                                ? 'ring-2 ring-rose-500 ring-offset-1 dark:ring-offset-zinc-900' 
-                                : 'opacity-60 hover:opacity-100'
-                            }`}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    <span className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
-
-                    {/* Text size controls */}
-                    <div className="flex items-center gap-1" title="Adjust text size">
-                      <button
-                        type="button"
-                        onClick={() => setTextSize(prev => prev === 'xl' ? 'lg' : prev === 'lg' ? 'base' : 'sm')}
-                        disabled={textSize === 'sm'}
-                        className="w-6 h-6 grid place-items-center rounded-md text-[10px] font-bold text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200/70 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-default"
-                        aria-label="Decrease text size"
-                      >
-                        A−
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTextSize(prev => prev === 'sm' ? 'base' : prev === 'base' ? 'lg' : 'xl')}
-                        disabled={textSize === 'xl'}
-                        className="w-6 h-6 grid place-items-center rounded-md text-xs font-bold text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200/70 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-default"
-                        aria-label="Increase text size"
-                      >
-                        A+
-                      </button>
-                    </div>
-
-                    <span className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
-
-                    {/* Bookmark */}
-                    <button
-                      type="button"
-                      onClick={() => toggleBookmark(activeArticle.id)}
-                      aria-label={bookmarkedArticles.includes(activeArticle.id) ? "Remove bookmark" : "Bookmark article"}
-                      className={`w-6 h-6 grid place-items-center rounded-md transition-all cursor-pointer ${
-                        bookmarkedArticles.includes(activeArticle.id)
-                          ? 'text-amber-500'
-                          : 'text-zinc-400 hover:text-rose-500'
-                      }`}
-                      title={bookmarkedArticles.includes(activeArticle.id) ? "Remove Bookmark" : "Bookmark / Save Article"}
-                    >
-                      <Bookmark className={`w-3.5 h-3.5 ${bookmarkedArticles.includes(activeArticle.id) ? 'fill-current' : ''}`} />
-                    </button>
-
-                    {/* Print */}
-                    <button
-                      type="button"
-                      onClick={() => window.print()}
-                      aria-label="Print article"
-                      className="w-6 h-6 grid place-items-center rounded-md text-zinc-400 hover:text-rose-500 cursor-pointer transition-colors"
-                      title="Print / Save as PDF"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                 </div>
 
                 {/* Reading Comfort & Theme Context Outer Wrapper */}

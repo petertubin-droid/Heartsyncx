@@ -431,3 +431,35 @@ html.dark, html.dark body {
 ::selection {
   background: rgba(244, 63, 94, 0.18);
 }
+
+/* =========================================================
+   Mobile article fit (2026-09-21): grid columns get min-w-0 in
+   App.tsx, and here the reading body itself is made blowout-proof —
+   wide media and long words can no longer overlap the viewport or
+   push the layout sideways on small screens.
+   ========================================================= */
+#heartsync-premium-article-reading-body {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+#heartsync-premium-article-reading-body img,
+#heartsync-premium-article-reading-body video,
+#heartsync-premium-article-reading-body iframe {
+  max-width: 100% !important;
+  height: auto !important;
+}
+#heartsync-premium-article-reading-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#heartsync-premium-article-reading-body pre,
+#heartsync-premium-article-reading-body code {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}

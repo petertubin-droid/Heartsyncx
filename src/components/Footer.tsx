@@ -328,6 +328,15 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
                 </button>
               </li>
               <li>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event('heartsync-open-cookie-preferences'))}
+                  className={`${textClass} text-left transition-colors cursor-pointer`}
+                >
+                  Cookie Settings
+                </button>
+              </li>
+              <li>
                 <button 
                   type="button"
                   onClick={() => onNavigate('disclaimer')}

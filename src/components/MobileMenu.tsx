@@ -268,6 +268,25 @@ export default function MobileMenu({
                 </h4>
                 <div className="rounded-2xl border border-zinc-100 dark:border-zinc-900/30 p-2.5 bg-zinc-50/20 dark:bg-zinc-950/10 space-y-1">
 
+                  {/* Live Chat — opens the HeartSync Concierge window
+                      (the floating bubble launcher was removed from the page) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(new Event('heartsync-open-live-chat'));
+                      onClose();
+                    }}
+                    className="w-full flex items-center justify-between px-3.5 py-2 rounded-full hover:bg-zinc-50/40 dark:hover:bg-zinc-900/30 transition-colors text-left group min-h-[44px] cursor-pointer"
+                    aria-label="Open live chat"
+                  >
+                    <span className="flex items-center gap-3.5 text-sm text-zinc-750 dark:text-zinc-300 font-medium">
+                      <MessageSquare className="w-5 h-5 text-zinc-400 dark:text-zinc-500 group-hover:text-[#CE2B5E] transition-colors" />
+                      <span>Live chat</span>
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                      Concierge
+                    </span>
+                  </button>
 
                   {/* Theme Selector */}
                   <div className="flex justify-between items-center text-sm px-3.5 py-2 hover:bg-zinc-50/40 dark:hover:bg-zinc-900/30 rounded-full transition-colors">
