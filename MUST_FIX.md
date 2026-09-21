@@ -457,3 +457,29 @@ voice, plays chunks sequentially with stop control and honest error states.
 - brand_button_radius/heading_weight/hover_animation/glow_accent (CSS-var theme refactor)
 - homepage_categories_columns_mobile / card_style / premium_enabled
 - alert() in LiveChatWidget + RichTextEditor
+
+## ROUND 6 (2026-09-21): article reader polish + Google login root cause
+
+### Google OAuth login failure — ROOT CAUSE FOUND (owner action required)
+Supabase project pdtibsfasvicjptqirro (Hearty) has Site URL =
+https://heartsyncx-petertubin-droids-projects.vercel.app — a DEAD Vercel
+deployment (now redirects to a Vercel login interstitial). After Google
+consent, Supabase redirects users there (https://heartsyncxhub.vercel.app is
+NOT in the Redirect URL allow-list), so the phone shows a desktop-styled
+Vercel page and login never completes. Verified: authorize endpoint is
+healthy, Google accepts the callback URI — only the redirect target is wrong.
+OWNER ACTION (Supabase Dashboard → Authentication → URL Configuration):
+1. Site URL: https://heartsyncxhub.vercel.app
+2. Redirect URLs: add https://heartsyncxhub.vercel.app/**
+(Agent could not apply it: the saved Supabase management token returns 401.)
+
+### Code changes this round
+- supabaseConfig.ts: client factory now pins PKCE auth flow
+  (flowType 'pkce', detectSessionInUrl, persistSession, autoRefreshToken).
+- App.tsx: removed the ambient soundscape feature entirely (Web Audio synth
+  engine, "Sound: Off" toolbar dropdown, admin toggle "Subtle Somatic Acoustic
+  Pulses" in AdminConsole). No dead setting left behind.
+- App.tsx: article reader header redesigned — "Back to Journal / Premium
+  Reader" mono row replaced with a clean "All Articles" back link + compact
+  professional toolbar (theme color swatches with tooltips, A-/A+ text size,
+  bookmark, print).

@@ -40,7 +40,7 @@ import {
   HelpCircle, AlertTriangle, User, Smile, PlusCircle, CheckCircle, 
   Trash2, ShieldAlert, BadgeInfo, BellRing, Bookmark, ChevronRight,
   BookmarkX, Award, AlertCircle, RefreshCw, Mail, Settings, Twitter, Facebook, Link as LinkIcon, Calendar, Clock,
-  HeartCrack, Brain, Flag, CircleDot, Lock, Play, Tv, Users, TrendingUp, Printer, Volume2, Maximize2
+  HeartCrack, Brain, Flag, CircleDot, Lock, Play, Tv, Users, TrendingUp, Printer, Maximize2
 } from 'lucide-react';
 
 export default function App() {
@@ -165,167 +165,11 @@ export default function App() {
     heartsync.toggleBookmark(postId);
   };
 
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const synthNodesRef = useRef<{
-    sourceNode?: AudioNode;
-    gainNode?: GainNode;
-    modNode?: OscillatorNode;
-    modGain?: GainNode;
-    oscillators?: OscillatorNode[];
-  }>({});
-
   const paragraphCountRef = useRef(0);
 
-  const [ambientSound, setAmbientSound] = useState<'none' | 'rain' | 'drone' | 'binaural'>('none');
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string; caption?: string } | null>(null);
   const [textSize, setTextSize] = useState<'sm' | 'base' | 'lg' | 'xl'>('base');
 
-  const stopAmbientSynth = useCallback(() => {
-    const nodes = synthNodesRef.current;
-    if (nodes.sourceNode) {
-      try { (nodes.sourceNode as any).stop(); } catch (_) {}
-    }
-    if (nodes.oscillators) {
-      nodes.oscillators.forEach(osc => {
-        try { osc.stop(); } catch (_) {}
-      });
-    }
-    if (nodes.modNode) {
-      try { nodes.modNode.stop(); } catch (_) {}
-    }
-    synthNodesRef.current = {};
-  }, []);
-
-  const playAmbientSynth = useCallback((type: 'rain' | 'drone' | 'binaural') => {
-    stopAmbientSynth();
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioCtx();
-      }
-      const ctx = audioContextRef.current;
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-
-      const mainGain = ctx.createGain();
-      mainGain.gain.setValueAtTime(0.08, ctx.currentTime); // Gentle background volume
-
-      if (type === 'rain') {
-        const bufferSize = 2 * ctx.sampleRate;
-        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const output = noiseBuffer.getChannelData(0);
-        let lastOut = 0.0;
-        for (let i = 0; i < bufferSize; i++) {
-          const white = Math.random() * 2 - 1;
-          output[i] = (lastOut + (0.02 * white)) / 1.02;
-          lastOut = output[i];
-          output[i] *= 3.5;
-        }
-        
-        const noiseSource = ctx.createBufferSource();
-        noiseSource.buffer = noiseBuffer;
-        noiseSource.loop = true;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(450, ctx.currentTime);
-
-        const lfo = ctx.createOscillator();
-        lfo.frequency.setValueAtTime(0.08, ctx.currentTime);
-        const lfoGain = ctx.createGain();
-        lfoGain.gain.setValueAtTime(120, ctx.currentTime);
-
-        lfo.connect(lfoGain);
-        lfoGain.connect(filter.frequency);
-        noiseSource.connect(filter);
-        filter.connect(mainGain);
-        mainGain.connect(ctx.destination);
-
-        noiseSource.start();
-        lfo.start();
-
-        synthNodesRef.current.sourceNode = noiseSource;
-        synthNodesRef.current.modNode = lfo;
-      } else if (type === 'drone') {
-        const frequencies = [110, 165, 220];
-        const oscillators: OscillatorNode[] = [];
-
-        frequencies.forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, ctx.currentTime);
-          osc.detune.setValueAtTime(idx === 0 ? -4 : idx === 1 ? 3 : -1, ctx.currentTime);
-
-          const oscGain = ctx.createGain();
-          oscGain.gain.setValueAtTime(0.04, ctx.currentTime);
-
-          const lfo = ctx.createOscillator();
-          lfo.frequency.setValueAtTime(0.05 + (idx * 0.02), ctx.currentTime);
-          const lfoGain = ctx.createGain();
-          lfoGain.gain.setValueAtTime(0.02, ctx.currentTime);
-
-          lfo.connect(lfoGain);
-          lfoGain.connect(oscGain.gain);
-
-          osc.connect(oscGain);
-          oscGain.connect(mainGain);
-
-          osc.start();
-          lfo.start();
-          oscillators.push(osc);
-          oscillators.push(lfo as any);
-        });
-
-        mainGain.connect(ctx.destination);
-        synthNodesRef.current.oscillators = oscillators;
-      } else if (type === 'binaural') {
-        const leftOsc = ctx.createOscillator();
-        leftOsc.type = 'sine';
-        leftOsc.frequency.setValueAtTime(100, ctx.currentTime);
-
-        const rightOsc = ctx.createOscillator();
-        rightOsc.type = 'sine';
-        rightOsc.frequency.setValueAtTime(108, ctx.currentTime);
-
-        const leftGain = ctx.createGain();
-        leftGain.gain.setValueAtTime(0.08, ctx.currentTime);
-
-        const rightGain = ctx.createGain();
-        rightGain.gain.setValueAtTime(0.08, ctx.currentTime);
-
-        const merger = ctx.createChannelMerger(2);
-
-        leftOsc.connect(leftGain);
-        rightOsc.connect(rightGain);
-
-        leftGain.connect(merger, 0, 0);
-        rightGain.connect(merger, 0, 1);
-
-        merger.connect(mainGain);
-        mainGain.connect(ctx.destination);
-
-        leftOsc.start();
-        rightOsc.start();
-
-        synthNodesRef.current.oscillators = [leftOsc, rightOsc];
-      }
-    } catch (err) {
-      console.warn('Web Audio Context not initialized or supported:', err);
-    }
-  }, [stopAmbientSynth]);
-
-  useEffect(() => {
-    if (ambientSound !== 'none') {
-      playAmbientSynth(ambientSound);
-    } else {
-      stopAmbientSynth();
-    }
-    return () => {
-      stopAmbientSynth();
-    };
-  }, [ambientSound, playAmbientSynth, stopAmbientSynth]);
 
   useEffect(() => {
     setHasLiked(false);
@@ -3497,31 +3341,27 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Floating Back Control & Main Section wrapper with premium comfort reading toolbar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-150 dark:border-zinc-800/60 font-sans">
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => navigateTo('articles')}
-                      className="inline-flex items-center gap-1.5 hover:text-rose-600 text-xs font-bold text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors duration-200"
-                      aria-label="Back to journal feed"
-                    >
-                      <ArrowLeft className="w-4 h-4 text-zinc-400" />
-                      Back to Journal
-                    </button>
-                    <span className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                      Premium Reader
-                    </span>
-                  </div>
+                {/* Article header bar: back control + reader settings */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-200 dark:border-zinc-800/60 font-sans">
+                  <button 
+                    onClick={() => navigateTo('articles')}
+                    className="inline-flex items-center gap-1.5 hover:text-rose-600 text-xs font-semibold text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors duration-200 w-fit"
+                    aria-label="Back to journal feed"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-zinc-400" />
+                    All Articles
+                  </button>
 
-                  {/* COMFORT CONTROLS TOOLBAR */}
-                  <div className="flex flex-wrap items-center gap-3 bg-zinc-50 dark:bg-zinc-900/60 p-2 sm:py-1.5 sm:px-3 rounded-2xl border border-zinc-150 dark:border-zinc-800 text-[11px] font-bold text-zinc-600 dark:text-zinc-300">
-                    
-                    {/* Theme selector */}
-                    <div className="flex items-center gap-1.5" title="Reader Background Tone">
-                      <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider hidden sm:inline">Tone:</span>
-                      <div className="flex bg-zinc-200/50 dark:bg-zinc-950 p-0.5 rounded-lg border border-zinc-250 dark:border-zinc-850">
-                        {(['light', 'sepia', 'dark', 'contrast'] as const).map((t) => (
+                  {/* READER SETTINGS TOOLBAR */}
+                  <div className="flex items-center gap-2 sm:gap-3 bg-zinc-50 dark:bg-zinc-900/60 py-1.5 px-2 sm:px-2.5 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80">
+                    {/* Reading theme swatches */}
+                    <div className="flex items-center gap-1.5">
+                      {(['light', 'sepia', 'dark', 'contrast'] as const).map((t) => {
+                        const swatch = t === 'light' ? 'bg-white border-zinc-300'
+                          : t === 'sepia' ? 'bg-amber-100 border-amber-200'
+                          : t === 'dark' ? 'bg-zinc-800 border-zinc-700'
+                          : 'bg-black border-black';
+                        return (
                           <button
                             key={t}
                             type="button"
@@ -3529,85 +3369,66 @@ export default function App() {
                               setReadingTheme(t);
                               try { heartsync.setLocalStorage('hs_reading_theme', t); } catch (_) {}
                             }}
-                            className={`px-2 py-1 rounded-md text-[9px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
+                            aria-label={`${t} reading theme`}
+                            title={`${t[0].toUpperCase()}${t.slice(1)} theme`}
+                            className={`w-5 h-5 rounded-full border cursor-pointer transition-all duration-200 ${swatch} ${
                               readingTheme === t 
-                                ? 'bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 shadow-sm' 
-                                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                                ? 'ring-2 ring-rose-500 ring-offset-1 dark:ring-offset-zinc-900' 
+                                : 'opacity-60 hover:opacity-100'
                             }`}
-                          >
-                            {t[0]}
-                          </button>
-                        ))}
-                      </div>
+                          />
+                        );
+                      })}
                     </div>
 
-                    <span className="h-3 w-[1px] bg-zinc-200 dark:bg-zinc-850 hidden sm:inline" />
+                    <span className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
 
-                    {/* Text Size adjusters */}
-                    <div className="flex items-center gap-1" title="Adjust Reader Text Size">
-                      <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider hidden sm:inline">Size:</span>
+                    {/* Text size controls */}
+                    <div className="flex items-center gap-1" title="Adjust text size">
                       <button
                         type="button"
                         onClick={() => setTextSize(prev => prev === 'xl' ? 'lg' : prev === 'lg' ? 'base' : 'sm')}
                         disabled={textSize === 'sm'}
-                        className="p-1 px-2 bg-zinc-150 dark:bg-zinc-950 rounded-md border hover:bg-zinc-250 dark:hover:bg-zinc-800 cursor-pointer disabled:opacity-40"
+                        className="w-6 h-6 grid place-items-center rounded-md text-[10px] font-bold text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200/70 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-default"
                         aria-label="Decrease text size"
                       >
-                        A-
+                        A−
                       </button>
                       <button
                         type="button"
                         onClick={() => setTextSize(prev => prev === 'sm' ? 'base' : prev === 'base' ? 'lg' : 'xl')}
                         disabled={textSize === 'xl'}
-                        className="p-1 px-2 bg-zinc-150 dark:bg-zinc-950 rounded-md border hover:bg-zinc-250 dark:hover:bg-zinc-800 cursor-pointer disabled:opacity-40"
+                        className="w-6 h-6 grid place-items-center rounded-md text-xs font-bold text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200/70 dark:hover:bg-zinc-800 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-default"
                         aria-label="Increase text size"
                       >
                         A+
                       </button>
                     </div>
 
-                    <span className="h-3 w-[1px] bg-zinc-200 dark:bg-zinc-850" />
+                    <span className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
 
-                    {/* Ambient Focus Sounds (Web Audio API Synthesizer) */}
-                    {(siteSettings.article_atmospheric_music_embedded ?? true) && (
-                      <div className="flex items-center gap-1.5" title="Somatic Soundscape Generator">
-                        <Volume2 className={`w-3.5 h-3.5 ${ambientSound !== 'none' ? 'text-rose-500 animate-pulse' : 'text-zinc-400'}`} />
-                        <select
-                          value={ambientSound}
-                          onChange={(e) => setAmbientSound(e.target.value as any)}
-                          className="bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-[10px] py-1 px-1.5 font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-rose-500"
-                          aria-label="Select ambient soundscape"
-                        >
-                          <option value="none">🔇 Sound: Off</option>
-                          <option value="rain">🌧️ Rain (Low-Pass)</option>
-                          <option value="drone">🧘 Zen Vocal Drone</option>
-                          <option value="binaural">🧠 Binaural Delta Beats</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <span className="h-3 w-[1px] bg-zinc-200 dark:bg-zinc-850" />
-
-                    {/* Bookmark Toggle */}
+                    {/* Bookmark */}
                     <button
                       type="button"
                       onClick={() => toggleBookmark(activeArticle.id)}
-                      className={`p-1.5 rounded-lg border hover:scale-105 active:scale-95 transition-all cursor-pointer ${
+                      aria-label={bookmarkedArticles.includes(activeArticle.id) ? "Remove bookmark" : "Bookmark article"}
+                      className={`w-6 h-6 grid place-items-center rounded-md transition-all cursor-pointer ${
                         bookmarkedArticles.includes(activeArticle.id)
-                          ? 'bg-amber-500 text-white border-amber-500'
-                          : 'bg-zinc-100 dark:bg-zinc-950 text-zinc-500 hover:text-rose-500 border-zinc-250 dark:border-zinc-800'
+                          ? 'text-amber-500'
+                          : 'text-zinc-400 hover:text-rose-500'
                       }`}
                       title={bookmarkedArticles.includes(activeArticle.id) ? "Remove Bookmark" : "Bookmark / Save Article"}
                     >
-                      <Bookmark className="w-3.5 h-3.5 fill-current" />
+                      <Bookmark className={`w-3.5 h-3.5 ${bookmarkedArticles.includes(activeArticle.id) ? 'fill-current' : ''}`} />
                     </button>
 
-                    {/* Print Button */}
+                    {/* Print */}
                     <button
                       type="button"
                       onClick={() => window.print()}
-                      className="p-1.5 rounded-lg border bg-zinc-100 dark:bg-zinc-950 text-zinc-500 hover:text-rose-500 border-zinc-250 dark:border-zinc-800 hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                      title="Print Article / Export PDF"
+                      aria-label="Print article"
+                      className="w-6 h-6 grid place-items-center rounded-md text-zinc-400 hover:text-rose-500 cursor-pointer transition-colors"
+                      title="Print / Save as PDF"
                     >
                       <Printer className="w-3.5 h-3.5" />
                     </button>

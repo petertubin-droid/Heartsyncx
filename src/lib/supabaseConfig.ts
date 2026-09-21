@@ -15,9 +15,18 @@ export function createSupabaseClient(
 ): SupabaseClient {
   const u = cleanConfigValue(url);
   const k = cleanConfigValue(key);
+  const authOptions = {
+    // PKCE flow: the OAuth callback returns a single-use ?code= exchange on the
+    // same origin, which survives browser storage restrictions better than
+    // implicit hash tokens and is Google's recommended flow.
+    flowType: 'pkce' as const,
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true,
+  };
   return createClient(u, k, authToken
-    ? { global: { headers: { Authorization: `Bearer ${authToken}` } } }
-    : undefined);
+    ? { global: { headers: { Authorization: `Bearer ${authToken}` } }, auth: authOptions }
+    : { auth: authOptions });
 }
 
 export function cleanConfigValue(val: string | null | undefined): string {

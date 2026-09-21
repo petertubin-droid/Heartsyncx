@@ -9735,26 +9735,7 @@ export default function AdminConsole({
                               />
                             </div>
 
-                            <div className="flex items-center justify-between p-1">
-                              <div className="space-y-0.5">
-                                <strong className="block text-[10.5px] font-semibold text-zinc-800 dark:text-zinc-200">Subtle Somatic Acoustic Pulses</strong>
-                                <span className="text-[8.5px] text-zinc-400 block leading-tight">Embed high-fidelity therapeutic acoustic pulse ambient player within articles.</span>
-                              </div>
-                              <input 
-                                type="checkbox" 
-                                checked={!!siteSettings.article_atmospheric_music_embedded}
-                                onChange={(e) => {
-                                  const updatedSettings = {
-                                    ...siteSettings,
-                                    article_atmospheric_music_embedded: e.target.checked
-                                  };
-                                  setSiteSettings(updatedSettings);
-                                  heartsync.updateSettings(updatedSettings);
-                                  triggerToast(e.target.checked ? 'Therapeutic focus player embedded.' : 'Focus music player hidden.');
-                                }}
-                                className="w-4 h-4 text-rose-500 rounded cursor-pointer accent-rose-500 shrink-0" 
-                              />
-                            </div>
+                            
                           </div>
                         </div>
 
