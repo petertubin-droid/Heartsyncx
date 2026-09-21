@@ -1365,13 +1365,6 @@ export default function App() {
         />
       )}
 
-      {/* Global Header Banner Ad Placement (Google AdSense) — never on admin/auth/error views */}
-      {['admin', 'login', 'error', 'access-denied'].every((t) => t !== currentTab) && (
-        <div className="max-w-6xl mx-auto px-4 w-full">
-          <AdPlacement slot="header" />
-        </div>
-      )}
-
       {/* Floating alert notification toast */}
       <AnimatePresence>
         {toastMsg && (
