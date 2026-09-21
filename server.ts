@@ -7129,7 +7129,19 @@ async function registerProductionRoutes() {
   // platform at runtime. Falling back to the Vite dev middleware there would
   // import 'vite' (a devDependency) that is NOT traced into the serverless
   // bundle and crash every invocation with MODULE_NOT_FOUND.
-  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.VERCEL || !!process.env.NETLIFY || fs.existsSync(path.join(process.cwd(), 'dist'));
+  //
+  // BUG FIXED 2026-09-22: on Netlify, none of NODE_ENV/VERCEL/NETLIFY were
+  // actually true at FUNCTION RUNTIME (only at build time), and dist/ is not
+  // part of the function's own bundle (it's the separate publish directory
+  // served by Netlify's CDN) - so this check fell through to `import('vite')`
+  // and every request served Vite's dev server, which then rejected the
+  // deployed host with "Blocked request... add to server.allowedHosts" and
+  // /admin (and everything else) 404'd. AWS_LAMBDA_FUNCTION_NAME is set by
+  // the AWS Lambda runtime itself (which both Netlify and Vercel Functions
+  // run on) regardless of any platform-specific env var propagation, so it
+  // is the reliable signal that this process is a deployed serverless
+  // function and must never touch the Vite dev server.
+  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.VERCEL || !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || fs.existsSync(path.join(process.cwd(), 'dist'));
   if (!isProduction) {
     // Inject Vite middleware inside Dev sandboxes ONLY. Both Netlify's
     // esbuild function bundler and Vercel's ncc bundler statically trace a

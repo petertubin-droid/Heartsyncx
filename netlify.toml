@@ -16,6 +16,10 @@
   # supabase-js client cannot construct (realtime-js throws) and the server
   # silently degrades to fallback seed state instead of the real database.
   NODE_VERSION = "22"
+  # Belt-and-suspenders alongside the AWS_LAMBDA_FUNCTION_NAME runtime check in
+  # server.ts: makes sure NODE_ENV=production is also true for the deployed
+  # function, not just at build time.
+  NODE_ENV = "production"
   SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY,VITE_SUPABASE_ANON_KEY,SUPABASE_URL,VITE_SUPABASE_URL"
 
 [functions]
