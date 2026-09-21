@@ -365,3 +365,33 @@ digital_products, homepage_categories_* (shadowed by the working homepage_topics
 brand_* (needs a real CSS-variable theme system to wire honestly),
 article_editorial_notes_enabled (no editor-note data field exists to gate).
 Also remaining: alert() in LiveChatWidget + RichTextEditor, newsletter template href="#" placeholder.
+
+## UI / UX AUDIT — FIX ROUND 3 (2026-09-21): honesty pass + audit corrections
+
+### CORRECTIONS to earlier audit claims (server.ts uses these — NOT dead)
+- TTS panel: real server endpoints (/api/tts, /api/admin/tts/*) — voice config is functional
+- digital_products: real Supabase table + full server CRUD (storefront page not built yet, but admin is real)
+- monetag_format: used by server rendering
+- brand_font / brand_theme: used by server
+- newsletter_subject / newsletter_template: sent in the /api/newsletter/send payload
+- ai_prompt_prefix: sent to /api/gemini/assist as promptType (alive)
+
+### REMOVED (settings that lied — no reader on server or site)
+- Security pane: 2FA toggle, lockout retries, session timeout card (nothing enforced them;
+  the pane keeps its real LocalStorage Audit & Sanitizer)
+- AI pane: fake "Core Engine Selection" model dropdown (the model value went nowhere)
+- Rewarded-ad card: fake earnings stats (totalViews/CPM/earnings were edited by hand, tracked by nothing)
+- Ads form: adsense_auto_script + adsterra_script_code fields (AdPlacement uses adsterra_key_<slot>)
+- homepage_categories_title/subtitle now write homepage_topics_title/subheading (the keys the site renders)
+
+### WIRED
+- Editor's review badge on articles: article_editorial_notes_enabled +
+  expert_reviewer_signature_text + expert_reviewer_credentials_desc now render a real
+  "Editor's review" trust badge above the article body
+
+### REMAINING (minor)
+- brand_button_radius / brand_heading_weight / brand_hover_animation / brand_glow_accent still dead
+  (need a CSS-variable theme system to wire honestly)
+- homepage_categories_columns_mobile / card_style / premium_enabled fields still dead
+- alert() in LiveChatWidget + RichTextEditor (should use inline errors)
+- newsletter template preview href="#" placeholder

@@ -3361,7 +3361,7 @@ export default function AdminConsole({
                     {activePane === 'metadata_manager' && 'Apply standalone title tags and explicit crawler permissions per slug path.'}
                     {activePane === 'site_branding' && 'Fine-tune typography, luxury layouts, card designs, headers, footers, dark mode defaults, and animation dynamics instantly.'}
                     {activePane === 'article_display_settings' && 'Fine-tune article reading layouts, typography scaling, featured image presentation, metadata visibility, desktop and mobile-specific settings immediately.'}
-                    {activePane === 'security' && 'Toggle 2FA, session timeout limits, lock capabilities, and access logs.'}
+                    {activePane === 'security' && 'Browser storage audits, security sanitizer, and access diagnostics.'}
                     {activePane === 'sentiment_guard' && 'Automated scanning of audience sentiment logs, trigger anxiety threshold patterns, and serve expert co-regulation drafts.'}
                     {activePane === 'acoustic_pulse' && 'Synthesize custom acoustic soundscapes natively in your browser to maintain deep calm and focus during admin sessions.'}
                     {activePane === 'webhooks' && 'Simulate outgoing event webhooks, examine API request payloads, and track webhook endpoint status logs.'}
@@ -5809,23 +5809,7 @@ export default function AdminConsole({
                     <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4">
                       <h3 className="font-bold text-sm">Model Parameters & Tuning</h3>
                       <div className="space-y-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Core Engine Selection</label>
-                          <select 
-                            value={aiModelSelected}
-                            onChange={(e) => {
-                              setAiModelSelected(e.target.value);
-                              const updated = { ...siteSettings, ai_model_selected: e.target.value };
-                              setSiteSettings(updated);
-                              heartsync.updateSettings(updated);
-                            }}
-                            className="w-full p-2.5 border bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl"
-                          >
-                            <option value="gemini-2.1-pro">Gemini 2.1 Pro Model (Clinical Reasoning)</option>
-                            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Fast Outlining)</option>
-                            <option value="claude-3-sonnet">Anthropic Claude 3.5 Sonnet Backfill</option>
-                          </select>
-                        </div>
+                        
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Dynamic AI Prompt Instructions</label>
                           <textarea 
@@ -7247,30 +7231,7 @@ export default function AdminConsole({
                         </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
-                            Header &lt;head&gt; Global AdSense Script Tag
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAdsenseAutoScript(`<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsensePubId || 'ca-pub-XXXXXXXXXXXXXXXX'}" crossorigin="anonymous"></script>`);
-                              triggerToast('Auto-generated standard Google AdSense tag!');
-                            }}
-                            className="text-[10px] text-rose-500 hover:underline font-bold"
-                          >
-                            Generate Default Tag
-                          </button>
-                        </div>
-                        <textarea 
-                          rows={3} 
-                          value={adsenseAutoScript}
-                          onChange={(e) => setAdsenseAutoScript(e.target.value)}
-                          placeholder="<script async src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=...' crossorigin='anonymous'></script>"
-                          className="w-full p-2.5 font-mono text-[10px] leading-relaxed border bg-zinc-50 dark:bg-zinc-950 text-zinc-650 dark:text-zinc-350 rounded-xl" 
-                        />
-                      </div>
+                      
                     </div>
                   )}
 
@@ -7469,30 +7430,7 @@ export default function AdminConsole({
                         />
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
-                            Adsterra Script &lt;script&gt; Tag Code
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAdsterraScriptCode(`<script type="text/javascript" src="//www.highperformanceformat.com/${adsterraKeyId || '883921'}/invoke.js"></script>`);
-                              triggerToast('Regenerated official Adsterra script tag!');
-                            }}
-                            className="text-[10px] text-amber-500 hover:underline font-bold"
-                          >
-                            Reset to Official Tag
-                          </button>
-                        </div>
-                        <textarea 
-                          rows={3} 
-                          value={adsterraScriptCode}
-                          onChange={(e) => setAdsterraScriptCode(e.target.value)}
-                          placeholder='<script type="text/javascript" src="//www.highperformanceformat.com/.../invoke.js"></script>'
-                          className="w-full p-2.5 font-mono text-[10px] leading-relaxed border bg-zinc-50 dark:bg-zinc-950 text-zinc-650 dark:text-zinc-350 rounded-xl" 
-                        />
-                      </div>
+                      
 
                       {/* Adsterra Quick Metrics */}
                       <div className="grid grid-cols-3 gap-3 p-3 bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-2xl">
@@ -7698,14 +7636,12 @@ export default function AdminConsole({
                           ...siteSettings,
                           adsense_client_id: adsensePubId,
                           adsense_active: adsenseAutoCode === 'true',
-                          adsense_auto_script: adsenseAutoScript,
                           monetag_active: monetagActive,
                           monetag_zone_id: monetagZoneId,
                           monetag_script_code: monetagScriptCode,
                           monetag_format: monetagFormat,
                           adsterra_active: adsterraActive,
                           adsterra_key_id: adsterraKeyId,
-                          adsterra_script_code: adsterraScriptCode,
                           adsterra_format: adsterraFormat,
                           placement_header: placementHeader,
                           placement_sidebar: placementSidebar,
@@ -10732,74 +10668,7 @@ export default function AdminConsole({
               {/* ADMINISTRATIVE SECURITY & AUDIT TRAIL OPTIONS */}
               {activePane === 'security' && (
                 <div className="space-y-6 text-xs font-sans">
-                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4">
-                    <h3 className="font-bold text-sm">Administrative Security Credentials</h3>
-                    
-                    <div className="space-y-3.5">
-                      <div className="flex justify-between items-center p-3.5 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl">
-                        <div>
-                          <strong className="block leading-tight">Enforce Multi-Factor 2FA Authentication</strong>
-                          <span className="text-[10px] text-zinc-400 block mt-0.5">Prompts secure verification email requests on administrative dashboard loads.</span>
-                        </div>
-                        <input 
-                          type="checkbox" 
-                          checked={security2FA}
-                          onChange={(e) => {
-                            setSecurity2FA(e.target.checked);
-                            const updated = { ...siteSettings, security_2fa: e.target.checked };
-                            setSiteSettings(updated);
-                            heartsync.updateSettings(updated);
-                            triggerToast(e.target.checked ? '2FA locked.' : '2FA bypass active.');
-                          }}
-                          className="w-4.5 h-4.5 text-rose-550 rounded" 
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Lockout Retries Limit Ceiling</label>
-                          <input 
-                            type="number" 
-                            value={securityMaxAttempts}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              setSecurityMaxAttempts(v);
-                              const updated = { ...siteSettings, security_max_attempts: v };
-                              setSiteSettings(updated);
-                              heartsync.updateSettings(updated);
-                            }}
-                            className="w-full p-2 border bg-transparent rounded-xl" 
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Session Lock Expiration (Minutes)</label>
-                          <input 
-                            type="number" 
-                            value={securitySessionTimeout}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              setSecuritySessionTimeout(v);
-                              const updated = { ...siteSettings, security_session_timeout: v };
-                              setSiteSettings(updated);
-                              heartsync.updateSettings(updated);
-                            }}
-                            className="w-full p-2 border bg-transparent rounded-xl" 
-                          />
-                        </div>
-                      </div>
-
-                      <div className="pt-2">
-                        <button 
-                          onClick={() => {
-                            triggerToast('Administrative security parameters locked successfully.');
-                          }}
-                          className="px-5 py-2 hover:opacity-90 bg-zinc-900 border dark:bg-white dark:text-zinc-900 text-white font-bold text-xs rounded-xl"
-                        >
-                          Save Security Rules
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  
 
                   {/* LocalStorage Audit & Security Sanitizer Panel */}
                   <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-5">
@@ -14688,110 +14557,7 @@ export default function AdminConsole({
               {/* REWARDED ACCESS ADS & CPM DASHBOARD */}
               {activePane === 'rewarded_access' && (
                 <div className="space-y-6 text-xs font-sans text-left">
-                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xl space-y-6">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b pb-4 gap-4">
-                      <div>
-                        <h2 className="font-serif font-bold text-lg bg-gradient-to-r from-rose-500 to-fuchsia-600 bg-clip-text text-transparent">Rewarded Ad Unlock Configuration</h2>
-                        <p className="text-[10px] text-zinc-400">Configure programmatic sponsored video ad gates for non-subscribers to earn high CPM revenue while offering free 24-hour reading passes.</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            heartsync.updateSettings({ ...siteSettings, rewarded_ad_config: rewardedAdConfig });
-                            triggerToast('Rewarded ad unlock parameters saved!');
-                          }}
-                          className="px-3.5 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-bold cursor-pointer transition-transform hover:scale-101 flex items-center gap-1.5 shadow-xs"
-                        >
-                          <Save className="w-3.5 h-3.5" />
-                          Save Ad Rules
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl text-center space-y-1">
-                        <span className="block text-zinc-400 uppercase font-bold text-[9px]">Total Rewarded Ad Views</span>
-                        <span className="font-mono text-xl font-black text-rose-600 dark:text-rose-400">{rewardedAdConfig.totalViews}</span>
-                      </div>
-                      <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl text-center space-y-1">
-                        <span className="block text-zinc-400 uppercase font-bold text-[9px]">Average CPM Rate</span>
-                        <span className="font-mono text-xl font-black text-emerald-500">${rewardedAdConfig.cpmRate.toFixed(2)}</span>
-                      </div>
-                      <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl text-center space-y-1">
-                        <span className="block text-zinc-400 uppercase font-bold text-[9px]">Total Ad Revenue</span>
-                        <span className="font-mono text-xl font-black text-violet-500">${rewardedAdConfig.totalEarnings.toFixed(2)}</span>
-                      </div>
-                      <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl text-center space-y-1">
-                        <span className="block text-zinc-400 uppercase font-bold text-[9px]">Active Unlocked Readers</span>
-                        <span className="font-mono text-xl font-black text-fuchsia-500">{rewardedAdConfig.activeUnlockedReaders}</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                      <div className="space-y-4 p-5 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/20 dark:bg-zinc-950/20">
-                        <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                          <Crown className="w-4 h-4 text-rose-500" /> Paywall & Paragraph Threshold Rules
-                        </h4>
-                        
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">Paragraph Paywall Lock Threshold</label>
-                            <select
-                              value={rewardedAdConfig.paragraphThreshold}
-                              onChange={(e) => setRewardedAdConfig({ ...rewardedAdConfig, paragraphThreshold: Number(e.target.value) })}
-                              className="w-full p-2.5 rounded-xl border bg-white dark:bg-zinc-900 font-bold"
-                            >
-                              <option value={2}>Lock after 2 Paragraphs (Aggressive)</option>
-                              <option value={3}>Lock after 3 Paragraphs (Recommended)</option>
-                              <option value={5}>Lock after 5 Paragraphs (Generous)</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">Pass Validity Window After Ad View</label>
-                            <select
-                              value={rewardedAdConfig.passValidityHours}
-                              onChange={(e) => setRewardedAdConfig({ ...rewardedAdConfig, passValidityHours: Number(e.target.value) })}
-                              className="w-full p-2.5 rounded-xl border bg-white dark:bg-zinc-900 font-bold"
-                            >
-                              <option value={12}>12 Hours Access</option>
-                              <option value={24}>24 Hours Access (Standard)</option>
-                              <option value={48}>48 Hours Access</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 p-5 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/20 dark:bg-zinc-950/20">
-                        <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-emerald-500" /> Sponsor Ad Settings
-                        </h4>
-
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">Video Ad Duration Requirement</label>
-                            <select
-                              value={rewardedAdConfig.adDurationSeconds}
-                              onChange={(e) => setRewardedAdConfig({ ...rewardedAdConfig, adDurationSeconds: Number(e.target.value) })}
-                              className="w-full p-2.5 rounded-xl border bg-white dark:bg-zinc-900 font-bold"
-                            >
-                              <option value={10}>10 Seconds Sponsor Video</option>
-                              <option value={15}>15 Seconds Sponsor Video (Standard)</option>
-                              <option value={30}>30 Seconds Sponsor Video (Max Revenue)</option>
-                            </select>
-                          </div>
-
-                          <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 rounded-xl">
-                            <span className="font-bold text-xs text-rose-800 dark:text-rose-300 block">💡 Reader Experience Guaranteed</span>
-                            <p className="text-[10px] text-rose-700 dark:text-rose-400 mt-0.5">
-                              Subscribers (Premium Attuner & Couples Sanctuary) bypass all video ads automatically.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  
                 </div>
               )}
 
@@ -16265,8 +16031,8 @@ export default function AdminConsole({
                           <label className="text-[10px] font-bold uppercase text-zinc-400 block mb-1">Section Title</label>
                           <input
                             type="text"
-                            value={siteSettings.homepage_categories_title || 'Explore by Topic'}
-                            onChange={(e) => setSiteSettings({ ...siteSettings, homepage_categories_title: e.target.value })}
+                            value={siteSettings.homepage_topics_title || siteSettings.homepage_categories_title || 'Explore by Topic'}
+                            onChange={(e) => setSiteSettings({ ...siteSettings, homepage_topics_title: e.target.value })}
                             className="w-full p-2.5 rounded-xl border font-bold bg-zinc-50 dark:bg-zinc-950"
                           />
                         </div>
@@ -16275,8 +16041,8 @@ export default function AdminConsole({
                           <label className="text-[10px] font-bold uppercase text-zinc-400 block mb-1">Section Subtitle</label>
                           <input
                             type="text"
-                            value={siteSettings.homepage_categories_subtitle || ''}
-                            onChange={(e) => setSiteSettings({ ...siteSettings, homepage_categories_subtitle: e.target.value })}
+                            value={siteSettings.homepage_topics_subheading || siteSettings.homepage_categories_subtitle || ''}
+                            onChange={(e) => setSiteSettings({ ...siteSettings, homepage_topics_subheading: e.target.value })}
                             placeholder="Dive into the subjects that matter most..."
                             className="w-full p-2.5 rounded-xl border bg-zinc-50 dark:bg-zinc-950"
                           />

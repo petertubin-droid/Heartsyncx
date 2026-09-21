@@ -3934,6 +3934,18 @@ export default function App() {
 
 
 
+                  {/* Editor's review badge (article_editorial_notes_enabled + expert_reviewer_* settings) */}
+                  {siteSettings.article_editorial_notes_enabled !== false && (siteSettings.expert_reviewer_signature_text || siteSettings.expert_reviewer_credentials_desc) && (
+                    <div className="flex items-start gap-3 p-4 bg-rose-50/60 dark:bg-zinc-900/60 border border-rose-100 dark:border-zinc-800 rounded-2xl">
+                      <Heart className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                      <div className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">
+                        <span className="font-bold">Editor's review.</span>{' '}
+                        {siteSettings.expert_reviewer_signature_text && <>{siteSettings.expert_reviewer_signature_text} — </>}
+                        {siteSettings.expert_reviewer_credentials_desc}
+                      </div>
+                    </div>
+                  )}
+
                   {/* 4. MAIN ARTICLE GRID: Floating Share Rail, Body, and Sidebar */}
                   {(() => {
                     const showLeftRail = (siteSettings.article_share_system_enabled !== false) || (siteSettings.article_table_of_contents_enabled !== false && headings.length > 0);
