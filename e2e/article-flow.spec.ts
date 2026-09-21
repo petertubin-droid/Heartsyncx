@@ -25,7 +25,7 @@ test.describe('Article flow', () => {
     await page.waitForTimeout(1500);
     expect(page.url()).toMatch(/\/article\//);
     const body = await page.locator('body').innerText();
-    expect(body.length).toBeGreaterThan(400, 'article view looks empty');
+    expect(body.length).toBeGreaterThan(400);
   });
 
   test('article deep-link from the sitemap renders heading + body', async ({ page }) => {
@@ -38,7 +38,7 @@ test.describe('Article flow', () => {
     await page.goto(`/article/${slug}`);
     await page.waitForTimeout(1500);
     const body = await page.locator('body').innerText();
-    expect(body.length).toBeGreaterThan(300, 'article body looks empty');
+    expect(body.length).toBeGreaterThan(300);
     // Reading UI markers (hero byline, reading time, or journal chrome)
     expect(body).toMatch(/min read|reading|by |categor|journal|essay/i);
   });

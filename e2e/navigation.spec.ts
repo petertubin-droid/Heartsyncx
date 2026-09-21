@@ -35,7 +35,7 @@ test.describe('Static sections render', () => {
         { timeout: 15_000 }
       );
       const body = await page.locator('body').innerText();
-      expect(body.length).toBeGreaterThan(150, `${route.name} looks like an empty shell`);
+      expect(body.length).toBeGreaterThan(150);
       expect(body.toLowerCase()).toMatch(route.expect);
       const title = await page.title();
       expect(title.length).toBeGreaterThan(3);
