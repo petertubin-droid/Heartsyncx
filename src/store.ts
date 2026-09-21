@@ -817,6 +817,19 @@ function toBasicSupabasePostUpdate(updates: any) {
 }
 
 export class HeartsyncStore {
+  /** Parses a fetch Response body as JSON, tolerating non-JSON error
+   *  bodies (e.g. an HTML 404/500 page from a misconfigured deploy) so a
+   *  backend outage surfaces as a clear message instead of throwing a raw
+   *  SyntaxError that silently aborts the auth flow. */
+  private async safeJson(res: Response): Promise<any> {
+    const text = await res.text();
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch (_) {
+      return { error: `Unexpected server response (HTTP ${res.status}). Please try again shortly.` };
+    }
+  }
+
   public getLocalStorage<T>(key: string, defaultValue: T): T {
     return getLocalStorage<T>(key, defaultValue);
   }
@@ -1034,7 +1047,7 @@ export class HeartsyncStore {
         });
 
         if (!syncRes.ok) {
-          const errData = await syncRes.json();
+          const errData = await this.safeJson(syncRes);
           console.error('❌ Session restore: Profile self-healing failed:', errData.error);
           await this.supabase.auth.signOut();
           this.current_user = null;
@@ -1042,7 +1055,7 @@ export class HeartsyncStore {
           return;
         }
 
-        const syncData = await syncRes.json();
+        const syncData = await this.safeJson(syncRes);
         const profile = syncData.profile;
 
         if (profile) {
@@ -1090,7 +1103,7 @@ export class HeartsyncStore {
               });
 
               if (!syncRes.ok) {
-                const errData = await syncRes.json();
+                const errData = await this.safeJson(syncRes);
                 console.error('❌ Auth state change: Profile self-healing failed:', errData.error);
                 await this.supabase.auth.signOut();
                 this.current_user = null;
@@ -1098,7 +1111,7 @@ export class HeartsyncStore {
                 return;
               }
 
-              const syncData = await syncRes.json();
+              const syncData = await this.safeJson(syncRes);
               const profile = syncData.profile;
 
               if (profile) {

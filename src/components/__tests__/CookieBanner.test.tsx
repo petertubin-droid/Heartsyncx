@@ -90,7 +90,9 @@ describe('CookieBanner (GDPR consent UI)', () => {
     heartsync.setLocalStorage('heartsync_cookie_consent', 'custom');
     heartsync.setLocalStorage('heartsync_cookie_preferences', { necessary: true, analytics: true, marketing: false, functional: false });
     renderBanner();
-    act(() => { screen.getByRole('button', { name: /manage cookie consent preferences/i }).click(); });
+    // The floating manage-cookie button was removed in the declutter pass; the
+    // Footer 'Cookie Settings' link is the reopen path and dispatches this event.
+    act(() => { window.dispatchEvent(new Event('heartsync-open-cookie-preferences')); });
     await waitFor(() => expect(screen.getAllByRole('dialog').length).toBeGreaterThan(0));
     expect(screen.getByRole('switch', { name: /analytics cookies/i }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('switch', { name: /marketing cookies/i }).getAttribute('aria-checked')).toBe('false');

@@ -12,4 +12,8 @@
 # in dist/. Those stay unlisted here on purpose: if one of them ever shows
 # up in a scan again, that's a real leak to fix in code, not to omit.
 [build.environment]
+  # Node 22 ships a native global WebSocket; on Node 20 the server-side
+  # supabase-js client cannot construct (realtime-js throws) and the server
+  # silently degrades to fallback seed state instead of the real database.
+  NODE_VERSION = "22"
   SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY,VITE_SUPABASE_ANON_KEY,SUPABASE_URL,VITE_SUPABASE_URL"

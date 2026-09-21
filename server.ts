@@ -23,6 +23,19 @@ dotenv.config({ path: '.env.local' });
 const app = express();
 const PORT = 3000;
 
+// Netlify serves this app through a serverless bridge reached via a
+// /.netlify/functions/<name> internal path. Normalize that prefix away so
+// the Express routes match the public URLs exactly. No-op on Vercel,
+// Cloud Run and local dev (the prefix never appears there).
+app.use((req, _res, next) => {
+  const prefix = '/.netlify/functions/';
+  if (req.url.startsWith(prefix)) {
+    // /.netlify/functions/api/state -> /api/state (the public URL)
+    req.url = '/' + req.url.slice(prefix.length);
+  }
+  next();
+});
+
 // Production Logger to centralize system and diagnostic logging securely
 export const logger = {
   info: (message: string, meta?: any) => {
@@ -6982,9 +6995,10 @@ async function startServer() {
   });
 }
 
-// On Vercel the module is imported by the serverless handler (api/index.ts) —
-// no listener, no background loop. Everywhere else, run as a standalone server.
-if (!process.env.VERCEL) {
+// On Vercel and Netlify the module is imported by a serverless handler
+// (api/index.ts on Vercel, netlify/functions/* on Netlify) — no listener,
+// no background loop. Everywhere else, run as a standalone server.
+if (!process.env.VERCEL && !process.env.NETLIFY) {
   startServer();
 }
 

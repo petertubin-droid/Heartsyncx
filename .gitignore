@@ -7,3 +7,5 @@ coverage/
 .env*
 !.env.example
 api/index.html
+playwright-report/
+test-results/
