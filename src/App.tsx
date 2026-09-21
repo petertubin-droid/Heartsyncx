@@ -3333,13 +3333,15 @@ export default function App() {
                 )}
 
                 {/* Article header bar: back control + reader settings */}
-                <div className="pb-4 border-b border-zinc-200 dark:border-zinc-800/60 font-sans">
+                <div className="pb-4 border-b border-zinc-200/70 dark:border-zinc-800/60 font-sans">
                   <button 
                     onClick={() => navigateTo('articles')}
-                    className="inline-flex items-center gap-1.5 hover:text-rose-600 text-xs font-semibold text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors duration-200 w-fit"
+                    className="group inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer transition-colors duration-200 w-fit"
                     aria-label="Back to journal feed"
                   >
-                    <ArrowLeft className="w-4 h-4 text-zinc-400" />
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-zinc-200 dark:border-zinc-700 group-hover:border-rose-400 dark:group-hover:border-rose-500/50 group-hover:bg-rose-50 dark:group-hover:bg-rose-500/10 transition-all duration-200">
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                    </span>
                     All Articles
                   </button>
 
@@ -3404,21 +3406,21 @@ export default function App() {
                     // Sub-component: Author Profile & Metadata Box
                     const renderMetadataAndAuthorRow = () => {
                       return (
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4 border-b border-zinc-150/40 dark:border-zinc-850/40 font-sans">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4 border-y border-zinc-200/60 dark:border-zinc-800/60 font-sans">
                           {/* Author details */}
                           {(siteSettings.article_meta_author_enabled !== false) && (
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3.5">
                               <img 
                                 src={authorObj.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"} 
                                 alt={authorObj.name} 
-                                className="w-10 h-10 rounded-full object-cover border border-zinc-200/50 dark:border-zinc-800 shrink-0"
+                                className="w-11 h-11 rounded-full object-cover ring-2 ring-white dark:ring-zinc-800 shadow-md shadow-black/10 shrink-0"
                                 referrerPolicy="no-referrer"
                               />
                               <div>
-                                <strong className="block text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm font-serif font-black leading-tight">
+                                <strong className="block text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm font-serif font-bold tracking-wide leading-tight">
                                   {authorObj.name}
                                 </strong>
-                                <span className="text-[9px] sm:text-[10px] text-zinc-400 dark:text-zinc-500 block mt-0.5 font-medium leading-none">
+                                <span className="text-[9px] sm:text-[10px] text-rose-500/90 dark:text-rose-400/80 block mt-1 font-sans font-bold uppercase tracking-[0.16em] leading-none">
                                   {authorObj.role_tag || authorObj.role || 'Relationship & Wellness Expert'}
                                 </span>
                               </div>
@@ -3453,7 +3455,7 @@ export default function App() {
                       return (
                         <div className="space-y-2">
                           <div 
-                            className={`relative overflow-hidden ${aspectClass} ${roundClass} shadow-lg border border-zinc-200/20 dark:border-zinc-800 group ${
+                            className={`relative overflow-hidden ${aspectClass} ${roundClass} shadow-2xl shadow-black/15 dark:shadow-black/50 ring-1 ring-black/5 dark:ring-white/10 group ${
                               siteSettings.article_lightbox_enabled !== false ? 'cursor-zoom-in' : ''
                             }`}
                             onClick={() => handleImageClick(imgSrc, activeArticle.title)}
@@ -3603,11 +3605,28 @@ export default function App() {
 
                         {imgPos === 'top' && renderFeaturedImage()}
 
-                        <div className="space-y-4">
-                          <h1 className="font-serif font-black text-2xl sm:text-4xl md:text-5xl leading-tight tracking-tight text-zinc-900 dark:text-white">
+                        <div className="space-y-5">
+                          {/* Editorial kicker: rose rule + category eyebrow + read time */}
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="h-px w-10 bg-gradient-to-r from-rose-500/90 to-rose-500/20" aria-hidden="true" />
+                            <span className="text-[10px] sm:text-[11px] font-sans font-extrabold uppercase tracking-[0.22em] text-rose-600 dark:text-rose-400">
+                              {matchedCat ? matchedCat.name : 'Heartsync Journal'}
+                            </span>
+                            <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 select-none" aria-hidden="true" />
+                            <span className="text-[10px] sm:text-[11px] font-mono text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.14em] font-bold">
+                              {activeArticle.read_time} min read
+                            </span>
+                          </div>
+                          <h1
+                            className="font-serif font-black text-[1.9rem] sm:text-5xl md:text-[3.35rem] leading-[1.1] sm:leading-[1.08] tracking-[-0.015em] text-zinc-900 dark:text-white"
+                            style={{ textWrap: 'balance' }}
+                          >
                             {activeArticle.title}
                           </h1>
-                          <p className="text-zinc-500 dark:text-zinc-400 text-xs sm:text-sm leading-relaxed max-w-4xl">
+                          <p
+                            className="font-serif italic text-zinc-500 dark:text-zinc-400 text-sm sm:text-lg leading-relaxed max-w-3xl border-l-2 border-rose-400/60 pl-4 sm:pl-5"
+                            style={{ textWrap: 'pretty' }}
+                          >
                             {activeArticle.excerpt}
                           </p>
                         </div>

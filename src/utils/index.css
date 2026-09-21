@@ -463,3 +463,197 @@ html.dark, html.dark body {
   overflow-wrap: break-word;
   white-space: pre-wrap;
 }
+
+/* ============================================================
+   PREMIUM EDITORIAL PROSE SYSTEM (2026-09-21)
+   Magazine-grade reading experience for article pages: measured
+   line lengths, balanced wrapping, refined hairlines, pull-quote
+   flourishes and gallery-grade media treatment. Light + dark aware.
+   ============================================================ */
+
+/* Balanced / pretty text wrapping (progressive enhancement) */
+#heartsync-premium-article-reading-body h1 { text-wrap: balance; }
+#heartsync-premium-article-reading-body h2,
+#heartsync-premium-article-reading-body h3,
+#heartsync-premium-article-reading-body p { text-wrap: pretty; }
+
+/* Optimal measure: no prose line exceeds ~70 characters */
+#heartsync-premium-article-reading-body .markdown-body > p,
+#heartsync-premium-article-reading-body .markdown-body > blockquote,
+#heartsync-premium-article-reading-body .markdown-body > ul,
+#heartsync-premium-article-reading-body .markdown-body > ol {
+  max-width: 70ch;
+}
+@media (min-width: 1024px) {
+  #heartsync-premium-article-reading-body .markdown-body > p { margin-left: auto; margin-right: auto; }
+}
+
+/* Refined in-prose links: rose with a soft underline, quiet hover lift */
+#heartsync-premium-article-reading-body .markdown-body a:not([href^="#"]) {
+  color: #be123c;
+  text-decoration: underline;
+  text-decoration-color: rgba(244, 63, 94, 0.35);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.2s ease, background-color 0.2s ease;
+  border-radius: 2px;
+}
+#heartsync-premium-article-reading-body .markdown-body a:not([href^="#"]):hover {
+  text-decoration-color: #be123c;
+  background-color: rgba(244, 63, 94, 0.07);
+}
+.dark #heartsync-premium-article-reading-body .markdown-body a:not([href^="#"]) {
+  color: #fb7185;
+  text-decoration-color: rgba(251, 113, 133, 0.35);
+}
+.dark #heartsync-premium-article-reading-body .markdown-body a:not([href^="#"]):hover {
+  text-decoration-color: #fb7185;
+  background-color: rgba(251, 113, 133, 0.1);
+}
+
+/* Elegant section dividers: twin rose hairlines fading to transparent */
+#heartsync-premium-article-reading-body .markdown-body hr {
+  border: none;
+  height: auto;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 2.75rem 0;
+}
+#heartsync-premium-article-reading-body .markdown-body hr::before,
+#heartsync-premium-article-reading-body .markdown-body hr::after {
+  content: '';
+  height: 1px;
+  width: 64px;
+}
+#heartsync-premium-article-reading-body .markdown-body hr::before {
+  background: linear-gradient(to right, rgba(190, 25, 60, 0.45), transparent);
+}
+#heartsync-premium-article-reading-body .markdown-body hr::after {
+  background: linear-gradient(to left, rgba(190, 25, 60, 0.45), transparent);
+}
+
+/* Rose list markers + generous list rhythm */
+#heartsync-premium-article-reading-body .markdown-body ul li::marker,
+#heartsync-premium-article-reading-body .markdown-body ol li::marker {
+  color: #e11d48;
+}
+.dark #heartsync-premium-article-reading-body .markdown-body ul li::marker,
+.dark #heartsync-premium-article-reading-body .markdown-body ol li::marker {
+  color: #fb7185;
+}
+#heartsync-premium-article-reading-body .markdown-body ul,
+#heartsync-premium-article-reading-body .markdown-body ol {
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* Emphasis: quietly stronger */
+#heartsync-premium-article-reading-body .markdown-body strong {
+  font-weight: 700;
+  color: #18181b;
+}
+.dark #heartsync-premium-article-reading-body .markdown-body strong {
+  color: #fafafa;
+}
+
+/* Code: dark gallery card for blocks, rose-tint pill for inline */
+#heartsync-premium-article-reading-body .markdown-body pre {
+  background: #101012;
+  color: #e4e4e7;
+  border-radius: 14px;
+  padding: 1.15rem 1.35rem;
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.4);
+}
+#heartsync-premium-article-reading-body .markdown-body :not(pre) > code {
+  background: rgba(244, 63, 94, 0.09);
+  color: #be123c;
+  padding: 0.14em 0.45em;
+  border-radius: 0.5rem;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+.dark #heartsync-premium-article-reading-body .markdown-body :not(pre) > code {
+  background: rgba(244, 63, 94, 0.14);
+  color: #fda4af;
+}
+
+/* Tables: hairline editorial grid */
+#heartsync-premium-article-reading-body .markdown-body th {
+  font-family: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #71717a;
+  padding: 0.6rem 1rem;
+  border-bottom: 2px solid #e4e4e7;
+  background: rgba(244, 63, 94, 0.03);
+}
+.dark #heartsync-premium-article-reading-body .markdown-body th {
+  color: #a1a1aa;
+  border-bottom-color: #3f3f46;
+  background: rgba(244, 63, 94, 0.05);
+}
+#heartsync-premium-article-reading-body .markdown-body td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #f4f4f5;
+  font-size: 0.875rem;
+}
+.dark #heartsync-premium-article-reading-body .markdown-body td {
+  border-bottom-color: #27272a;
+}
+
+/* Gallery-grade in-prose media */
+#heartsync-premium-article-reading-body .markdown-body img {
+  border-radius: 1.25rem;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.28);
+}
+#heartsync-premium-article-reading-body .markdown-body figcaption {
+  font-family: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: #a1a1aa;
+  text-align: center;
+  margin-top: 0.75rem;
+}
+
+/* H2: softened full-width rule becomes a short elegant underline */
+#heartsync-premium-article-reading-body .markdown-body h2 {
+  border-bottom: 1px solid rgba(228, 228, 231, 0.9);
+  position: relative;
+}
+#heartsync-premium-article-reading-body .markdown-body h2::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 56px;
+  height: 2px;
+  background: linear-gradient(to right, #e11d48, rgba(225, 29, 72, 0.25));
+}
+.dark #heartsync-premium-article-reading-body .markdown-body h2 {
+  border-bottom-color: rgba(63, 63, 70, 0.9);
+}
+
+/* Drop-cap pairing: first-line letter spacing for the opening paragraph */
+#heartsync-premium-article-reading-body .markdown-body > p:first-of-type {
+  letter-spacing: 0.005em;
+}
+
+/* Respect reduced motion for all new flourishes (inherited rules above are
+   static; nothing to disable here, but keep motion-safety explicit). */
+@media (prefers-reduced-motion: reduce) {
+  #heartsync-premium-article-reading-body * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
