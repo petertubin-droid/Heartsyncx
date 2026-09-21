@@ -271,3 +271,69 @@ admin cannot log in. Findings, verified live against the Hearty project
   2. email signup → immediate session, profile visible in admin console
   3. admin login at /admin with admin@heartsync.app
   4. Google sign-in roundtrip → account + profile created
+
+## UI / UX AUDIT (2026-09-21) — sticky dock fix + broken/dead UI inventory
+
+### FIXED (commit pending deploy)
+- **Sticky mobile share dock + reading-progress bar scrolled away with the page.**
+  Root cause: the page-transition wrapper (`motion.div` in `<main>`) carries
+  `transform: translateZ(0)` for GPU animation. Per CSS spec, any ancestor
+  transform creates a NEW containing block for `position: fixed` descendants —
+  so the dock/progress bar were "fixed" relative to the animated page wrapper,
+  not the viewport, and scrolled away. Both now render via createPortal to
+  document.body, escaping the transformed ancestor. Same class of bug cannot
+  recur for these two elements; any future `fixed` element added inside the
+  animated wrapper will need the same treatment.
+
+### BROKEN / DEAD UI (needs decisions or fixes)
+1. **~39 admin settings are dead toggles/selects** — settable in AdminConsole,
+   stored in site_settings, but ZERO code on the live site reads them:
+   - Article reading: article_layout, article_content_width,
+     article_desktop_content_width, article_line_height,
+     article_paragraph_spacing, article_heading_styles,
+     article_mobile_header_spacing, article_mobile_image_height,
+     article_atmospheric_linen, article_editorial_notes_enabled
+   - Sidebar: article_desktop_sidebar_sticky/visible/width/position,
+     article_desktop_related_placement
+   - Mobile: article_mobile_share_style (dock/inline/floating — always dock),
+     article_mobile_sticky_actions, article_mobile_progress_bar
+   - Brand: brand_font, brand_theme, brand_button_radius, brand_heading_weight,
+     brand_hover_animation, brand_glow_accent
+   - SEO: og_title, og_description (not used even server-side in meta tags)
+   - Homepage: homepage_categories_title/subtitle, homepage_categories_columns_mobile,
+     homepage_categories_card_style, homepage_premium_enabled
+   - Security: security_2fa, security_max_attempts, security_session_timeout
+   - TTS: the whole tts_* panel (tts_global_enabled, tts_provider,
+     tts_selected_voice, tts_player_position, tts_player_style, ...)
+   - Newsletter: newsletter_subject, newsletter_template
+   - Expert reviewer: expert_reviewer_credentials_desc,
+     expert_reviewer_signature_text
+   - Ads: monetag_format, adsterra_script_code, adsense_auto_script,
+     rewarded_ad_config (the live ad paths use monetag_script_code /
+     adsterra_key_<slot> instead); ai_model_selected / ai_prompt_prefix
+     (AI features removed earlier)
+   Fix options: wire them up, or remove the settings UI to stop implying
+   behavior that doesn't exist. The TTS and security panels are the most
+   misleading.
+2. **"Table of Connections" sidebar widget** (static fallback sidebar): items
+   have cursor-pointer + hover styling but NO click handler — dead interactive
+   element (App.tsx ~line 4762).
+3. **Rewarded-ad overlay is a hardcoded fake**: the "Heartsync Ad Exchange"
+   overlay presents "Aura Meditation App" as the sponsor with a 15s fake watch
+   flow — no real sponsor content. It "unlocks 3 hours of access" that the
+   platform doesn't enforce. Either wire to a real ad network or remove.
+4. **alert() used for error UX** in AdminConsole (category save, newsletter
+   send), LiveChatWidget (attachments), RichTextEditor (validation/upload) —
+   blocks the JS thread and reads as a browser error, not app UI. Replace
+   with the existing toast system.
+5. **5 console.log calls** left in production frontend code.
+6. Newsletter template preview link is a literal `href="#"` placeholder
+   (minor — it's an editable template).
+
+### VERIFIED WORKING (no action)
+- Header sticky toggle (Header.tsx) IS wired (headerPositionClass).
+- Adsterra key slots, monetag_script_code, adsense publisher id — used by
+  AdPlacement/AdNetworkScripts.
+- CookieBanner/LiveChat/MobileMenu/Lightbox/LoadingSystem fixed-position
+  elements render OUTSIDE the transformed wrapper — unaffected by the
+  containing-block bug.

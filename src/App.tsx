@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 // The 16k-line admin console is split out of the reader bundle — it only
 // downloads when an admin actually opens the admin tab.
@@ -3446,14 +3447,22 @@ export default function App() {
                 <div className="col-span-12 lg:col-span-8 space-y-6">
                 
                 {/* 1. Sticky Reading Progress Indicator Bar */}
-                {(siteSettings.article_reading_progress_enabled ?? true) && (
+                {/* Portalled straight to document.body: the page-transition wrapper above
+                    applies `transform: translateZ(0)` for GPU-accelerated animation, and any
+                    ancestor transform creates a NEW containing block for `position: fixed`
+                    descendants (CSS spec). Left in place, this bar would be fixed relative to
+                    that animated wrapper instead of the viewport, so it scrolls away with the
+                    page instead of staying pinned to the top. Portalling escapes that ancestor
+                    entirely and restores true viewport-fixed behavior. */}
+                {(siteSettings.article_reading_progress_enabled ?? true) && createPortal(
                   <div 
                     className="fixed top-0 left-0 h-1.5 z-50 w-full transition-all duration-300" 
                     style={{ 
                       width: `${scrollPercent}%`, 
                       backgroundColor: siteSettings.article_reading_progress_color || '#e11d48' 
                     }}
-                  />
+                  />,
+                  document.body
                 )}
 
                 {/* Floating Back Control & Main Section wrapper with premium comfort reading toolbar */}
@@ -4767,6 +4776,12 @@ export default function App() {
                 })()}
 
                   {/* 5. STICKY MOBILE SOCIAL SHARE DOCK (COLLAPSED AT THE BOTTOM OF PORT FOR SMOOTH REACH WHILE TOUCH SCROLLING) */}
+                  {/* Portalled to document.body for the same reason as the reading-progress bar
+                      above: the page-transition wrapper's `transform: translateZ(0)` creates a new
+                      containing block for `position: fixed` descendants, which made this dock fixed
+                      relative to the animated page wrapper instead of the viewport -- so it scrolled
+                      away with the article instead of staying pinned to the bottom of the screen. */}
+                  {createPortal(
                   <div className="fixed bottom-0 inset-x-0 bg-white/95 dark:bg-zinc-950/95 border-t border-zinc-200/80 dark:border-zinc-850 p-2.5 z-40 flex items-center justify-around md:hidden shadow-2xl backdrop-blur-md">
                     <button
                       type="button"
@@ -4826,7 +4841,9 @@ export default function App() {
                       <Send className="w-5 h-5" />
                       <span className="text-[8px] uppercase tracking-wider">Send</span>
                     </a>
-                  </div>
+                  </div>,
+                  document.body
+                  )}
 
                 </div>
                 </div>
