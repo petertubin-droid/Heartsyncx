@@ -3429,6 +3429,69 @@ let lastSupabaseFetchTime = 0;
 const CACHE_TTL = 15000;
 
 // Initialize state (Reads strictly from Supabase, falling back to local JSON data only if Supabase is unavailable)
+
+// Values that mark a profile as an administrative role (kept in one place so
+// the setup wizard, the one-time reset and the first-admin election agree).
+const ADMIN_ROLE_VALUES = ['admin', 'superadmin', 'Administrator', 'Editor', 'Super Admin'];
+
+// ---------------------------------------------------------------------------
+// OWNER-DIRECTED ADMIN OWNERSHIP RESET (2026-09-21)
+// Demotes EVERY existing administrator (removes admin access from the
+// previous admin email) exactly once, so the FIRST account to register after
+// this deploy is elected admin by /api/auth/sync-profile. Idempotent and
+// race-safe across serverless instances: the marker is written before any
+// demotion happens and demotion itself is a no-op when repeated.
+// ---------------------------------------------------------------------------
+async function runAdminOwnershipReset() {
+  const svc = getServiceRoleSupabase();
+  if (!svc) return; // no service role (dev sandbox / DB down): nothing to reset
+  try {
+    const { data: settings, error: settingsErr } = await svc.from('site_settings')
+      .select('metadata').eq('id', 'singleton').maybeSingle();
+    if (settingsErr) { console.warn('[admin-reset] marker read failed:', settingsErr.message); return; }
+    const metadata = (settings && (settings as any).metadata) || {};
+    if (metadata && (metadata as any).admin_ownership_reset_2026_09) return; // already done
+
+    // Claim the marker FIRST (race-safe: two cold starts both writing the
+    // same marker is harmless; both demoting the same already-demoted rows
+    // is a no-op).
+    const nowIso = new Date().toISOString();
+    const markedMetadata = { ...(metadata || {}), admin_ownership_reset_2026_09: nowIso };
+    if (settings) {
+      const { error: markErr } = await svc.from('site_settings')
+        .update({ metadata: markedMetadata, updated_at: nowIso }).eq('id', 'singleton');
+      if (markErr) { console.warn('[admin-reset] marker write failed:', markErr.message); return; }
+    } else {
+      const { error: markErr } = await svc.from('site_settings')
+        .insert({ id: 'singleton', metadata: markedMetadata });
+      if (markErr) { console.warn('[admin-reset] marker insert failed:', markErr.message); return; }
+    }
+
+    // Demote every administrative profile to subscriber.
+    const { error: demoteErr } = await svc.from('profiles')
+      .update({ role: 'subscriber', updated_at: nowIso })
+      .in('role', ADMIN_ROLE_VALUES);
+    if (demoteErr) console.warn('[admin-reset] profile demotion warning:', demoteErr.message);
+
+    // Clear the admin_users registry entirely.
+    const { error: adminDelErr } = await svc.from('admin_users').delete().neq('email', '');
+    if (adminDelErr) console.warn('[admin-reset] admin_users clear warning:', adminDelErr.message);
+
+    // Mirror the demotion into the in-memory state so this very instance
+    // serves a consistent view until the next full state load.
+    if (serverCacheState) {
+      serverCacheState.admin_users = [];
+      (serverCacheState.profiles || []).forEach((p: any) => {
+        if (p && ADMIN_ROLE_VALUES.includes(p.role)) p.role = 'subscriber';
+      });
+      try { await saveServerCacheState(serverCacheState); } catch (_) {}
+    }
+    console.log('[admin-reset] Admin ownership reset applied: all prior admins demoted; the next account to register/login becomes admin.');
+  } catch (err: any) {
+    console.warn('[admin-reset] skipped:', err?.message || err);
+  }
+}
+
 async function initializeSharedState() {
   console.log('🔍 Initializing server state with Supabase database storage...');
 
@@ -3441,6 +3504,7 @@ async function initializeSharedState() {
       };
       lastSupabaseFetchTime = Date.now();
       console.log('⚡ [PRIMARY PERSISTENCE SUCCESS] Successfully retrieved live persistent state from Supabase Cloud.');
+      await runAdminOwnershipReset();
       return;
     }
   } catch (err) {
@@ -3448,6 +3512,7 @@ async function initializeSharedState() {
   }
 
   serverCacheState = serverCacheState || {};
+  await runAdminOwnershipReset();
   console.log('💚 Running in fallback state mode with seed state.');
 }
 
@@ -4851,7 +4916,24 @@ app.post('/api/webhooks/paystack', async (req: Request, res: Response) => {
 });
 
 app.get('/api/setup/status', async (req: Request, res: Response) => {
-  res.json({ hasAdmins: true });
+  // Authoritative: report whether ANY administrative profile exists in the
+  // database (service role). Falls back to the in-memory state only when the
+  // service role is unavailable. The setup wizard is only offered when there
+  // is genuinely no admin account.
+  try {
+    const svc = getServiceRoleSupabase();
+    if (svc) {
+      const { data: adminRows, error } = await svc.from('profiles')
+        .select('id').in('role', ADMIN_ROLE_VALUES).limit(1);
+      if (!error) {
+        res.json({ hasAdmins: !!(adminRows && adminRows.length > 0) });
+        return;
+      }
+    }
+  } catch (_) { /* fall through to cache-based answer */ }
+  const cacheHasAdmins = ((serverCacheState && serverCacheState.admin_users) || []).length > 0
+    || ((serverCacheState && serverCacheState.profiles) || []).some((p: any) => ADMIN_ROLE_VALUES.includes(p?.role));
+  res.json({ hasAdmins: !!cacheHasAdmins });
 });
 
 app.post('/api/setup/register', async (req: Request, res: Response) => {
@@ -5126,7 +5208,32 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
     p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail)
   );
 
-  const isAdmin = !!adminUser || (existingProfile && ['admin', 'Super Admin', 'Admin'].includes(existingProfile.role));
+  // OWNER-DIRECTED RULE (2026-09-21): the FIRST account to register becomes
+  // the admin. Election happens only when NO administrator exists anywhere:
+  // authoritative DB check via the service role + the in-memory state as a
+  // secondary guard. Once one admin exists nobody else is ever auto-promoted.
+  let promoteToAdmin = false;
+  if (!adminUser && !(existingProfile && ADMIN_ROLE_VALUES.includes(existingProfile.role))) {
+    try {
+      const svc = getServiceRoleSupabase();
+      if (svc) {
+        const { data: adminRows, error: adminErr } = await svc.from('profiles')
+          .select('id').in('role', ADMIN_ROLE_VALUES).limit(1);
+        if (!adminErr) {
+          const cacheHasAdmin = ((serverCacheState.admin_users) || []).length > 0
+            || ((serverCacheState.profiles) || []).some((p: any) => ADMIN_ROLE_VALUES.includes(p?.role));
+          promoteToAdmin = (!adminRows || adminRows.length === 0) && !cacheHasAdmin;
+          if (promoteToAdmin) {
+            console.log(`👑 First-admin election: no administrator exists; promoting ${cleanEmail}.`);
+          }
+        }
+      }
+    } catch (_) { /* election unavailable; subscriber default applies */ }
+  }
+
+  const isAdmin = !!adminUser
+    || (existingProfile && ADMIN_ROLE_VALUES.includes(existingProfile.role))
+    || promoteToAdmin;
   const finalRole = isAdmin ? 'admin' : (existingProfile?.role || 'subscriber');
 
   const profileObj = {
@@ -5191,6 +5298,28 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
         updated_at: profileObj.updated_at
       });
       if (profileMirrorErr) console.warn('Profile mirror upsert warning:', profileMirrorErr.message);
+    }
+    if (promoteToAdmin) {
+      // Persist the elected first admin authoritatively (service role):
+      // profiles.role is never client-writable, so the promotion must go
+      // through the server-side privileged client, same as the setup wizard.
+      const svc = getServiceRoleSupabase();
+      if (svc) {
+        const { error: promoteErr } = await svc.from('profiles').upsert({
+          id: userId,
+          email: cleanEmail,
+          role: 'admin',
+          updated_at: profileObj.updated_at
+        }, { onConflict: 'id' });
+        if (promoteErr) console.warn('First-admin promotion warning:', promoteErr.message);
+        const { error: adminRegErr } = await svc.from('admin_users').upsert({
+          id: userId,
+          email: cleanEmail,
+          name: profileObj.name,
+          role: 'admin'
+        }, { onConflict: 'id' });
+        if (adminRegErr) console.warn('admin_users registration warning:', adminRegErr.message);
+      }
     }
   } catch (_) {}
 
