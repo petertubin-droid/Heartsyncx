@@ -41,7 +41,7 @@ import {
   HelpCircle, AlertTriangle, User, Smile, PlusCircle, CheckCircle, 
   Trash2, ShieldAlert, BadgeInfo, BellRing, ChevronRight,
   BookmarkX, Award, AlertCircle, RefreshCw, Mail, Settings, Twitter, Facebook, Link as LinkIcon, Calendar, Clock,
-  HeartCrack, Brain, Flag, CircleDot, Lock, Play, Tv, Users, TrendingUp, Maximize2, ArrowRight
+  HeartCrack, Brain, Flag, CircleDot, Lock, Play, Tv, Users, TrendingUp, Maximize2, ArrowRight, Share2
 } from 'lucide-react';
 
 export default function App() {
@@ -136,6 +136,14 @@ export default function App() {
   const [homeNewsletterEmail, setHomeNewsletterEmail] = useState('');
   const [homeNewsletterSubscribed, setHomeNewsletterSubscribed] = useState(false);
   const [copyFeedbackToast, setCopyFeedbackToast] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!shareMenuOpen) return;
+    const closeOnOutsideClick = () => setShareMenuOpen(false);
+    window.addEventListener('click', closeOnOutsideClick);
+    return () => window.removeEventListener('click', closeOnOutsideClick);
+  }, [shareMenuOpen]);
   const [hasLiked, setHasLiked] = useState(false);
   const [mobileTocOpen, setMobileTocOpen] = useState(false);
   const [bookmarkedArticles, setBookmarkedArticles] = useState<string[]>(() => heartsync.bookmarks);
@@ -3359,7 +3367,7 @@ export default function App() {
                       role: 'author'
                     };
                     const articleHeroStyle = siteSettings.article_hero_style || 'standard';
-                    const imgPos = siteSettings.article_image_position || 'top';
+                    const imgPos = siteSettings.article_image_position || 'below-meta';
                     const aspectClass = siteSettings.article_image_aspect_ratio === '21/9' ? 'aspect-[21/9]' :
                                         siteSettings.article_image_aspect_ratio === '16/9' ? 'aspect-video' :
                                         siteSettings.article_image_aspect_ratio === '4/3' ? 'aspect-[4/3]' :
@@ -3404,52 +3412,19 @@ export default function App() {
                     // Sub-component: Author Profile & Metadata Box
                     const renderMetadataAndAuthorRow = () => {
                       return (
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4 border-y border-zinc-200/60 dark:border-zinc-800/60 font-sans">
-                          {/* Author details */}
-                          {(siteSettings.article_meta_author_enabled !== false) && (
-                            <div className="flex items-center gap-3.5">
-                              <img 
-                                src={authorObj.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"} 
-                                alt={authorObj.name} 
-                                className="w-11 h-11 rounded-full object-cover ring-2 ring-white dark:ring-zinc-800 shadow-md shadow-black/10 shrink-0"
-                                referrerPolicy="no-referrer"
-                              />
-                              <div>
-                                <strong className="block text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm font-serif font-bold tracking-wide leading-tight">
-                                  {authorObj.name}
-                                </strong>
-                                <span className="text-[9px] sm:text-[10px] text-rose-500/90 dark:text-rose-400/80 block mt-1 font-sans font-bold uppercase tracking-[0.16em] leading-none">
-                                  {authorObj.role_tag || authorObj.role || 'Relationship & Wellness Expert'}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Right: Date and Reading Time */}
-                          {(siteSettings.article_meta_updated_date_enabled === true) && (activeArticle as any).updated_date && (
-                            <span className="flex items-center gap-1.5" title="Content actively vetted and revised">
-                              <RefreshCw className="w-3.5 h-3.5" />
-                              Updated {new Date((activeArticle as any).updated_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </span>
-                          )}
-                          {(siteSettings.article_meta_categories_enabled === true) && matchedCat && (
-                            <button
-                              type="button"
-                              onClick={() => navigateTo('category', matchedCat.slug)}
-                              className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors"
-                            >
-                              {matchedCat.name}
-                            </button>
-                          )}
-                          <div className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-400 dark:text-zinc-500 font-bold sm:text-right">
-                            {(siteSettings.article_meta_date_enabled !== false) && (
-                              <span className="flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5" />
-                                {new Date(activeArticle.publish_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-y border-zinc-200/60 dark:border-zinc-800/60 font-sans">
+                          {/* Left cluster: author, read time, date, freshness, category */}
+                          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-zinc-500 dark:text-zinc-400 text-xs">
+                            {(siteSettings.article_meta_author_enabled !== false) && (
+                              <span className="flex items-center gap-2">
+                                <img
+                                  src={authorObj.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"}
+                                  alt={authorObj.name}
+                                  className="w-6 h-6 rounded-full object-cover ring-1 ring-zinc-200 dark:ring-zinc-700 shrink-0"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <span className="font-semibold text-zinc-700 dark:text-zinc-300">{authorObj.name}</span>
                               </span>
-                            )}
-                            {(siteSettings.article_meta_date_enabled !== false && siteSettings.article_meta_reading_time_enabled !== false) && (
-                              <span className="text-zinc-350 dark:text-zinc-700 select-none">•</span>
                             )}
                             {(siteSettings.article_meta_reading_time_enabled !== false) && (
                               <span className="flex items-center gap-1.5">
@@ -3457,6 +3432,48 @@ export default function App() {
                                 {activeArticle.read_time} min read
                               </span>
                             )}
+                            {(siteSettings.article_meta_date_enabled !== false) && (
+                              <span className="flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5" />
+                                {new Date(activeArticle.publish_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                              </span>
+                            )}
+                            {(siteSettings.article_meta_updated_date_enabled === true) && (activeArticle as any).updated_date && (
+                              <span className="flex items-center gap-1.5" title="Content actively vetted and revised">
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                Updated {new Date((activeArticle as any).updated_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </span>
+                            )}
+                            {(siteSettings.article_meta_categories_enabled === true) && matchedCat && (
+                              <button
+                                type="button"
+                                onClick={() => navigateTo('category', matchedCat.slug)}
+                                className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors"
+                              >
+                                {matchedCat.name}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Right cluster: compact Listen + Share (small round icon buttons, never touching the body) */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <ArticleTTS content={activeArticle.content} compact />
+                            <button
+                              type="button"
+                              onClick={() => setShareMenuOpen((v) => !v)}
+                              className="relative inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 text-xs font-semibold hover:border-rose-400 dark:hover:border-rose-500/60 hover:text-rose-500 transition-all cursor-pointer shadow-sm"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                              Share
+                              {shareMenuOpen && (
+                                <div
+                                  className="absolute right-0 top-full mt-2 z-20 p-3 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ArticleShareRow title={activeArticle.title} compact />
+                                </div>
+                              )}
+                            </button>
                           </div>
                         </div>
                       );
@@ -3491,18 +3508,6 @@ export default function App() {
                             {siteSettings.article_lightbox_enabled !== false && (
                               <div className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm pointer-events-none">
                                 <Maximize2 className="w-3.5 h-3.5" />
-                              </div>
-                            )}
-
-                            {/* Category Badge - Left Overlaid if standard style */}
-                            {matchedCat && articleHeroStyle === 'standard' && (
-                              <div className="absolute top-4 left-4 z-10">
-                                <span 
-                                  className="px-3.5 py-1 rounded-full text-[9px] font-sans font-extrabold tracking-widest text-white uppercase shadow-md backdrop-blur-md"
-                                  style={{ backgroundColor: `${matchedCat.color}dd` || '#CE2B5E' }}
-                                >
-                                  {matchedCat.name}
-                                </span>
                               </div>
                             )}
                           </div>
@@ -3618,18 +3623,17 @@ export default function App() {
 
                         {imgPos === 'top' && renderFeaturedImage()}
 
-                        <div className="space-y-5">
-                          {/* Editorial kicker: rose rule + category eyebrow + read time */}
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <span className="h-px w-10 bg-gradient-to-r from-rose-500/90 to-rose-500/20" aria-hidden="true" />
-                            <span className="text-[10px] sm:text-[11px] font-sans font-extrabold uppercase tracking-[0.22em] text-rose-600 dark:text-rose-400">
-                              {matchedCat ? matchedCat.name : 'Heartsync Journal'}
-                            </span>
-                            <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 select-none" aria-hidden="true" />
-                            <span className="text-[10px] sm:text-[11px] font-mono text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.14em] font-bold">
-                              {activeArticle.read_time} min read
-                            </span>
-                          </div>
+                        <div className="space-y-4">
+                          {/* Category pill badge */}
+                          <span
+                            className="inline-flex px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-sans font-bold uppercase tracking-wider"
+                            style={{
+                              color: matchedCat?.color || '#e11d48',
+                              backgroundColor: matchedCat?.color ? `${matchedCat.color}1a` : 'rgba(225,29,72,0.1)'
+                            }}
+                          >
+                            {matchedCat ? matchedCat.name : 'Heartsync Journal'}
+                          </span>
                           <h1
                             className="font-serif font-black text-[1.9rem] sm:text-5xl md:text-[3.35rem] leading-[1.1] sm:leading-[1.08] tracking-[-0.015em] text-zinc-900 dark:text-white"
                             style={{ textWrap: 'balance' }}
@@ -3637,7 +3641,7 @@ export default function App() {
                             {activeArticle.title}
                           </h1>
                           <p
-                            className="font-serif italic text-zinc-500 dark:text-zinc-400 text-sm sm:text-lg leading-relaxed max-w-3xl border-l-2 border-rose-400/60 pl-4 sm:pl-5"
+                            className="text-zinc-500 dark:text-zinc-400 text-sm sm:text-lg leading-relaxed max-w-3xl"
                             style={{ textWrap: 'pretty' }}
                           >
                             {activeArticle.excerpt}
@@ -3699,10 +3703,6 @@ export default function App() {
                   </div>
 
 
-
-                {/* Listen-to-article player: professional placement below the
-                    header/hero area, above the reading body (moved from page top) */}
-                <ArticleTTS content={activeArticle.content} />
 
                   {/* 4. MAIN ARTICLE GRID: Floating Share Rail, Body, and Sidebar */}
                   {(() => {

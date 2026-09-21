@@ -1,11 +1,14 @@
 import React, { useRef, useState } from 'react';
-import { Volume2, Square, Loader2 } from 'lucide-react';
+import { Volume2, Square, Loader2, VolumeX } from 'lucide-react';
 import { heartsync } from '../store';
 
 /**
  * Article TTS reader  - the server-side /api/tts endpoint (ElevenLabs, with
  * the admin-configured voice) existed but the site never exposed a player.
  * This revives the feature: chunked sequential playback of the article.
+ *
+ * `compact`: small round icon-only button (speaker glyph) for the article
+ * header meta row, so it never touches or shifts the reading body.
  */
 const MAX_CHUNK = 1400; // server caps each synthesis at 1500 chars
 
@@ -33,7 +36,7 @@ function splitIntoChunks(raw: string): string[] {
   return chunks;
 }
 
-export default function ArticleTTS({ content }: { content: string }) {
+export default function ArticleTTS({ content, compact = false }: { content: string; compact?: boolean }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'playing' | 'error'>('idle');
   const [part, setPart] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -82,6 +85,36 @@ export default function ArticleTTS({ content }: { content: string }) {
       setStatus('error');
     }
   };
+
+  if (compact) {
+    const label = status === 'playing' ? 'Stop audio narration' : status === 'error' ? 'Audio narration unavailable' : 'Listen to this article';
+    return (
+      <button
+        type="button"
+        onClick={status === 'error' ? undefined : (status === 'playing' ? stop : start)}
+        disabled={status === 'error'}
+        title={label}
+        aria-label={label}
+        className={`inline-flex items-center justify-center w-8 h-8 rounded-full border shrink-0 transition-all cursor-pointer shadow-sm ${
+          status === 'playing'
+            ? 'bg-rose-500 border-rose-500 text-white'
+            : status === 'error'
+            ? 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-300 dark:text-zinc-600 cursor-not-allowed'
+            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:border-rose-400 dark:hover:border-rose-500/60 hover:text-rose-500'
+        }`}
+      >
+        {status === 'playing' ? (
+          <Square className="w-3.5 h-3.5 fill-current" />
+        ) : status === 'loading' ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500" />
+        ) : status === 'error' ? (
+          <VolumeX className="w-3.5 h-3.5" />
+        ) : (
+          <Volume2 className="w-3.5 h-3.5" />
+        )}
+      </button>
+    );
+  }
 
   if (status === 'error') {
     return (
