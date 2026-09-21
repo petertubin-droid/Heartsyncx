@@ -426,13 +426,13 @@ export default function Header({
 
   let headerStyleClass = "";
   if (headerStyleSetting === 'blur') {
-    headerStyleClass = "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-rose-100/50 dark:border-zinc-800/80";
+    headerStyleClass = "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-rose-100/50 dark:border-zinc-800/80 neon-edge-static";
   } else if (headerStyleSetting === 'solid') {
-    headerStyleClass = "bg-white dark:bg-zinc-950 border-b border-zinc-150 dark:border-zinc-850";
+    headerStyleClass = "bg-white dark:bg-zinc-950 border-b border-zinc-150 dark:border-zinc-850 neon-edge-static";
   } else if (headerStyleSetting === 'transparent') {
     headerStyleClass = "bg-transparent border-transparent";
   } else if (headerStyleSetting === 'banner') {
-    headerStyleClass = "bg-gradient-to-r from-rose-50 to-rose-100/40 dark:from-zinc-950 dark:to-zinc-900 border-b border-rose-200/40 dark:border-zinc-800/80";
+    headerStyleClass = "bg-gradient-to-r from-rose-50 to-rose-100/40 dark:from-zinc-950 dark:to-zinc-900 border-b border-rose-200/40 dark:border-zinc-800/80 neon-edge-static";
   }
 
   const layoutWidthSetting = siteSettings.layout_width || heartsync.getLocalStorage('pn_brand_layout_width', 'contained');
@@ -480,7 +480,7 @@ export default function Header({
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-[#FFF0F2] flex items-center justify-center text-[#CE2B5E] shadow-xs group-hover:scale-105 transition-transform shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#FFF0F2] flex items-center justify-center text-[#CE2B5E] shadow-xs group-hover:scale-105 transition-transform shrink-0 dark:shadow-[0_0_16px_rgba(244,63,94,0.45)]">
                 <Heart className="w-4.5 h-4.5 fill-current" />
               </div>
             )}

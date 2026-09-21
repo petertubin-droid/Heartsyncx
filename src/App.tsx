@@ -1688,13 +1688,19 @@ export default function App() {
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               transition={{ duration: 0.4, ease: 'easeOut' }}
-                              className="relative overflow-hidden rounded-[2.5rem] border border-rose-100/20 p-5 sm:p-12 lg:p-16 transition-all duration-300 shadow-sm"
+                              className="premium-card relative overflow-hidden rounded-[2.5rem] border border-rose-100/20 dark:border-rose-500/25 dark:shadow-[0_0_60px_-14px_rgba(244,63,94,0.28)] p-5 sm:p-12 lg:p-16 transition-all duration-300 shadow-sm"
                               style={{
                                 ...heroBgStyle,
                                 ...textOverrideStyle
                               }}
                             >
-                              {/* Absolute Overlay layer under the content */}
+
+                              {/* Ambient neon orbs (dark mode only) */}
+                              <div className="hidden dark:block absolute inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
+                                <div className="absolute -top-24 -right-16 w-80 h-80 rounded-full bg-rose-500/12 blur-3xl animate-float-soft" />
+                                <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full bg-rose-700/10 blur-3xl animate-float-soft-slow" />
+                              </div>
+                                                          {/* Absolute Overlay layer under the content */}
                               {(bgType === 'overlay' || bgType === 'image') && heroSettings.bg_image_url && (
                                 <div 
                                   className="absolute inset-0 z-0 pointer-events-none transition-all duration-200"
@@ -1713,7 +1719,7 @@ export default function App() {
                                   {/* Heart Announcement Badge */}
                                   {heroSettings.enabled_sections?.badge !== false && finalBadgeText && (
                                     <div 
-                                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FFF0F2] text-[#CE2B5E] text-xs font-bold tracking-wider uppercase rounded-full shadow-xs"
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FFF0F2] dark:bg-rose-500/10 text-[#CE2B5E] text-xs font-bold tracking-wider uppercase rounded-full shadow-xs dark:border dark:border-rose-500/30 dark:shadow-[0_0_16px_rgba(244,63,94,0.35)]"
                                       style={badgeStyle}
                                     >
                                       <Heart className="w-3.5 h-3.5" />
@@ -1729,7 +1735,7 @@ export default function App() {
                                     >
                                       {finalTitle.includes("Hearts") ? (
                                         <>
-                                          Helping <span className="text-[#CE2B5E] underline decoration-rose-300 decoration-wavy underline-offset-4">Hearts</span><br className="hidden sm:inline" />
+                                          Helping <span className="text-[#CE2B5E] dark:text-rose-400 underline decoration-rose-300 decoration-wavy underline-offset-4 dark:neon-text">Hearts</span><br className="hidden sm:inline" />
                                           {finalTitle.replace("Helping Hearts", "").trim()}
                                         </>
                                       ) : (
@@ -1754,7 +1760,7 @@ export default function App() {
                                       {finalButtonText && (
                                         <button 
                                           onClick={() => navigateTo(finalButtonUrl)}
-                                          className="w-full sm:w-auto px-5 sm:px-7 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-white text-[10px] sm:text-xs font-extrabold font-sans tracking-wide uppercase shadow-lg shadow-rose-250/20 hover:scale-102 transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+                                          className="w-full sm:w-auto px-5 sm:px-7 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-white text-[10px] sm:text-xs font-extrabold font-sans tracking-wide uppercase shadow-lg shadow-rose-250/20 hover:scale-102 hover:shadow-[0_0_28px_rgba(244,63,94,0.55)] transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
                                           style={{
                                             backgroundColor: heroSettings.primary_btn_bg || '#CE2B5E',
                                             color: heroSettings.primary_btn_text || '#ffffff'
@@ -1812,7 +1818,7 @@ export default function App() {
                                 {isMediaEnabled && (
                                   <div className="col-span-12 lg:col-span-5 relative">
                                     <div className="absolute -inset-1.5 bg-gradient-to-tr from-[#CE2B5E]/20 to-[#FFA5B5]/20 rounded-[3rem] blur-lg opacity-80" />
-                                    <div className="relative overflow-hidden aspect-[4/5] rounded-[2.5rem] bg-zinc-100 dark:bg-zinc-900 w-full shadow-xl">
+                                    <div className="relative overflow-hidden aspect-[4/5] rounded-[2.5rem] bg-zinc-100 dark:bg-zinc-900 w-full shadow-xl dark:border dark:border-rose-500/30 dark:shadow-[0_0_45px_-10px_rgba(244,63,94,0.35)]">
                                       <HeartsyncImage 
                                         src={finalImageUrl} 
                                         alt={finalTitle} 
@@ -1920,7 +1926,7 @@ export default function App() {
                               initial={{ opacity: 0, y: 15 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ duration: 0.5, ease: 'easeOut' }}
-                              className="relative overflow-hidden rounded-[2rem] border border-rose-100/10 p-6 sm:p-10 text-left bg-gradient-to-b from-[#FAF5F5] to-white dark:from-zinc-900/60 dark:to-zinc-950 shadow-sm space-y-8"
+                              className="premium-card relative overflow-hidden rounded-[2rem] border border-rose-100/10 dark:border-rose-500/25 dark:shadow-[0_0_45px_-12px_rgba(244,63,94,0.30)] p-6 sm:p-10 text-left bg-gradient-to-b from-[#FAF5F5] to-white dark:from-zinc-900/60 dark:to-zinc-950 shadow-sm space-y-8"
                               style={{ ...heroBgStyle }}
                             >
                               {/* Absolute Overlay layer under the content */}
@@ -1935,12 +1941,13 @@ export default function App() {
                               )}
 
                               {/* Floating subtle ambient glow */}
-                              <div className="absolute top-0 right-0 w-36 h-36 bg-[#CE2B5E]/5 rounded-full blur-2xl pointer-events-none" />
+                              <div className="absolute top-0 right-0 w-36 h-36 bg-[#CE2B5E]/8 rounded-full blur-2xl pointer-events-none animate-float-soft" />
+                              <div className="absolute -bottom-16 -left-10 w-48 h-48 bg-rose-500/8 rounded-full blur-3xl pointer-events-none dark:block hidden animate-float-soft-slow" />
 
                               {/* Heart Announcement Badge */}
                               {heroSettings.enabled_sections?.badge !== false && finalBadgeText && (
                                 <div 
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFF0F2] text-[#CE2B5E] text-[10px] font-bold tracking-wider uppercase rounded-full shadow-xs w-fit"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFF0F2] dark:bg-rose-500/10 text-[#CE2B5E] text-[10px] font-bold tracking-wider uppercase rounded-full shadow-xs w-fit dark:border dark:border-rose-500/30 dark:shadow-[0_0_16px_rgba(244,63,94,0.35)]"
                                   style={badgeStyle}
                                 >
                                   <Heart className="w-3 h-3 fill-[#CE2B5E]" />
@@ -1957,7 +1964,7 @@ export default function App() {
                                   >
                                     {finalTitle.includes("Hearts") ? (
                                       <>
-                                        Helping <span className="text-[#CE2B5E] underline decoration-rose-300 decoration-wavy underline-offset-4">Hearts</span><br />
+                                        Helping <span className="text-[#CE2B5E] dark:text-rose-400 underline decoration-rose-300 decoration-wavy underline-offset-4 dark:neon-text">Hearts</span><br />
                                         {finalTitle.replace("Helping Hearts", "").trim()}
                                       </>
                                     ) : (
@@ -1978,7 +1985,7 @@ export default function App() {
 
                               {/* Hero Image / Spotlight with aspect ratio */}
                               {isMediaEnabled && (
-                                <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-900 shadow-md">
+                                <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-900 shadow-md dark:border dark:border-rose-500/30 dark:shadow-[0_0_35px_-10px_rgba(244,63,94,0.35)]">
                                   <HeartsyncImage 
                                     src={finalImageUrl} 
                                     alt={finalTitle} 
@@ -3263,10 +3270,13 @@ export default function App() {
             {currentTab === 'articles' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <div className="col-span-12 lg:col-span-8 space-y-8">
-                  <div className="pb-4 border-b border-zinc-150 dark:border-zinc-800">
-                    <span className="text-[10px] font-mono tracking-widest text-[#F43F5E] block uppercase font-bold">Comprehensive Database</span>
-                    <h1 className="font-serif font-bold text-3xl text-zinc-900 dark:text-white mt-1">Heartsync Wellness Journals</h1>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500 font-sans mt-0.5">Explore our human-centered catalog tracking emotional resilience, relationship advice, schema mappings and active lifestyle content.</p>
+                  <div className="pb-5 border-b border-zinc-150 dark:border-zinc-800 dark:border-rose-500/15">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-sans tracking-widest text-[#CE2B5E] uppercase font-bold">
+                      <span className="w-6 h-[2px] bg-rose-500 rounded-full" />
+                      The Journal
+                    </span>
+                    <h1 className="font-serif font-bold text-3xl sm:text-4xl text-zinc-900 dark:text-white mt-2 tracking-tight">Heartsync Wellness Journals</h1>
+                    <p className="text-xs sm:text-sm text-zinc-400 dark:text-zinc-500 font-sans mt-1.5 max-w-xl leading-relaxed">Expert essays on emotional resilience, attachment, and relationship wellness — written by clinicians, curated with care.</p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

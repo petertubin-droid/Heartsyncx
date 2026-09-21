@@ -339,3 +339,75 @@ html.dark, html.dark body {
 .article-headings-sans h1, .article-headings-sans h2, .article-headings-sans h3, .article-headings-sans h4 {
   font-family: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
 }
+
+/* ============================================================
+   PREMIUM POLISH + NEON DARK-MODE TOOLKIT (2026-09-21)
+   Rose neon edge treatments, glow text, floating orbs,
+   shine-sweep cards and scroll reveal animations.
+   ============================================================ */
+
+/* Neon edge: glowing rose border for interactive dark-mode cards */
+.dark .neon-edge {
+  border-color: rgba(244, 63, 94, 0.28) !important;
+  box-shadow:
+    0 0 0 1px rgba(244, 63, 94, 0.08),
+    0 0 18px -2px rgba(244, 63, 94, 0.22),
+    inset 0 0 24px -12px rgba(244, 63, 94, 0.15);
+  transition: box-shadow 0.35s ease, border-color 0.35s ease;
+}
+.dark .neon-edge:hover {
+  border-color: rgba(244, 63, 94, 0.55) !important;
+  box-shadow:
+    0 0 0 1px rgba(244, 63, 94, 0.18),
+    0 0 28px -2px rgba(244, 63, 94, 0.38),
+    inset 0 0 28px -10px rgba(244, 63, 94, 0.22);
+}
+
+/* Static neon edge: non-hover surfaces (header, hero frame) */
+.dark .neon-edge-static {
+  border-color: rgba(244, 63, 94, 0.22) !important;
+  box-shadow: 0 1px 24px -6px rgba(244, 63, 94, 0.18);
+}
+
+/* Glowing headline text (dark mode only) */
+.dark .neon-text {
+  text-shadow:
+    0 0 12px rgba(244, 63, 94, 0.55),
+    0 0 36px rgba(244, 63, 94, 0.22);
+}
+
+/* Soft floating orbs for hero ambience */
+@keyframes float-soft {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(14px, -18px) scale(1.07); }
+  66%      { transform: translate(-12px, 12px) scale(0.95); }
+}
+.animate-float-soft      { animation: float-soft 14s ease-in-out infinite; }
+.animate-float-soft-slow { animation: float-soft 22s ease-in-out infinite; }
+
+/* Light-sweep across premium cards on hover */
+.premium-card { position: relative; overflow: hidden; }
+.premium-card::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 45%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.30), transparent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-140%) skewX(-18deg);
+}
+.premium-card:hover::after { opacity: 1; animation: shine-sweep 0.9s ease; }
+@keyframes shine-sweep {
+  from { transform: translateX(-140%) skewX(-18deg); }
+  to   { transform: translateX(340%)  skewX(-18deg); }
+}
+.dark .premium-card::after {
+  background: linear-gradient(105deg, transparent, rgba(244, 63, 94, 0.13), transparent);
+}
+
+/* Accessibility: respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-soft, .animate-float-soft-slow { animation: none; }
+  .premium-card::after { display: none; }
+}

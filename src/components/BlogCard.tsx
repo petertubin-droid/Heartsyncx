@@ -48,9 +48,9 @@ export default function BlogCard({ post, onClick, onNavigate, layout = 'vertical
   const cardStyleSetting = heartsync.site_settings.card_style || 'standard';
 
   const styleClasses = {
-    standard: "bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 hover:border-rose-200 dark:hover:border-rose-900/50 hover:shadow-lg transition-all duration-300",
-    minimal: "bg-zinc-50/50 dark:bg-zinc-900/40 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 hover:bg-white dark:hover:bg-zinc-900 transition-all duration-300",
-    glass: "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-zinc-200/50 dark:border-zinc-800 shadow-sm transition-all duration-300",
+    standard: "bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 hover:border-rose-200 dark:hover:border-rose-500/40 dark:hover:shadow-[0_0_30px_-8px_rgba(244,63,94,0.35)] hover:shadow-lg transition-all duration-300",
+    minimal: "bg-zinc-50/50 dark:bg-zinc-900/40 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 hover:bg-white dark:hover:bg-zinc-900 dark:hover:border-rose-500/25 transition-all duration-300",
+    glass: "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-zinc-200/50 dark:border-zinc-800/80 dark:hover:border-rose-500/35 dark:hover:shadow-[0_0_30px_-8px_rgba(244,63,94,0.35)] shadow-sm transition-all duration-300",
     borderless: "bg-transparent rounded-none border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50/20 dark:hover:bg-zinc-900/10 transition-all duration-300"
   };
 
@@ -59,6 +59,10 @@ export default function BlogCard({ post, onClick, onNavigate, layout = 'vertical
   if (layout === 'horizontal') {
     return (
       <MotionCard 
+        initial={{ opacity: 0, y: 18 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-30px' }}
+        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         whileHover={{ y: -4 }}
         onClick={onClick}
         className={`group flex flex-col md:flex-row h-full overflow-hidden cursor-pointer transition-all duration-300 ${activeCardClass}`}
@@ -162,6 +166,10 @@ export default function BlogCard({ post, onClick, onNavigate, layout = 'vertical
 
   return (
     <MotionCard 
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-30px' }}
+      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -6 }}
       onClick={onClick}
       className={`group flex flex-col h-full overflow-hidden cursor-pointer transition-all duration-300 ${activeCardClass}`}

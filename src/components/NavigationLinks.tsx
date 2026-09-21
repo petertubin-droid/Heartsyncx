@@ -99,12 +99,12 @@ export default function NavigationLinks({
     } else {
       if (isTabActive) {
         return { 
-          className: `${baseLinkClass} font-semibold border-b-2 pb-1 px-1`,
-          style: textColor ? { color: textColor, borderBottomColor: textColor } : { color: '#f43f5e', borderBottomColor: '#f43f5e' }
+          className: `${baseLinkClass} font-semibold px-3 py-1.5 rounded-full bg-rose-500/10 dark:bg-rose-500/15 dark:shadow-[0_0_14px_rgba(244,63,94,0.22)]`,
+          style: textColor ? { color: textColor } : { color: '#f43f5e' }
         };
       }
       return { 
-        className: `${baseLinkClass} text-zinc-600 dark:text-zinc-350 hover:text-rose-500 pb-1 px-1`,
+        className: `${baseLinkClass} text-zinc-600 dark:text-zinc-350 hover:text-rose-500 px-3 py-1.5 rounded-full hover:bg-rose-500/5 dark:hover:bg-rose-500/10`,
         style: textColor ? { color: textColor + 'cc' } : undefined
       };
     }
