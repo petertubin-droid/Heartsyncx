@@ -6941,11 +6941,17 @@ async function registerProductionRoutes() {
   // platform at runtime. Falling back to the Vite dev middleware there would
   // import 'vite' (a devDependency) that is NOT traced into the serverless
   // bundle and crash every invocation with MODULE_NOT_FOUND.
-  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.VERCEL || fs.existsSync(path.join(process.cwd(), 'dist'));
+  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.VERCEL || !!process.env.NETLIFY || fs.existsSync(path.join(process.cwd(), 'dist'));
   if (!isProduction) {
-    // Inject Vite middleware inside Dev sandboxes. Lazy import: keeps Vite
-    // out of the serverless bundle (only the dev sandbox ever loads it).
-    const { createServer: createViteServer } = await import('vite');
+    // Inject Vite middleware inside Dev sandboxes ONLY. Both Netlify's
+    // esbuild function bundler and Vercel's ncc bundler statically trace a
+    // literal `import('vite')` and try to resolve vite's own optional
+    // transitive deps (e.g. @vitejs/devtools/config) at BUILD time, even
+    // though this branch never runs in either serverless environment. A
+    // Function-constructed import hides the specifier from static analysis
+    // so neither bundler ever attempts to trace or bundle vite.
+    const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<typeof import('vite')>;
+    const { createServer: createViteServer } = await dynamicImport('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
