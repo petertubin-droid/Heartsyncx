@@ -229,3 +229,45 @@ Post-migration verification (all checked live):
   dev origin (needs an ad-network/script-inventory decision before tightening).
 - H-09: subscriptions/payments must never be serialized into public GET /api/state —
   currently empty only because RLS blocks anon reads; enforce explicitly in Phase 3.
+
+## AUTH / LOGIN AUDIT (2026-09-21) — root causes found + fixed
+
+User report: email signup creates no account, Google sign-in creates no account,
+admin cannot log in. Findings, verified live against the Hearty project
+(pdtibsfasvicjptqirro) and the https://heartsyncxhub.vercel.app deployment:
+
+- **BLOCKER: the /api serverless function crashed on EVERY invocation**
+  (500 FUNCTION_INVOCATION_FAILED). The api/index.ts + vercel.json entrypoint
+  (58b3382) had never deployed before — its build was broken (includeFiles
+  schema) until the c2fcc61 fix, so the first successful deploy ran it cold.
+  Every auth flow dies here: /api/auth/sync-profile 500s right after a
+  successful Supabase sign-in, so the client signs the user back out.
+  Fixes (commit b511558):
+  1. api/index.ts catches boot/register failures and answers a visible 500
+     JSON with the error detail — a rejected handler promise was rendering
+     as an opaque FUNCTION_INVOCATION_FAILED on every route.
+  2. server.ts isProduction now includes `!!process.env.VERCEL` — the dev
+     branch `await import('vite')` runs in the lambda only if NODE_ENV is
+     unset AND dist/ is absent; vite is a devDependency that is never traced
+     into the bundle → MODULE_NOT_FOUND at cold start.
+- **Supabase Auth: Confirm email is now OFF** (mailer_autoconfirm=true, set
+  via Management API 2026-09-21). No SMTP was configured, so confirmation
+  emails never arrived — every new signup sat unconfirmed and could never
+  sign in. Signups now get an immediate session.
+- **admin@heartsync.app repaired**: created 2026-07-24 via the setup wizard,
+  which died at the unconfirmed-email step (so the account stayed
+  email_confirmed_at NULL and role subscriber). Email confirmed + role
+  promoted to admin in the DB (2026-09-21), completing the wizard's intent.
+  petertubin@gmail.com was already admin and confirmed.
+- **Google OAuth verified live**: the authorize endpoint redirects to the
+  Google consent page (no redirect_uri_mismatch) — client
+  66066586618-...apps.googleusercontent.com has
+  https://pdtibsfasvicjptqirro.supabase.co/auth/v1/callback registered, and
+  site/redirect host heartsyncxhub.vercel.app is valid. Google sign-in was
+  "not creating accounts" purely because the post-OAuth /api/auth/sync-profile
+  call hit the crashed function (blocker above).
+- **POST-DEPLOY CHECKLIST** (owner deploys b511558 on Vercel):
+  1. GET /api/health → 200 JSON (not FUNCTION_INVOCATION_FAILED)
+  2. email signup → immediate session, profile visible in admin console
+  3. admin login at /admin with admin@heartsync.app
+  4. Google sign-in roundtrip → account + profile created
