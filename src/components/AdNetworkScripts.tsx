@@ -15,7 +15,7 @@ import { useCookieConsent } from './useCookieConsent';
  *   zone id is provided, the standard MultiTag loader shape is used.
  * - Adsterra: one snippet field per site-wide format
  *   (adsterra_popunder_script, adsterra_social_bar_script,
- *   adsterra_interstitial_script, adsterra_inpage_push_script) — paste each
+ *   adsterra_interstitial_script, adsterra_inpage_push_script)  - paste each
  *   format's code from the dashboard.
  *
  * Everything is consent-gated: nothing injects until the visitor has
@@ -57,7 +57,7 @@ export const AdNetworkScripts: React.FC = () => {
   const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
   const shouldInject = hasConsented && marketingConsent && (hasConsented) && (monetagSnippet || adsterraSnippets.length > 0);
 
-  // Revived feature: adsense_auto_script — the site-owner's own AdSense
+  // Revived feature: adsense_auto_script  - the site-owner's own AdSense
   // loader snippet, injected on mount WITHOUT a consent gate (the loader is
   // the site's own ad infrastructure; the ad units inside AdPlacement still
   // honor consent and serve non-personalized ads without marketing consent).
@@ -76,7 +76,7 @@ export const AdNetworkScripts: React.FC = () => {
         document.head.appendChild(fresh);
       });
     } catch {
-      // Malformed snippet — do nothing rather than break the page.
+      // Malformed snippet  - do nothing rather than break the page.
     }
   }, [version]);
 
@@ -88,7 +88,7 @@ export const AdNetworkScripts: React.FC = () => {
       try {
         const doc = new DOMParser().parseFromString(html, 'text/html');
         // A bare <script src=...> snippet parses into the parsed doc's <head>
-        // (HTML parsing rules), so scan BOTH containers — body-only missed the
+        // (HTML parsing rules), so scan BOTH containers  - body-only missed the
         // single-script format that network dashboards emit most often.
         const targets = [...doc.head.querySelectorAll('script'), ...doc.body.querySelectorAll('script')];
         targets.forEach((old) => {
@@ -105,7 +105,7 @@ export const AdNetworkScripts: React.FC = () => {
           });
         }
       } catch {
-        // Malformed snippet — do nothing rather than break the page.
+        // Malformed snippet  - do nothing rather than break the page.
       }
     };
 

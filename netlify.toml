@@ -1,12 +1,12 @@
 # Netlify build config.
 #
 # Secrets scanning false positive: SUPABASE_ANON_KEY / SUPABASE_URL (and
-# their VITE_ aliases) are Supabase's PUBLIC anon key and project URL —
+# their VITE_ aliases) are Supabase's PUBLIC anon key and project URL - 
 # by design they are inlined into the client bundle (dist/assets/*.js) so
 # the browser can talk to Supabase. Netlify's secrets scanner still flags
 # any configured env var whose literal value appears in the build output,
 # even intentionally-public ones, so we omit exactly these four from the
-# scan. Nothing else is omitted — verified via a real build with stand-in
+# scan. Nothing else is omitted  - verified via a real build with stand-in
 # fake secrets that GEMINI_API_KEY, SUPABASE_SERVICE_ROLE_KEY,
 # STRIPE_SECRET_KEY, PAYSTACK_SECRET_KEY and RESEND_API_KEY never appear
 # in dist/. Those stay unlisted here on purpose: if one of them ever shows
@@ -37,7 +37,7 @@
 # paths that match real static files in dist/, so hashed assets and any
 # prerendered pages are still served straight off the CDN. The three
 # specific prefixes are listed first for clarity; the trailing "/*" is the
-# REQUIRED catch-all — without it, client-side-only routes with no static
+# REQUIRED catch-all  - without it, client-side-only routes with no static
 # file on disk (e.g. /admin, /login, /faq, /lovevault, /ai-copilot) have no
 # matching redirect at all and Netlify serves its own platform 404 instead
 # of falling through to the app (this was the actual bug: /admin 404'd).

@@ -30,7 +30,7 @@ export function getArticleSeoData(slug: string, title: string): ArticleSeoAdditi
         },
         {
           question: "What is the first step in healing an insecure attachment style?",
-          answer: "The first step is awareness and self-compassion. Recognizing your triggers—such as the urge to cling or the instinct to bolt—without judgment allows you to pause. Pausing gives you the space to regulate your nervous system somatically before responding reactively."
+          answer: "The first step is awareness and self-compassion. Recognizing your triggers - such as the urge to cling or the instinct to bolt - without judgment allows you to pause. Pausing gives you the space to regulate your nervous system somatically before responding reactively."
         }
       ],
       takeaways: [
@@ -51,7 +51,7 @@ export function getArticleSeoData(slug: string, title: string): ArticleSeoAdditi
         },
         {
           question: "How do you reframe a first date to avoid the 'job interview' feel?",
-          answer: "Instead of running through a checklist of credentials, focus on mutual presence. Ask open-ended questions about values, passions, and emotional landscapes, rather than career progression. Treat the date as a shared somatic experience—such as taking a walk or exploring a gallery—rather than an interrogation."
+          answer: "Instead of running through a checklist of credentials, focus on mutual presence. Ask open-ended questions about values, passions, and emotional landscapes, rather than career progression. Treat the date as a shared somatic experience - such as taking a walk or exploring a gallery - rather than an interrogation."
         },
         {
           question: "What digital boundaries are essential when early dating?",
@@ -72,7 +72,7 @@ export function getArticleSeoData(slug: string, title: string): ArticleSeoAdditi
       faq: [
         {
           question: "What is somatic grounding in couples connection?",
-          answer: "Somatic grounding involves using body-based mindfulness practices—like deep breathing, posture adjustment, and tactile focus—to stabilize the nervous system during relational distress. When partners are grounded, they can exit the fight-or-flight response and access their relational brain."
+          answer: "Somatic grounding involves using body-based mindfulness practices - like deep breathing, posture adjustment, and tactile focus - to stabilize the nervous system during relational distress. When partners are grounded, they can exit the fight-or-flight response and access their relational brain."
         },
         {
           question: "What is co-regulation and how does it heal trauma?",
@@ -111,7 +111,7 @@ export function getArticleSeoData(slug: string, title: string): ArticleSeoAdditi
       takeaways: [
         "Relational boundaries are bridges, not walls; they instruct your partner on how to love and respect you safely.",
         "Upgraded I-statements reveal vulnerability instead of criticism, turning defensiveness into compassionate connection.",
-        "Differentiation—retaining your individual self within the union—is crucial to maintaining long-term attraction."
+        "Differentiation - retaining your individual self within the union - is crucial to maintaining long-term attraction."
       ]
     };
   }

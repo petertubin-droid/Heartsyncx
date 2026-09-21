@@ -10,7 +10,7 @@ export const MORE_CATEGORIES: Category[] = [
     color: '#E11D48',
     icon: 'Heart',
     featured_image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Love & Relationships — Insights for Deeper Intimacy',
+    seo_title: 'Love & Relationships  - Insights for Deeper Intimacy',
     seo_description: 'Discover research-backed principles for deepening emotional connection, nurturing trust, and building enduring love.',
     seo_keywords: ['love', 'relationships', 'intimacy', 'partnership', 'commitment']
   },
@@ -22,7 +22,7 @@ export const MORE_CATEGORIES: Category[] = [
     color: '#D97706',
     icon: 'Heart',
     featured_image: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Dating & Romance — Mindful Approaches to Modern Courtship',
+    seo_title: 'Dating & Romance  - Mindful Approaches to Modern Courtship',
     seo_description: 'Learn how to approach dating with clarity, build authentic romance, and recognize early compatibility indicators.',
     seo_keywords: ['dating', 'romance', 'courtship', 'singles', 'chemistry', 'dating advice']
   },
@@ -34,7 +34,7 @@ export const MORE_CATEGORIES: Category[] = [
     color: '#2563EB',
     icon: 'MessageCircle',
     featured_image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Communication & Emotional Connection — Speak from the Heart',
+    seo_title: 'Communication & Emotional Connection  - Speak from the Heart',
     seo_description: 'Effective communication tools to help partners express needs, listen deeply, and cultivate lasting emotional closeness.',
     seo_keywords: ['communication', 'emotional connection', 'active listening', 'vulnerability', 'conflict resolution']
   },
@@ -46,7 +46,7 @@ export const MORE_CATEGORIES: Category[] = [
     color: '#7C3AED',
     icon: 'ShieldAlert',
     featured_image: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Relationship Problems & Breakups — Healing and Recovery',
+    seo_title: 'Relationship Problems & Breakups  - Healing and Recovery',
     seo_description: 'Supportive perspectives on working through complex relationship challenges, processing breakups, and restoring inner peace.',
     seo_keywords: ['breakups', 'relationship problems', 'heartbreak', 'healing', 'closure', 'recovery']
   },
@@ -58,7 +58,7 @@ export const MORE_CATEGORIES: Category[] = [
     color: '#059669',
     icon: 'UserCheck',
     featured_image: 'https://images.unsplash.com/photo-1499209974431-9dac3ada00d7?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Self Love & Personal Growth — Becoming Your Best Self',
+    seo_title: 'Self Love & Personal Growth  - Becoming Your Best Self',
     seo_description: 'Inspirational guidance on building self-compassion, emotional resilience, and an authentic relationship with yourself.',
     seo_keywords: ['self love', 'personal growth', 'self care', 'mindfulness', 'emotional resilience']
   }
@@ -72,7 +72,13 @@ export const MORE_POSTS: Post[] = [
     title: 'The Art of Mindful Love: Cultivating Lasting Intimacy in Modern Relationships',
     slug: 'art-of-mindful-love-cultivating-lasting-intimacy',
     excerpt: 'True intimacy is not a static destination, but a ongoing practice of presence, emotional attunement, and gentle curiosity between two evolving partners.',
-    content: `
+        in_article_inserts: {
+      insight: { id: 'insight', title: 'Key Insight', enabled: true, placementPercent: 12, content: "\"To be loved is to be seen. To be mindfully loved is to feel that your internal world matters deeply to the person sitting across from you.\"" },
+      reflection: { id: 'reflection', title: 'Pause & Reflect', enabled: true, placementPercent: 50, content: "Where does the pattern in \"The Art of Mindful Love: Cultivating Lasting Intimacy in Modern Relationships\" show up in your own relationship this week? Name one concrete moment, either out loud or on paper." },
+      tip: { id: 'tip', title: 'Practice Tip', enabled: true, placementPercent: 75, content: "What am I feeling right now in my body?" }
+    },
+
+content: `
 # The Art of Mindful Love: Cultivating Lasting Intimacy in Modern Relationships
 
 In our fast-paced modern world, relationships are frequently subjected to intense schedules, digital distractions, and implicit pressures to remain constantly productive. Amidst this flurry of everyday demands, romantic partnerships can easily shift from sanctuary to logistics management.
@@ -93,7 +99,7 @@ When partners practice emotional presence, small everyday interactions transform
 
 ## 2. Differentiating Reactivity from Response
 
-In long-term relationships, triggers inevitably surface. When old emotional wounds are bumped into, the habitual reaction is defensive self-protection—whether through stonewalling, criticism, or withdrawal.
+In long-term relationships, triggers inevitably surface. When old emotional wounds are bumped into, the habitual reaction is defensive self-protection - whether through stonewalling, criticism, or withdrawal.
 
 Mindfulness creates a crucial pause between stimulus and response. In that brief space, you can ask yourself:
 * *What am I feeling right now in my body?*
@@ -139,7 +145,12 @@ A healthy repair attempt does not require perfection; it requires humility. Ackn
     title: 'Navigating Modern Dating: How to Move from Chemistry to Compatible Connection',
     slug: 'navigating-modern-dating-chemistry-to-compatibility',
     excerpt: 'While initial spark and electric chemistry can feel intoxicating, long-term romantic fulfillment depends on underlying values alignment and mutual emotional maturity.',
-    content: `
+        in_article_inserts: {
+      insight: { id: 'insight', title: 'Key Insight', enabled: true, placementPercent: 12, content: "Modern dating apps and speed-of-light romantic options have made it easier than ever to meet new people. Yet, many singles find themselves stuck in a frustrating loop of rapid excitement followed by abrupt disappointment." },
+      reflection: { id: 'reflection', title: 'Pause & Reflect', enabled: true, placementPercent: 50, content: "Where does the pattern in \"Navigating Modern Dating: How to Move from Chemistry to Compatible Connection\" show up in your own relationship this week? Name one concrete moment, either out loud or on paper." }
+    },
+
+content: `
 # Navigating Modern Dating: How to Move from Chemistry to Compatible Connection
 
 Modern dating apps and speed-of-light romantic options have made it easier than ever to meet new people. Yet, many singles find themselves stuck in a frustrating loop of rapid excitement followed by abrupt disappointment.
@@ -196,11 +207,17 @@ Pay close attention to how your body feels after spending time with someone. Do 
     id: 'post-3',
     title: 'Breaking the Silence: How Active Listening & Emotional Vulnerability Transform Partnerships',
     slug: 'breaking-silence-active-listening-emotional-vulnerability',
-    excerpt: 'Effective communication in relationships goes far beyond speaking clearly—it requires creating a safe, non-judgmental space where both partners feel truly heard.',
-    content: `
+    excerpt: 'Effective communication in relationships goes far beyond speaking clearly - it requires creating a safe, non-judgmental space where both partners feel truly heard.',
+        in_article_inserts: {
+      insight: { id: 'insight', title: 'Key Insight', enabled: true, placementPercent: 12, content: "Most relationship disputes are rarely about the superficial topic on the surface - whether that is unwashed dishes, busy schedules, or weekend plans. At their core, most conflicts center around deeper underlying emotional questions: *\"Do you see me? Do my feelings matter to you? Am I safe with you?\"*" },
+      reflection: { id: 'reflection', title: 'Pause & Reflect', enabled: true, placementPercent: 50, content: "Where does the pattern in \"Breaking the Silence: How Active Listening & Emotional Vulnerability Transform Partnerships\" show up in your own relationship this week? Name one concrete moment, either out loud or on paper." },
+      tip: { id: 'tip', title: 'Practice Tip', enabled: true, placementPercent: 75, content: "You slow down the dialogue." }
+    },
+
+content: `
 # Breaking the Silence: How Active Listening & Emotional Vulnerability Transform Partnerships
 
-Most relationship disputes are rarely about the superficial topic on the surface—whether that is unwashed dishes, busy schedules, or weekend plans. At their core, most conflicts center around deeper underlying emotional questions: *"Do you see me? Do my feelings matter to you? Am I safe with you?"*
+Most relationship disputes are rarely about the superficial topic on the surface - whether that is unwashed dishes, busy schedules, or weekend plans. At their core, most conflicts center around deeper underlying emotional questions: *"Do you see me? Do my feelings matter to you? Am I safe with you?"*
 
 Mastering communication requires shifting from defending your position to understanding your partner's emotional reality.
 
@@ -253,7 +270,13 @@ Try saying: *"I felt disappointed when our dinner plans changed because I was re
     title: 'Healing After Heartbreak: Rebuilding Trust, Boundaries, and Emotional Clarity',
     slug: 'healing-after-heartbreak-rebuilding-trust-boundaries',
     excerpt: 'The end of a relationship can feel like an emotional earthquake, but with self-compassion and intentional boundary setting, it becomes a powerful doorway to self-discovery.',
-    content: `
+        in_article_inserts: {
+      insight: { id: 'insight', title: 'Key Insight', enabled: true, placementPercent: 12, content: "Heartbreak is one of the most intense emotional experiences a human can navigate. Whether a breakup was long in the making or unexpected, the loss of a shared future alters your daily rhythms, sense of identity, and emotional landscape." },
+      reflection: { id: 'reflection', title: 'Pause & Reflect', enabled: true, placementPercent: 50, content: "Where does the pattern in \"Healing After Heartbreak: Rebuilding Trust, Boundaries, and Emotional Clarity\" show up in your own relationship this week? Name one concrete moment, either out loud or on paper." },
+      tip: { id: 'tip', title: 'Practice Tip', enabled: true, placementPercent: 75, content: "Reconnect with Old Passions: Revisit hobbies, creative projects, or interests you may have put aside." }
+    },
+
+content: `
 # Healing After Heartbreak: Rebuilding Trust, Boundaries, and Emotional Clarity
 
 Heartbreak is one of the most intense emotional experiences a human can navigate. Whether a breakup was long in the making or unexpected, the loss of a shared future alters your daily rhythms, sense of identity, and emotional landscape.
@@ -266,7 +289,7 @@ Healing from heartbreak is neither linear nor instantaneous, but it is entirely 
 
 Breakups trigger genuine grief. You are not only mourning the loss of a person's presence in your daily life, but also the loss of shared dreams, habits, and future expectations.
 
-Allow yourself to experience the natural emotional waves—sadness, anger, confusion, and longing—without judging yourself for having them. Trying to rush or suppress these feelings often prolongs emotional pain.
+Allow yourself to experience the natural emotional waves - sadness, anger, confusion, and longing - without judging yourself for having them. Trying to rush or suppress these feelings often prolongs emotional pain.
 
 ---
 
@@ -274,7 +297,7 @@ Allow yourself to experience the natural emotional waves—sadness, anger, confu
 
 In the immediate aftermath of a breakup, maintaining continuous contact often keeps emotional wounds raw and prevents true emotional processing.
 
-Establishing clear boundaries—such as taking a break from social media monitoring, unfollowing or muting profiles, and limiting texting—is not an act of hostility. It is an essential act of self-preservation that gives your brain space to adapt to the new reality.
+Establishing clear boundaries - such as taking a break from social media monitoring, unfollowing or muting profiles, and limiting texting - is not an act of hostility. It is an essential act of self-preservation that gives your brain space to adapt to the new reality.
 
 ---
 
@@ -312,12 +335,17 @@ Heartbreak teaches us profound lessons about what we need, what we can tolerate,
     title: 'Self-Love as the Foundation: Unlocking Healthy Attachment and Personal Fulfillment',
     slug: 'self-love-foundation-healthy-attachment-personal-fulfillment',
     excerpt: 'The quality of your relationship with yourself sets the blueprint for every relationship you build with others. Discover how self-compassion transforms attachment patterns.',
-    content: `
+        in_article_inserts: {
+      insight: { id: 'insight', title: 'Key Insight', enabled: true, placementPercent: 12, content: "We often look outward for validation, comfort, and security, placing the weight of our emotional stability onto romantic partners. However, true security begins within." },
+      reflection: { id: 'reflection', title: 'Pause & Reflect', enabled: true, placementPercent: 50, content: "Where does the pattern in \"Self-Love as the Foundation: Unlocking Healthy Attachment and Personal Fulfillment\" show up in your own relationship this week? Name one concrete moment, either out loud or on paper." }
+    },
+
+content: `
 # Self-Love as the Foundation: Unlocking Healthy Attachment and Personal Fulfillment
 
 We often look outward for validation, comfort, and security, placing the weight of our emotional stability onto romantic partners. However, true security begins within.
 
-When you cultivate deep self-love and self-acceptance, you transform from a place of emotional lack into a place of abundance—allowing you to choose partners out of genuine connection rather than fear of loneliness.
+When you cultivate deep self-love and self-acceptance, you transform from a place of emotional lack into a place of abundance - allowing you to choose partners out of genuine connection rather than fear of loneliness.
 
 ---
 

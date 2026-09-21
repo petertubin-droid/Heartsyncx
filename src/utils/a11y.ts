@@ -16,7 +16,7 @@ const FOCUSABLE_SELECTOR = [
 
 export function getFocusable(container: HTMLElement | null): HTMLElement[] {
   if (!container) return [];
-  // NOTE: no offsetParent/display visibility filtering — jsdom reports no
+  // NOTE: no offsetParent/display visibility filtering  - jsdom reports no
   // layout, and dialogs here never render hidden focusable children.
   return Array.from(
     container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)

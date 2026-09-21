@@ -975,7 +975,7 @@ app.post('/api/gdpr/dsr-requests', rateLimiter(5, 60 * 1000), async (req: Reques
 
   const db = getSupabaseClient();
   if (!db) {
-    res.status(503).json({ error: 'DSR storage is not configured. Your request was NOT saved — please retry.' });
+    res.status(503).json({ error: 'DSR storage is not configured. Your request was NOT saved  - please retry.' });
     return;
   }
 
@@ -1035,7 +1035,7 @@ app.patch('/api/gdpr/dsr-requests/:id', adminAuthMiddleware, async (req: Request
 // =========================================================================
 
 // ============================================================================
-// DIGITAL PRODUCTS — fully database-backed (Supabase). No in-memory stores and
+// DIGITAL PRODUCTS  - fully database-backed (Supabase). No in-memory stores and
 // no fake seeds: the catalog starts empty and admins create real products.
 // Orders are created ONLY by verified payment webhooks (service role); readers
 // redeem downloads exclusively through the token-holding RPC.
@@ -1178,7 +1178,7 @@ app.delete('/api/digital-products/:id', adminAuthMiddleware, async (req: Request
   res.json({ success: true, removed });
 });
 
-// CHECKOUT DIGITAL PRODUCT — opens a real gateway session only. The order and
+// CHECKOUT DIGITAL PRODUCT  - opens a real gateway session only. The order and
 // download token are created exclusively by the VERIFIED payment webhook.
 app.post('/api/digital-products/checkout', async (req: Request, res: Response) => {
   const { productId, userEmail, gateway } = req.body;
@@ -1228,7 +1228,7 @@ app.post('/api/digital-products/checkout', async (req: Request, res: Response) =
   }
 });
 
-// VERIFY AND DOWNLOAD DIGITAL PRODUCT ASSET (token-holding RPC — anonymous
+// VERIFY AND DOWNLOAD DIGITAL PRODUCT ASSET (token-holding RPC  - anonymous
 // users can never enumerate orders; the token IS the capability)
 app.get('/api/digital-products/download/:token', async (req: Request, res: Response) => {
   const { token } = req.params;
@@ -1647,7 +1647,7 @@ Make the output feel deeply empathetic, practical, modern, and human-written. In
 
 // 1.25. Dynamic Article Summarizer
 // ============================================================================
-// AI ADVICE ENGINE — the reader-facing relational guide (HeartSync Copilot)
+// AI ADVICE ENGINE  - the reader-facing relational guide (HeartSync Copilot)
 // Public but rate-limited; degrades honestly when Gemini is not configured.
 // ============================================================================
 
@@ -2495,6 +2495,28 @@ async function resolveGeminiApiKey(invalidateCache: boolean = false): Promise<st
     return cachedDbGeminiApiKey;
   }
 
+  // 1b. Admin AI panel: the Gemini API key entered in the admin console is
+  // stored in integration_settings (is_sensitive)  - readable only via the
+  // service role, never exposed to the anon client or public state payloads.
+  try {
+    const svc = getServiceRoleSupabase();
+    if (svc) {
+      const { data: geminiIntegrationRow } = await svc.from('integration_settings')
+        .select('value')
+        .eq('integration_id', 'gemini')
+        .eq('key', 'apiKey')
+        .limit(1)
+        .maybeSingle();
+      const integrationKey = sanitizeApiKey(geminiIntegrationRow?.value);
+      if (integrationKey && integrationKey !== '' && integrationKey !== 'MY_GEMINI_API_KEY') {
+        cachedDbGeminiApiKey = integrationKey;
+        lastDbGeminiKeyCheck = now;
+        process.env.GEMINI_API_KEY = integrationKey;
+        return integrationKey;
+      }
+    }
+  } catch (_) { /* integration store unavailable  - fall through */ }
+
   // 2. Query Memory serverCacheState first for instantaneous hot setup
   if (serverCacheState?.site_settings?.gemini_api_key) {
     const sKey = sanitizeApiKey(serverCacheState.site_settings.gemini_api_key);
@@ -3244,10 +3266,10 @@ async function loadStateFromSupabase(): Promise<any> {
       sponsorshipCampaignsRes
     ] = await Promise.all([
       // List columns only: content (full article bodies) is fetched per-article
-      // via GET /api/posts/:slug — it no longer ships in the boot payload.
+      // via GET /api/posts/:slug  - it no longer ships in the boot payload.
       queryWithTimeout(supabase.from('posts').select(POST_LIST_COLUMNS.join(',')).order('publish_date', { ascending: false })),
       queryWithTimeout(supabase.from('categories').select('*')),
-      // Public columns only — author_email is PII and never ships in the
+      // Public columns only  - author_email is PII and never ships in the
       // boot payload (RLS already restricts rows to approved comments for
       // the anon-key server client).
       queryWithTimeout(supabase.from('comments').select('id,post_id,author_name,content,is_approved,parent_id,created_at')),
@@ -3636,7 +3658,7 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
             is_approved: cm.is_approved ?? (cm.status ? cm.status === 'approved' : true),
             created_at: cm.created_at || new Date().toISOString()
           };
-          // Upsert only the columns we carry — a boot-state comment (public
+          // Upsert only the columns we carry  - a boot-state comment (public
           // projection) has no email, so leave the stored value untouched
           // instead of overwriting it with an empty string.
           const email = cm.author_email || cm.user_email || cm.authorEmail;
@@ -4662,7 +4684,7 @@ async function saveServerCacheState(newState: any, dbClient?: any) {
 // FIRST-RUN SETUP WIZARD SECURE ENDPOINTS
 // --------------------------------------------------------
 // ============================================================================
-// REAL PAYMENT GATEWAYS — subscriptions & digital products
+// REAL PAYMENT GATEWAYS  - subscriptions & digital products
 // Checkout sessions are created with live gateway APIs; subscriptions and
 // payments rows are only written after a VERIFIED webhook confirms the charge.
 // ============================================================================
@@ -4824,7 +4846,7 @@ app.post('/api/subscriptions/checkout', async (req: Request, res: Response) => {
   }
 });
 
-// Stripe webhook — event is re-fetched from Stripe so payloads cannot be forged
+// Stripe webhook  - event is re-fetched from Stripe so payloads cannot be forged
 app.post('/api/webhooks/stripe', async (req: Request, res: Response) => {
   const key = cleanConfigValue(process.env.STRIPE_SECRET_KEY);
   if (!key) { res.status(503).json({ received: false, error: 'Stripe is not configured.' }); return; }
@@ -4870,7 +4892,7 @@ app.post('/api/webhooks/stripe', async (req: Request, res: Response) => {
   }
 });
 
-// Paystack webhook — reference is re-verified against the Paystack API
+// Paystack webhook  - reference is re-verified against the Paystack API
 app.post('/api/webhooks/paystack', async (req: Request, res: Response) => {
   const key = cleanConfigValue(process.env.PAYSTACK_SECRET_KEY);
   if (!key) { res.status(503).json({ received: false, error: 'Paystack is not configured.' }); return; }
@@ -5026,7 +5048,7 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
           }
 
           // OWNER RECOVERY (2026-09-21): the email may already exist in Supabase
-          // Auth — most commonly the prior administrator demoted by the 2026-09
+          // Auth  - most commonly the prior administrator demoted by the 2026-09
           // ownership reset, whose auth.user row survives the demotion. When NO
           // administrator exists, this wizard is the designated recovery path:
           // reset the existing auth user's password via the service role and
@@ -5062,7 +5084,7 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
 
           // Check if failure is due to email rate limiting, unconfirmed email, or existing user
           if (userId) {
-            // recovery succeeded above — fall through to first-admin election below
+            // recovery succeeded above  - fall through to first-admin election below
           } else if (
             authErrorCode === 'over_email_send_rate_limit' || 
             authStatus === 429 || 
@@ -5364,7 +5386,7 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
   return;
 });
 
-// Public: full single article by slug (content included) — the per-article
+// Public: full single article by slug (content included)  - the per-article
 // counterpart of the projected boot state. Only published, non-draft rows.
 app.get('/api/posts/:slug', async (req: Request, res: Response) => {
   try {
@@ -5640,7 +5662,7 @@ app.post('/api/subscribe', async (req: Request, res: Response) => {
       });
       if (subErr) {
         if (subErr.code === '23505' || /duplicate|unique/i.test(subErr.message || '')) {
-          // Already subscribed (the DB is the source of truth) — idempotent success.
+          // Already subscribed (the DB is the source of truth)  - idempotent success.
           res.json({ success: true, message: 'You are already subscribed. Welcome back!' });
           return;
         }
@@ -5714,7 +5736,7 @@ app.post('/api/analytics', async (req: Request, res: Response) => {
 });
 
 // Aggregate page-view stats for the admin dashboard (H-08: reads the analytics
-// table — real persisted counts, not per-instance cache guesses).
+// table  - real persisted counts, not per-instance cache guesses).
 app.get('/api/analytics/summary', adminAuthMiddleware, async (req: Request, res: Response) => {
   const db = getAdminDbClient(req);
   if (!db) {
@@ -6193,7 +6215,7 @@ app.get('/google9904a5acdaa0b412.html', (req: Request, res: Response) => {
   res.send('google-site-verification: google9904a5acdaa0b412.html');
 });
 
-// 1b. ads.txt — required for AdSense serving. Serves the real publisher id
+// 1b. ads.txt  - required for AdSense serving. Serves the real publisher id
 // once configured in Monetization settings; an honest comment until then.
 app.get('/ads.txt', async (req: Request, res: Response) => {
   res.type('text/plain');
@@ -6578,7 +6600,7 @@ app.get('/feed.xml', async (req: Request, res: Response) => {
   const rssXml = `<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Heartsync — Mindful Insights for Connected Hearts</title>
+    <title>Heartsync  - Mindful Insights for Connected Hearts</title>
     <link>${baseUrl}</link>
     <description>Science-based couples counseling guidelines, attachment style blueprints, and somatic trauma recovery resources.</description>
     <language>en-us</language>
@@ -6611,7 +6633,7 @@ async function resolveAdSenseClientIdServer(): Promise<{ clientId: string; activ
     };
   }
 
-  // 4. Nothing configured — honest absence. The publisher ID lives ONLY in
+  // 4. Nothing configured  - honest absence. The publisher ID lives ONLY in
   // site_settings (now migrated there); no hardcoded fallback in code.
   return { clientId: '', active: false };
 }
@@ -6657,7 +6679,7 @@ async function handleDynamicHtml(req: Request, res: Response) {
   }
 
   // Establish default search and compliance metadata
-  let seoTitle = 'Heartsync — Mindful Insights for Connected Hearts';
+  let seoTitle = 'Heartsync  - Mindful Insights for Connected Hearts';
   let seoDesc = 'Explore scientific relationships advice, attachment style counseling blueprints, and evidence-based couples wellness resources.';
   let seoKeywords = 'heartsync, relationship advice, attachment styles, couples counseling, emotional wellness, somatic grounding';
   let seoImage = `${baseUrl}/og-image.png`;
@@ -6782,7 +6804,7 @@ async function handleDynamicHtml(req: Request, res: Response) {
     }
 
     // Articles that ship in the codebase (src/utils/data/articles) are not in
-    // the database — resolve them from the SEO projection so crawlers get
+    // the database  - resolve them from the SEO projection so crawlers get
     // real titles, descriptions, and BlogPosting/BreadcrumbList schemas.
     if (slug && !post) {
       const codeArticle = HEARTSYNC_ARTICLE_SEO.find((a) => a.slug === slug);
@@ -6920,7 +6942,7 @@ async function handleDynamicHtml(req: Request, res: Response) {
     }
 
     if (category) {
-      seoTitle = category.seo_title || `${category.name} — Relational Guide | Heartsync`;
+      seoTitle = category.seo_title || `${category.name}  - Relational Guide | Heartsync`;
       seoDesc = category.seo_description || category.description || seoDesc;
       seoImage = category.featured_image || seoImage;
       if (category.seo_keywords) {
@@ -7000,7 +7022,7 @@ async function handleDynamicHtml(req: Request, res: Response) {
         "@context": "https://schema.org",
         "@type": pageType,
         "@id": `${canonicalUrl}/#page`,
-        "name": `${pageName} — Heartsync`,
+        "name": `${pageName}  - Heartsync`,
         "description": seoDesc,
         "url": canonicalUrl,
         "isPartOf": {
@@ -7168,7 +7190,7 @@ async function startServer() {
 }
 
 // On Vercel and Netlify the module is imported by a serverless handler
-// (api/index.ts on Vercel, netlify/functions/* on Netlify) — no listener,
+// (api/index.ts on Vercel, netlify/functions/* on Netlify)  - no listener,
 // no background loop. Everywhere else, run as a standalone server.
 if (!process.env.VERCEL && !process.env.NETLIFY) {
   startServer();

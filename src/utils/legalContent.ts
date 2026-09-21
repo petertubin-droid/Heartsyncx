@@ -1,5 +1,5 @@
 /**
- * Heartsync legal content — Privacy Policy, Terms of Service,
+ * Heartsync legal content  - Privacy Policy, Terms of Service,
  * Editorial & Professional Disclaimer, and Cookie Policy.
  *
  * These are the site's default legal documents, rendered on the

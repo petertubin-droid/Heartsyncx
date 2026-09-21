@@ -345,7 +345,7 @@ export default function Header({
     setSiteSettings({ ...heartsync.site_settings });
 
     // Password-reset recovery link: Supabase returns the user to the site with
-    // a recovery session and a hash like #type=recovery — open the new-password form.
+    // a recovery session and a hash like #type=recovery  - open the new-password form.
     if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
       setAuthModalMode('reset');
       setAuthModalOpen(true);

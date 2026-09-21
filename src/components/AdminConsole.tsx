@@ -5332,7 +5332,7 @@ export default function AdminConsole({
               {/* ADS Placements CRM */}
               {activePane === 'ads' && (
                 <div className="space-y-6">
-                  {/* Monetag provider settings — MultiTag covers OnClick Popunder, Push Notifications, In-Page Push and Vignette Banner */}
+                  {/* Monetag provider settings  - MultiTag covers OnClick Popunder, Push Notifications, In-Page Push and Vignette Banner */}
                   <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4 font-sans text-xs">
                     <h3 className="font-bold text-sm">Monetag MultiTag Settings</h3>
                     <p className="text-[10px] text-zinc-500 leading-relaxed">
@@ -5361,7 +5361,7 @@ export default function AdminConsole({
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Full MultiTag Snippet (from dashboard — overrides the zone-id loader)</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Full MultiTag Snippet (from dashboard  - overrides the zone-id loader)</label>
                         <textarea
                           rows={3}
                           placeholder="&lt;script src=... data-zone=... async data-cfasync=false&gt;&lt;/script&gt;"
@@ -5387,12 +5387,12 @@ export default function AdminConsole({
                     </div>
                   </div>
 
-                  {/* Adsterra provider settings — per-slot banner keys + site-wide format snippets */}
+                  {/* Adsterra provider settings  - per-slot banner keys + site-wide format snippets */}
                   <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4 font-sans text-xs">
                     <h3 className="font-bold text-sm">Adsterra Settings</h3>
                     <p className="text-[10px] text-zinc-500 leading-relaxed">
                       Two integration paths. (1) Display/banner units: create a Native Banner or Banner unit per placement in your Adsterra
-                      dashboard and paste its key into the matching slot below — header renders 728x90, sidebar/in-article/homepage/article-bottom
+                      dashboard and paste its key into the matching slot below  - header renders 728x90, sidebar/in-article/homepage/article-bottom
                       300x250, footer 468x60. (2) Site-wide formats (Popunder, Social Bar, Interstitial, In-Page Push): paste each format's full
                       code from the dashboard into its snippet field. Everything injects only after marketing-cookie consent.
                     </p>
@@ -5492,7 +5492,7 @@ export default function AdminConsole({
                       className="space-y-4"
                     >
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">AdSense Unit Slot IDs (one per placement — create the units in your AdSense account)</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">AdSense Unit Slot IDs (one per placement  - create the units in your AdSense account)</label>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                           {([
                             ['adsense_slot_header', 'Header'],
@@ -8379,7 +8379,7 @@ export default function AdminConsole({
                               type="text"
                               value={siteSettings.seo_site_title || ''}
                               onChange={(e) => heartsync.updateSettings({ seo_site_title: e.target.value })}
-                              placeholder="e.g. Heartsync — Mindful Insights for Connected Hearts"
+                              placeholder="e.g. Heartsync  - Mindful Insights for Connected Hearts"
                               className="w-full p-2.5 bg-transparent border border-zinc-200 dark:border-zinc-800 focus:border-rose-500 rounded-xl text-xs"
                             />
                             <p className="text-[9px] text-zinc-400">Appears in search lists and web browser tabs. Recommended maximum length is 60 characters.</p>
@@ -8472,7 +8472,7 @@ export default function AdminConsole({
                             </div>
                             
                             <h4 className="text-sm font-serif font-bold text-blue-700 dark:text-blue-400 hover:underline cursor-pointer leading-tight">
-                              {siteSettings.seo_site_title || siteSettings.site_name || 'Heartsync — Mindful Connection'}
+                              {siteSettings.seo_site_title || siteSettings.site_name || 'Heartsync  - Mindful Connection'}
                             </h4>
 
                             <p className="text-[10px] leading-relaxed text-zinc-600 dark:text-zinc-350 line-clamp-3">
@@ -8539,7 +8539,7 @@ export default function AdminConsole({
                               type="text"
                               value={siteSettings.og_title || ''}
                               onChange={(e) => heartsync.updateSettings({ og_title: e.target.value })}
-                              placeholder="e.g. Heartsync — Intimacy, Connection & Therapeutic Wellness Guides"
+                              placeholder="e.g. Heartsync  - Intimacy, Connection & Therapeutic Wellness Guides"
                               className="w-full p-2.5 bg-transparent border border-zinc-200 dark:border-zinc-800 focus:border-rose-500 rounded-xl text-xs"
                             />
                           </div>
@@ -8652,7 +8652,7 @@ export default function AdminConsole({
                               </p>
                               
                               <h5 className="font-serif font-black text-xs text-zinc-900 dark:text-zinc-100 leading-snug line-clamp-2">
-                                {siteSettings.og_title || siteSettings.seo_site_title || siteSettings.site_name || 'Heartsync — Intimacy Core'}
+                                {siteSettings.og_title || siteSettings.seo_site_title || siteSettings.site_name || 'Heartsync  - Intimacy Core'}
                               </h5>
 
                               <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-normal line-clamp-3">
@@ -10434,6 +10434,7 @@ export default function AdminConsole({
                                 { key: 'article_borderless_mode', title: 'Disable All Reader Border Edges', desc: 'Strips away all structural dividers and internal borders from the article reader.' },
                                 { key: 'article_reading_progress_enabled', title: 'Sticky Reading Progress Bar', desc: 'Displays a pixel-perfect horizontal indicator tracking scroll progress.' },
                                 { key: 'article_table_of_contents_enabled', title: 'Dynamic Table of Contents (TOC)', desc: 'Generates clickable directory mapping automatically from written heading trees.' },
+                                { key: 'article_inserts_enabled', title: 'Professional In-Article Inserts', desc: 'Displays curated insight, reflection, and practice-tip callout cards woven into the article body.' },
                                 { key: 'article_share_system_enabled', title: 'Interactive Social Quick-Share Rail', desc: 'Displays copy-link, Twitter, and Facebook actions alongside the text.' },
                                 { key: 'article_author_box_enabled', title: 'Author Biography Card', desc: 'Inserts professional author details, expert advisor tags, and credentials below articles.' },
                                 { key: 'article_related_carousel_enabled', title: 'Vibrant Related Recommendation Grid', desc: 'Proactively offers related relationship articles to retain reader attention.' },
@@ -10785,7 +10786,7 @@ export default function AdminConsole({
                         <div key={idx} className="p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-2xl flex justify-between items-center text-left">
                           <div className="space-y-0.5">
                             <div>
-                              <strong className="text-zinc-700 dark:text-zinc-200">[{log.type}]</strong> — IP: {log.ip} ({log.loc})
+                              <strong className="text-zinc-700 dark:text-zinc-200">[{log.type}]</strong>  - IP: {log.ip} ({log.loc})
                             </div>
                             <span className="text-[9px] text-zinc-445">{log.time}</span>
                           </div>
@@ -11488,11 +11489,11 @@ export default function AdminConsole({
                               onChange={(e) => setSiteSettings({ ...siteSettings, tts_default_speed: Number(e.target.value) })}
                               className="w-full p-2.5 rounded-xl border bg-white dark:bg-zinc-900 outline-none focus:border-rose-500 font-bold"
                             >
-                              <option value="0.75">0.75x — Warm & Relational (Slower cadence)</option>
-                              <option value="1.0">1.0x — Standard Natural Flow (Optimal voice)</option>
-                              <option value="1.25">1.25x — Fast Information Stream (Engaged audience)</option>
-                              <option value="1.5">1.5x — Rapid Compression rate</option>
-                              <option value="2.0">2.0x — Extreme Speed Auditing</option>
+                              <option value="0.75">0.75x  - Warm & Relational (Slower cadence)</option>
+                              <option value="1.0">1.0x  - Standard Natural Flow (Optimal voice)</option>
+                              <option value="1.25">1.25x  - Fast Information Stream (Engaged audience)</option>
+                              <option value="1.5">1.5x  - Rapid Compression rate</option>
+                              <option value="2.0">2.0x  - Extreme Speed Auditing</option>
                             </select>
                           </div>
 
@@ -14229,7 +14230,7 @@ export default function AdminConsole({
                                   segment: "All Verified Subscribers",
                                   date: "Scheduled (Sun 09:00 AM)",
                                   recipients: subscribers.length || 128,
-                                  openRate: "—",
+                                  openRate: " - ",
                                   status: "Scheduled"
                                 }
                               ].map((camp, idx) => (
@@ -15824,7 +15825,7 @@ export default function AdminConsole({
                               { id: 'sec-hero', type: 'hero', title: "Healing, Love & Self-Growth", subtitle: "Premium insights for building deeper connections and healthier relationships", is_active: true },
                               { id: 'sec-featured', type: 'featured_stories', title: "Featured Insights", is_active: true },
                               { id: 'sec-trending', type: 'trending', title: "Trending Now", is_active: true },
-                              { id: 'sec-categories', type: 'categories', title: "Explore by Topic", subtitle: "Dive into the subjects that matter most — each curated with depth and intention.", is_active: true },
+                              { id: 'sec-categories', type: 'categories', title: "Explore by Topic", subtitle: "Dive into the subjects that matter most  - each curated with depth and intention.", is_active: true },
                               { id: 'sec-insights', type: 'insights', title: "Relationship Insights", is_active: true },
                               { id: 'sec-premium', type: 'premium', title: "UNLOCK PREMIUM ACCESS", is_active: true },
                               { id: 'sec-about', type: 'about', title: "About HeartSync Journal", is_active: true },
@@ -15848,7 +15849,7 @@ export default function AdminConsole({
                                 { id: 'sec-hero', type: 'hero', title: "Healing, Love & Self-Growth", subtitle: "Premium insights for building deeper connections and healthier relationships", is_active: true },
                                 { id: 'sec-featured', type: 'featured_stories', title: "Featured Insights", is_active: true },
                                 { id: 'sec-trending', type: 'trending', title: "Trending Now", is_active: true },
-                                { id: 'sec-categories', type: 'categories', title: "Explore by Topic", subtitle: "Dive into the subjects that matter most — each curated with depth and intention.", is_active: true },
+                                { id: 'sec-categories', type: 'categories', title: "Explore by Topic", subtitle: "Dive into the subjects that matter most  - each curated with depth and intention.", is_active: true },
                                 { id: 'sec-insights', type: 'insights', title: "Relationship Insights", is_active: true },
                                 { id: 'sec-premium', type: 'premium', title: "UNLOCK PREMIUM ACCESS", is_active: true },
                                 { id: 'sec-about', type: 'about', title: "About HeartSync Journal", is_active: true },

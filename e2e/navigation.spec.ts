@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { grantConsent } from './helpers';
 
 /**
- * Header navigation across all sections — every route from the sitemap
+ * Header navigation across all sections  - every route from the sitemap
  * must load with meaningful content and a matching URL.
  */
 const routes = [

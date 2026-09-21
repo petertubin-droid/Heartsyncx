@@ -29,7 +29,7 @@ function renderPlacement(slot: any = 'header') {
 describe('AdPlacement (policy-honest ad rendering)', () => {
   beforeEach(() => {
   // The store mirrors localStorage in an in-memory virtualStorageMap that
-  // survives localStorage.clear() — clear consent keys through the store so
+  // survives localStorage.clear()  - clear consent keys through the store so
   // consent state never leaks between tests.
   heartsync.setLocalStorage('heartsync_cookie_consent', null);
   heartsync.setLocalStorage('heartsync_cookie_preferences', null);
@@ -105,7 +105,7 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
     act(() => { screen.getByTestId('grant').click(); });
     const pushes = (window.adsbygoogle || []);
     expect(pushes).toHaveLength(1);
-    expect(pushes[0]).toEqual({}); // personalization request — no NPA flag
+    expect(pushes[0]).toEqual({}); // personalization request  - no NPA flag
   });
 
   it('renders a visible reserved ad space when no provider is configured (crawlable slot, no layout shift)', () => {

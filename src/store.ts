@@ -267,7 +267,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   tts_style: 0.0,
   tts_last_voice_sync: '',
   gemini_api_key: '',
-  // Runtime config only — no hardcoded fallbacks. Values arrive from the
+  // Runtime config only  - no hardcoded fallbacks. Values arrive from the
   // VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY build env or from the server's
   // /api/state site_settings payload.
   supabase_url: '',
@@ -276,13 +276,13 @@ const DEFAULT_SETTINGS: SiteSettings = {
   extra_api_keys: [],
 
   // Site-wide Meta Tags and Open Graph Settings Defaults
-  seo_site_title: 'Heartsync — Mindful Insights for Connected Hearts',
+  seo_site_title: 'Heartsync  - Mindful Insights for Connected Hearts',
   seo_site_description: 'An elegant, science-backed platform exploring modern romance, emotional wellness, dating alignment, and intentional lifestyle content.',
   seo_site_keywords: 'relationship coaching, couples connection, attachment styles, somatic healing, conscious communication, emotional intimacy, validation, non-violent communication',
   seo_robots_tag: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
   seo_google_verification: 'google9904a5acdaa0b412',
   og_site_name: 'Heartsync',
-  og_title: 'Heartsync — Mindful Insights for Connected Hearts',
+  og_title: 'Heartsync  - Mindful Insights for Connected Hearts',
   og_description: 'An elegant, science-backed platform exploring modern romance, emotional wellness, dating alignment, and intentional lifestyle content.',
   og_image_url: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200',
   og_type: 'website',
@@ -358,7 +358,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   article_mobile_progress_bar: true,
 
   expert_review_stamp_enabled: true,
-  expert_reviewer_signature_text: 'Reviewed and Approved by Dr. Sarah Eldridge, PhD — Relationship Advisor',
+  expert_reviewer_signature_text: 'Reviewed and Approved by Dr. Sarah Eldridge, PhD  - Relationship Advisor',
   expert_reviewer_credentials_desc: 'Certified Gottman Method Relationship Coach, specialization in somatic relational growth.',
   homepage_insights_title: 'Relationship Insights',
   homepage_insights_desc: 'Discover your attachment patterns, emotional needs, communication style, and relationship strengths in under 2 minutes.',
@@ -371,7 +371,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   homepage_premium_enabled: true,
   homepage_premium_order: 5,
   homepage_categories_title: 'Explore by Topic',
-  homepage_categories_subtitle: 'Dive into the subjects that matter most — each curated with depth and intention.',
+  homepage_categories_subtitle: 'Dive into the subjects that matter most  - each curated with depth and intention.',
   homepage_categories_enabled: true,
   homepage_categories_order: 3,
   homepage_custom_categories: [],
@@ -423,7 +423,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
       id: 'sec-categories',
       type: 'categories',
       title: "Explore by Topic",
-      subtitle: "Dive into the subjects that matter most — each curated with depth and intention.",
+      subtitle: "Dive into the subjects that matter most  - each curated with depth and intention.",
       is_active: true
     },
     {
@@ -865,7 +865,7 @@ export class HeartsyncStore {
   public categories: Category[] = [];
   public comments: Comment[] = [];
 
-  // LoveVault — private, user-scoped reader storage
+  // LoveVault  - private, user-scoped reader storage
   public vaultItems: Array<{
     id: string;
     user_id: string;
@@ -960,7 +960,7 @@ export class HeartsyncStore {
         this.activeSupabaseKey = key;
         console.log('🔌 Supabase initialized successfully as primary database store. URL:', url);
         // Boot data comes from the single /api/state fetch (loadServerState,
-        // called from the constructor) — no duplicate full-table sync here.
+        // called from the constructor)  - no duplicate full-table sync here.
         // syncWithSupabase remains available for explicit re-syncs.
         this.restoreSupabaseSession();
         this.subscribeToRealtime();
@@ -979,7 +979,7 @@ export class HeartsyncStore {
   private serverStateRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Debounced /api/state refresh: realtime events arrive in bursts (a single
-   *  admin save fires many postgres change events) — collapse them into one
+   *  admin save fires many postgres change events)  - collapse them into one
    *  trailing full-state fetch. */
   public queueServerStateRefresh(delayMs = 2000) {
     if (typeof window === 'undefined') return;
@@ -1249,7 +1249,7 @@ export class HeartsyncStore {
             price: Number(c.price) || 0
           }));
 
-          // The DB is the single source of truth for categories — no hardcoded
+          // The DB is the single source of truth for categories  - no hardcoded
           // slug whitelist (it silently hid every admin-created category).
           this.categories = mappedCats.filter(c => c && c.slug);
         }
@@ -1259,7 +1259,7 @@ export class HeartsyncStore {
 
       // 2. Fetch Posts
       try {
-        // List columns only (same projection as the server boot state) — article
+        // List columns only (same projection as the server boot state)  - article
       // bodies are fetched per-article via ensureArticleContent().
       const { data: postData, error: postError } = await this.supabase.from('posts')
         .select('id,title,slug,excerpt,status,publish_date,featured_image,read_time,category_id,author_id,tags,likes,reactions,views,seo_title,seo_description,seo_keywords,is_premium,created_at,updated_at,is_featured,reading_time')
@@ -1412,7 +1412,7 @@ export class HeartsyncStore {
             this.site_settings.homepage_trending_enabled = true;
             this.site_settings.homepage_featured_enabled = true;
             this.site_settings.homepage_categories_title = 'Explore by Topic';
-            this.site_settings.homepage_categories_subtitle = 'Dive into the subjects that matter most — each curated with depth and intention.';
+            this.site_settings.homepage_categories_subtitle = 'Dive into the subjects that matter most  - each curated with depth and intention.';
             this.site_settings.homepage_categories_enabled = true;
             this.site_settings.homepage_categories_order = 3;
             this.site_settings.homepage_featured_order = 1;
@@ -1422,7 +1422,7 @@ export class HeartsyncStore {
               { id: 'sec-hero', type: 'hero', title: "Healing, Love & Self-Growth", subtitle: "Premium insights for building deeper connections and healthier relationships", buttonText: "Explore Articles", buttonUrl: "articles", secondaryButtonText: "Take Relationship Quiz", secondaryButtonUrl: "quiz", imageUrl: "", badgeText: "Welcome to HeartSync Journal", is_active: true },
               { id: 'sec-featured', type: 'featured_stories', title: "Featured Insights", is_active: true },
               { id: 'sec-trending', type: 'trending', title: "Trending Now", is_active: true },
-              { id: 'sec-categories', type: 'categories', title: "Explore by Topic", subtitle: "Dive into the subjects that matter most — each curated with depth and intention.", is_active: true },
+              { id: 'sec-categories', type: 'categories', title: "Explore by Topic", subtitle: "Dive into the subjects that matter most  - each curated with depth and intention.", is_active: true },
               { id: 'sec-about', type: 'about', title: "About HeartSync Journal", is_active: true },
               { id: 'sec-newsletter', type: 'newsletter', title: "Join the HeartSync Journal", is_active: true }
             ];
@@ -1436,7 +1436,7 @@ export class HeartsyncStore {
               homepage_featured_enabled: true,
               homepage_trending_enabled: true,
               homepage_categories_title: 'Explore by Topic',
-              homepage_categories_subtitle: 'Dive into the subjects that matter most — each curated with depth and intention.',
+              homepage_categories_subtitle: 'Dive into the subjects that matter most  - each curated with depth and intention.',
               homepage_categories_enabled: true,
               homepage_categories_order: 3,
               homepage_featured_order: 1,
@@ -1719,7 +1719,7 @@ export class HeartsyncStore {
     }
     if (this.site_settings.expert_review_stamp_enabled === undefined) {
       this.site_settings.expert_review_stamp_enabled = true;
-      this.site_settings.expert_reviewer_signature_text = 'Reviewed and Approved by Dr. Sarah Eldridge, PhD — Relationship Advisor';
+      this.site_settings.expert_reviewer_signature_text = 'Reviewed and Approved by Dr. Sarah Eldridge, PhD  - Relationship Advisor';
       this.site_settings.expert_reviewer_credentials_desc = 'Certified Gottman Method Relationship Coach, specialization in somatic relational growth.';
     }
     if (this.site_settings.tts_global_enabled === undefined) {
@@ -1802,7 +1802,7 @@ export class HeartsyncStore {
       { id: 'rss-2', name: 'Psychology Today Relationship Feed', url: 'https://www.psychologytoday.com/us/feed/relationships', status: 'Active', lastSync: '2026-06-12 09:12' }
     ]);
     // Honest absence: no provider is preconfigured. Admins add their own real
-    // publisher/zone/key credentials via the Admin Console — fake demo IDs must
+    // publisher/zone/key credentials via the Admin Console  - fake demo IDs must
     // never ship (AdSense policy risk + misleading admin defaults).
     this.ad_providers = getLocalStorage<any[]>('hs_ad_providers', []);
     const defaultCampaigns = [

@@ -14,13 +14,13 @@ const UNIVERSAL_INTEGRATION_MODULE = `
 
 ---
 
-## Part V: Making It Real — A Gentle Integration Plan
+## Part V: Making It Real  - A Gentle Integration Plan
 
-Reading about relational science is the easy part; the honest work begins when you close this article and re-enter the room where your actual life is happening. Insight that never touches behavior becomes trivia, so treat this final section as the bridge between understanding and lived change. Start smaller than your ambition suggests. If you take a single practice from this piece, rehearse it in a low-stakes moment — a casual morning conversation, a text about groceries — before you attempt it mid-conflict. Skills rehearsed in calm conditions become available under stress; skills attempted only in crisis collapse under pressure.
+Reading about relational science is the easy part; the honest work begins when you close this article and re-enter the room where your actual life is happening. Insight that never touches behavior becomes trivia, so treat this final section as the bridge between understanding and lived change. Start smaller than your ambition suggests. If you take a single practice from this piece, rehearse it in a low-stakes moment  - a casual morning conversation, a text about groceries  - before you attempt it mid-conflict. Skills rehearsed in calm conditions become available under stress; skills attempted only in crisis collapse under pressure.
 
 Next, expect regression and do not interpret it as failure. Nervous systems and long-standing relational habits are shaped by years of repetition, and they do not reorganize in a single weekend. A useful rhythm is the weekly review: once a week, spend five private minutes asking what went well, where you slipped, and which single adjustment would make next week one percent kinder. Writing this down matters; a note you can reread outlives the mood that produced it.
 
-Finally, remember that connection is built in ordinary moments far more than in grand ones. The research on successful couples keeps returning to the same humble finding: consistent small turns toward each other, repeated over years, outperform occasional dramatic gestures. Let the ideas in this article become part of that quiet accumulation. Choose one practice, protect one small ritual, and offer one honest sentence this week. Then repeat. That is how attachment security, communication skill, and emotional intimacy are actually grown — deliberately, imperfectly, and together.`;
+Finally, remember that connection is built in ordinary moments far more than in grand ones. The research on successful couples keeps returning to the same humble finding: consistent small turns toward each other, repeated over years, outperform occasional dramatic gestures. Let the ideas in this article become part of that quiet accumulation. Choose one practice, protect one small ritual, and offer one honest sentence this week. Then repeat. That is how attachment security, communication skill, and emotional intimacy are actually grown  - deliberately, imperfectly, and together.`;
 
 export function expandArticleContent(post: Post): Post {
   const currentWordCount = post.content.split(/\s+/).length;
@@ -52,11 +52,11 @@ export function expandArticleContent(post: Post): Post {
 
 ## Part II: The Somatic Landscape of Attachment Patterns
 
-To truly understand how attachment style shapes our adult connection systems, we must look beyond cognitive stories and enter the direct physiology of the nervous system. Attachment is not merely an intellectual concept or a mental schema we select from a catalog; it is an active, living somatic reflex. When a securely attached individual senses mild relational dissonance, their nervous system stays anchored in what polyvagal theory defines as the **ventral vagal state**—a spacious, resilient zone of safety, biological trust, and open-hearted curiosity. Here, disagreement is parsed not as a life-threatening catastrophe, but as an minor atmospheric shift in a warm room.
+To truly understand how attachment style shapes our adult connection systems, we must look beyond cognitive stories and enter the direct physiology of the nervous system. Attachment is not merely an intellectual concept or a mental schema we select from a catalog; it is an active, living somatic reflex. When a securely attached individual senses mild relational dissonance, their nervous system stays anchored in what polyvagal theory defines as the **ventral vagal state** - a spacious, resilient zone of safety, biological trust, and open-hearted curiosity. Here, disagreement is parsed not as a life-threatening catastrophe, but as an minor atmospheric shift in a warm room.
 
 For the anxiously attached person, however, that exact same dissonance acts as a lightning rod. The amygdala activates instantly, interpreting a slow text response or a quiet glance as an existential threat to security. This triggers a frantic sympathetic nervous system launch, pushing adrenaline and cortisol through the bloodstream. This somatic alarm manifests physically as a tight constriction in the throat, a rapid heartbeat, and an urgent, kinetic desire to chase, question, or demand immediate reassurance. 
 
-Conversely, the avoidantly attached spouse or partner registers the identical relational friction by retreating. For them, intimacy is physiologically tied to memory pathways of overwhelm, suffocation, and emotional entrapment. When the anxious partner reaches out to restore contact, the avoidant partner's nervous system drops into a **dorsal vagal state**—a state of quiet immobilization, flat vocal expressions, and rigid muscular shields. This is not cold indifference or apathy; it is an active, ancient survival mechanism designed to conserve biological energy under perceived threat.
+Conversely, the avoidantly attached spouse or partner registers the identical relational friction by retreating. For them, intimacy is physiologically tied to memory pathways of overwhelm, suffocation, and emotional entrapment. When the anxious partner reaches out to restore contact, the avoidant partner's nervous system drops into a **dorsal vagal state** - a state of quiet immobilization, flat vocal expressions, and rigid muscular shields. This is not cold indifference or apathy; it is an active, ancient survival mechanism designed to conserve biological energy under perceived threat.
 
 \`\`\`
 +-------------------------------------------------------------------+
@@ -72,7 +72,7 @@ Conversely, the avoidantly attached spouse or partner registers the identical re
 
 In the theater of modern relationships, our primitive subconscious possesses an uncanny, magnetic attraction to familiar chaos. We do not fall in love with partners who are perfectly secure; instead, we seek out individuals whose defensive patterns perfectly activate our own emotional wounds. This is known in depth psychology as **trauma-matching**.
 
-For example, a person with deep anxious attachment fears often finds themselves magnetically drawn to the mysterious, distant presence of an avoidant partner. To the anxious system, this distance feels intensely familiar—it mirrors the erratic warmth they received in childhood. The thrill of trying to "unlock" the avoidant partner's heart mimics real love, creating a high-voltage dopamine loop. But this is the relational equivalent of drinking salt water to satisfy thirst. Each anxious attempt to draw closer triggers a corresponding avoidant retreat, sealing the couple inside an endless, painful push-and-pull dance.
+For example, a person with deep anxious attachment fears often finds themselves magnetically drawn to the mysterious, distant presence of an avoidant partner. To the anxious system, this distance feels intensely familiar - it mirrors the erratic warmth they received in childhood. The thrill of trying to "unlock" the avoidant partner's heart mimics real love, creating a high-voltage dopamine loop. But this is the relational equivalent of drinking salt water to satisfy thirst. Each anxious attempt to draw closer triggers a corresponding avoidant retreat, sealing the couple inside an endless, painful push-and-pull dance.
 
 ### Case Comparison: The Tension Trap
 
@@ -119,7 +119,7 @@ By engaging in these somatic practices, we step off the exhausting merry-go-roun
 
 ## Part II: The Neurology of the Swipe & Dopamine Desensitization
 
-To salvage our modern romantic spirits from the exhausting, transactional culture of swipe burnout, we must understand the neurological mechanics at play behind the screen. Modern dating applications are not designed by relationship experts; they are constructed by software engineers who specialize in **intermittent variable reward structures**—the same psychological architecture that makes slot machines in Las Vegas highly addictive.
+To salvage our modern romantic spirits from the exhausting, transactional culture of swipe burnout, we must understand the neurological mechanics at play behind the screen. Modern dating applications are not designed by relationship experts; they are constructed by software engineers who specialize in **intermittent variable reward structures** - the same psychological architecture that makes slot machines in Las Vegas highly addictive.
 
 Every swipe left or right is a micro-gambling move. When a match appears, the brain is flooded with a localized surge of **dopamine** (the chemical messenger of anticipation, search, and desire). Note that dopamine is not the hormone of fulfillment; it is the hormone of *seeking*. The brain is wired to love the chase far more than the capture. When we have an infinite directory of hundreds of potential matches, our subconscious begins to categorize human beings as disposable, low-stakes resources. If a conversation stalls, or if a partner shows a minor, natural human flaw, we do not engage in the slow work of emotional repair; instead, we swipe again, chasing a fresh dopamine high. This endless cycle leads directly to relational desensitization, profound loneliness, and emotional detachment.
 
@@ -135,7 +135,7 @@ Every swipe left or right is a micro-gambling move. When a match appears, the br
 
 ## Part III: Reclaiming the Magic of Atmospheric Presence
 
-Slow dating is more than an intentional pacing strategy; it is a profound reclamation of our personal sovereignty and biological presence. Swiping at high speeds forces us to operate from our cognitive intellect—checking resumes, matching travel portfolios, and vetting profiles according to static criteria. But lasting romance is registered somatically inside the physical body.
+Slow dating is more than an intentional pacing strategy; it is a profound reclamation of our personal sovereignty and biological presence. Swiping at high speeds forces us to operate from our cognitive intellect - checking resumes, matching travel portfolios, and vetting profiles according to static criteria. But lasting romance is registered somatically inside the physical body.
 
 When we meet another human in the real world, our sensory systems exchange millions of micro-signals that are completely invisible to an online application profile. We register the subtle warmth in their vocal cadence, the organic alignment of our breathing rhythms, the spacious ease of our shared silence, and the calm physical settling of our shoulders in their presence. This is what ancient relational writers called **atmospheric chemistry**. 
 
@@ -161,7 +161,7 @@ Instead of juggling five conversations simultaneously (which maintains your brai
 
 ### 2. The Slow-Dating Integration Checklist
 
-*   **Choose Sensory Cohere Dates:** Avoid high-stress, performative settings like noisy bars or formal, expensive dinners. Instead, propose dates with open physical movement—such as walking through botanical gardens, seeking vintage vinyl records, or wandering quiet local art spaces.
+*   **Choose Sensory Cohere Dates:** Avoid high-stress, performative settings like noisy bars or formal, expensive dinners. Instead, propose dates with open physical movement - such as walking through botanical gardens, seeking vintage vinyl records, or wandering quiet local art spaces.
 *   **Track Your Autonomic Feelings:** During and after the date, take a physical check-in. Does your physical throat feel open and relaxed? Do you feel a quiet, grounded calm, or a frantic, insecure urge to perform?
 *   **Express Clear Intent Without Fear:** If you are dating to build secure relational commitments and deep emotional alignment, say so with elegant confidence. The right partner will find your clarity incredibly refreshing and safe.
 
@@ -203,7 +203,7 @@ When a partner walks into a room with high, tense energy, our brain’s mirror n
 
 Somatic healing begins when we learn to track our physical sensations in real time. Our bodies register emotional friction long before our conscious minds decode the situation. We experience a sudden clenching in our jaw, a loss of spacious breathing, or a heavy tightness in our shoulders. These are physical indicators that our system has crossed the line from safe connection into survival defense.
 
-If we continue to speak from this defensive posture, we almost always use words that wound. To break this automatic cycle, we must practice somatic grounding—using physical anchors to calm our nervous systems and return to the Present Moment.
+If we continue to speak from this defensive posture, we almost always use words that wound. To break this automatic cycle, we must practice somatic grounding - using physical anchors to calm our nervous systems and return to the Present Moment.
 
 Imagine sitting close to a partner whose breathing is slow, steady, and deep. As you sit in their safe presence, your own nervous system naturally begins to coordinate with their relaxed baseline. Your heart rate slows, your muscles loosen, and your brain returns to a state of open-hearted security. This is the beautiful, healing power of co-regulation.
 
@@ -219,7 +219,7 @@ Imagine sitting close to a partner whose breathing is slow, steady, and deep. As
 Use this practical somatic worksheet to build physical co-regulation and de-escalate emotional flooding during clashes:
 
 ### 1. The Somatic Timeout Protocol
-The moment either partner detects signs of emotional flooding—manifesting as a heart rate over 100 BPM, rapid voices, or silent shutdown—call an immediate **Somatic Timeout**.
+The moment either partner detects signs of emotional flooding - manifesting as a heart rate over 100 BPM, rapid voices, or silent shutdown - call an immediate **Somatic Timeout**.
 
 1.  **Use the Compassionate Phrase:** "I notice my system feels flooded right now. I want to pause our conversation for 20 minutes to settle my body so we can communicate safely."
 2.  **Physically Separate:** Go to separate rooms. Do not sit and retrace the argument or plan your next defense.
@@ -302,7 +302,7 @@ Set aside quiet time twice a week to journal through these four self-parenting p
 
 ### 2. Daily Core Self-Worth Habits
 
-*   **Accept Unseen Value:** practice doing small, kind acts—like making your bed, writing poetry, or walking in nature—purely for yourself. Avoid posting about them or sharing them for praise. Let value exist in quiet sovereignty.
+*   **Accept Unseen Value:** practice doing small, kind acts - like making your bed, writing poetry, or walking in nature - purely for yourself. Avoid posting about them or sharing them for praise. Let value exist in quiet sovereignty.
 *   **Identify Your boundaries:** When setting a limit, remember that you do not need permission or detailed justifications. A secure boundary is healthy and warm, protecting your emotional energy so you can love from a full cup.
 *   **Speak with Authenticity:** practice sharing your true, small preferences cleanly and simply. Allow your partner to have different opinions, realizing that minor disagreements do not threaten your connection.
 
@@ -331,7 +331,7 @@ In relationship research systems, we focus heavily on Gottman's research regardi
 +--------------------------------------------------------------------+
 \`\`\`
 
-Every time we turn toward a partner's bid for connection—paying attention when they point out a bird, looking up when they sigh, or offering a gentle touch—we deposit coins into our relationship's trust bank. When conflict inevitably arises, this emotional savings buffer protects our bond from immediate collapse.
+Every time we turn toward a partner's bid for connection - paying attention when they point out a bird, looking up when they sigh, or offering a gentle touch - we deposit coins into our relationship's trust bank. When conflict inevitably arises, this emotional savings buffer protects our bond from immediate collapse.
 
 ---
 

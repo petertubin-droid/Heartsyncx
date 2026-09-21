@@ -15,7 +15,7 @@ const QUICK_PROMPTS = [
   'How do I rebuild trust in myself after a painful breakup?'
 ];
 
-const GUIDELINES_NOTE = 'HeartSync Guide offers reflective, evidence-informed perspective — it is not therapy or crisis care. If you are in danger or thinking of harming yourself, please contact local emergency services or a crisis hotline right away.';
+const GUIDELINES_NOTE = 'HeartSync Guide offers reflective, evidence-informed perspective  - it is not therapy or crisis care. If you are in danger or thinking of harming yourself, please contact local emergency services or a crisis hotline right away.';
 
 export default function AiCopilot({ onNavigate }: { onNavigate: (tab: string, arg?: string) => void }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -75,7 +75,7 @@ export default function AiCopilot({ onNavigate }: { onNavigate: (tab: string, ar
         </h1>
         <p className="mt-3 text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-xl mx-auto">
           Ask anything about love, dating, communication, breakups, or self-growth.
-          You get grounded, practical perspective — with real phrases you can use.
+          You get grounded, practical perspective  - with real phrases you can use.
         </p>
       </div>
 
@@ -140,7 +140,7 @@ export default function AiCopilot({ onNavigate }: { onNavigate: (tab: string, ar
               <TriangleAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
                 What you described may involve real risk. Please consider contacting local emergency
-                services or a domestic-violence / crisis hotline — professional support matters here.
+                services or a domestic-violence / crisis hotline  - professional support matters here.
               </p>
             </div>
           )}

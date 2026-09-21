@@ -268,7 +268,7 @@ export default function MobileMenu({
                 </h4>
                 <div className="rounded-2xl border border-zinc-100 dark:border-zinc-900/30 p-2.5 bg-zinc-50/20 dark:bg-zinc-950/10 space-y-1">
 
-                  {/* Live Chat — opens the HeartSync Concierge window
+                  {/* Live Chat  - opens the HeartSync Concierge window
                       (the floating bubble launcher was removed from the page) */}
                   <button
                     type="button"

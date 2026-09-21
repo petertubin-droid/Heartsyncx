@@ -274,7 +274,7 @@ export const getEnabledLanguages = (): Language[] => {
 
 export const setEnabledLanguages = (_langs: Language[]): void => {
   try {
-    heartsync.setLocalStorage('hs_enabled_languages', ['en']); // setLocalStorage stringifies internally — pre-stringifying double-encodes
+    heartsync.setLocalStorage('hs_enabled_languages', ['en']); // setLocalStorage stringifies internally  - pre-stringifying double-encodes
   } catch (e) {}
 };
 

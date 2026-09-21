@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * GDPR cookie consent — banner, accept/reject, customization modal,
+ * GDPR cookie consent  - banner, accept/reject, customization modal,
  * persistence and the Footer "Cookie Settings" reopen path.
  */
 const CONSENT_KEY = 'heartsync_cookie_consent';

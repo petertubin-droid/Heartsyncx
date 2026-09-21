@@ -5,7 +5,7 @@ import { heartsync } from '../store';
 import { BOUNDARIES_TEMPLATES } from '../utils/data/boundariesTemplates';
 
 const JOURNAL_PROMPTS = [
-  'What did I need today that I didn\'t ask for — and what stopped me from asking?',
+  'What did I need today that I didn\'t ask for  - and what stopped me from asking?',
   'Where in my body did I feel tension this week? What was happening when it started?',
   'What is one thing I forgive myself for this month?',
   'Which relationship gave me energy this week, and which one drained me? What made the difference?',
@@ -13,7 +13,7 @@ const JOURNAL_PROMPTS = [
   'When did I last feel truly seen? Describe the moment in detail.',
   'What boundary did I almost set this week but swallowed instead? What would saying it have cost me?',
   'If I treated myself the way I treat my dearest friend, what would change tomorrow?',
-  'What story am I telling myself about my last relationship — and what parts of it might not be true?',
+  'What story am I telling myself about my last relationship  - and what parts of it might not be true?',
   'What does love look like on an ordinary Tuesday, when nobody is watching?',
   'Whose approval am I still chasing, and what would it mean to stop?',
   'What did love look like in the home I grew up in, and what did it teach me to expect?'
@@ -99,7 +99,7 @@ export default function LoveVault() {
       await navigator.clipboard.writeText(text);
       heartsync.notifyToast('Script copied to your clipboard.', 'success');
     } catch {
-      heartsync.notifyToast('Copy failed — please select the text manually.', 'error');
+      heartsync.notifyToast('Copy failed  - please select the text manually.', 'error');
     }
   };
 
@@ -363,7 +363,7 @@ export default function LoveVault() {
       {activeTab === 'boundaries' && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-            Real scripts for real conversations. Adapt the wording to your voice — a boundary
+            Real scripts for real conversations. Adapt the wording to your voice  - a boundary
             only works if it sounds like you.
           </p>
           {BOUNDARIES_TEMPLATES.map((b) => (

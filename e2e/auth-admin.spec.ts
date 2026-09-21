@@ -17,7 +17,7 @@ test.describe('Auth UI', () => {
     await page.waitForTimeout(1500);
     const loginTrigger = page.getByRole('button', { name: /login \/ sign ?up/i }).first();
     await loginTrigger.click();
-    // Auth modal is a motion.div without role=dialog — locate by its heading
+    // Auth modal is a motion.div without role=dialog  - locate by its heading
     const dialog = page.locator('div').filter({ has: page.getByRole('heading', { name: /welcome back|join heartsync/i }) }).last();
     await expect(page.getByText(/welcome back|join heartsync/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible();

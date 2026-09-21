@@ -188,7 +188,7 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
   const dims = SLOT_DIMENSIONS[slot];
 
   if (!adsenseConfigured) {
-    // No AdSense config for this slot — Adsterra banner if configured, else a
+    // No AdSense config for this slot  - Adsterra banner if configured, else a
     // visible, labelled reserved ad space (crawlable, no layout shift).
     const fmt = ADSTERRA_FORMAT[slot];
     return (

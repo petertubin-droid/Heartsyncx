@@ -250,7 +250,7 @@ export default function AdminLogin({ onNavigate, onSuccess }: AdminLoginProps) {
           handleError(error.message);
         }
       }
-      // On success the browser redirects to Google and back to /admin —
+      // On success the browser redirects to Google and back to /admin - 
       // the OAuth-return effect below completes the session.
     } catch (err: any) {
       handleError(err?.message || 'Google sign-in failed to start.');

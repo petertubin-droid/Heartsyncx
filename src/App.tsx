@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
-// The 16k-line admin console is split out of the reader bundle — it only
+// The 16k-line admin console is split out of the reader bundle  - it only
 // downloads when an admin actually opens the admin tab.
 const AdminConsole = React.lazy(() => import('./components/AdminConsole'));
 import Header from './components/Header';
@@ -739,7 +739,7 @@ export default function App() {
 
   // Sync URL with site tab on mount & handle popstate browser back/forward buttons
   useEffect(() => {
-    // H-08: anonymous page-view beacon — persisted server-side via the
+    // H-08: anonymous page-view beacon  - persisted server-side via the
     // log_page_view() RPC (fire-and-forget; failures are silent and safe).
     const logPageView = (path: string) => {
       fetch('/api/analytics', {
@@ -1076,7 +1076,7 @@ export default function App() {
       return;
     }
 
-    // Admin access requires a signed-in admin account — no auto-provisioned sessions
+    // Admin access requires a signed-in admin account  - no auto-provisioned sessions
     if (tab === 'admin' || tab === 'access-denied') {
       if (!heartsync.current_user || heartsync.current_user.role !== 'admin') {
         setCurrentTab('login');
@@ -1101,7 +1101,7 @@ export default function App() {
       if (match) {
         setActiveArticle(match);
         heartsync.recordView(match.id);
-        // Full body ships per-article (not in the boot payload) — enrich lazily.
+        // Full body ships per-article (not in the boot payload)  - enrich lazily.
         if (!match.content) {
           heartsync.ensureArticleContent(match).then(enriched => {
             if (enriched) setActiveArticle(enriched);
@@ -1404,7 +1404,7 @@ export default function App() {
               ['categories', 'category', 'articles', 'search', 'trending'].includes(currentTab) ? 'grid' :
               'home'
             }>
-              {/* Global breadcrumbs — every page except home/admin/auth keeps a
+              {/* Global breadcrumbs  - every page except home/admin/auth keeps a
                   crawlable Home trail; article/category views have their own richer trail. */}
             {(() => {
               const crumbs: { label: string; onClick?: () => void }[] = [{ label: 'Home', onClick: () => navigateTo('home') }];
@@ -1491,7 +1491,7 @@ export default function App() {
                     { id: 'sec-hero', type: 'hero', title: "Build Healthier Relationships Through Psychology and Emotional Wellness", subtitle: "Discover expert relationship advice, dating insights, emotional wellness resources, and premium relationship guides that help people build stronger, healthier, and happier relationships.", buttonText: "Read Articles", buttonUrl: "articles", secondaryButtonText: "Join Premium", secondaryButtonUrl: "subscription", imageUrl: "", badgeText: "Welcome to Heartsync", is_active: true },
                     { id: 'sec-featured', type: 'featured_stories', title: "Featured Insights", is_active: true },
                     { id: 'sec-trending', type: 'trending', title: "Trending Now", is_active: true },
-                    { id: 'sec-categories', type: 'categories', title: "Explore by Topic", subtitle: "Dive into the subjects that matter most — each curated with depth and intention.", is_active: true },
+                    { id: 'sec-categories', type: 'categories', title: "Explore by Topic", subtitle: "Dive into the subjects that matter most  - each curated with depth and intention.", is_active: true },
                     { id: 'sec-about', type: 'about', title: "About HeartSync", is_active: true },
                     { id: 'sec-newsletter', type: 'newsletter', title: "Join the HeartSync Newsletter", is_active: true }
                   ];
@@ -2222,7 +2222,7 @@ export default function App() {
                                 {finalTopicsTitle}
                               </h2>
                               <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                                Browse topics that matter most — curated with depth and intention.
+                                Browse topics that matter most  - curated with depth and intention.
                               </p>
                             </div>
 
@@ -3257,7 +3257,7 @@ export default function App() {
                       The Journal
                     </span>
                     <h1 className="font-serif font-bold text-3xl sm:text-4xl text-zinc-900 dark:text-white mt-2 tracking-tight">Heartsync Wellness Journals</h1>
-                    <p className="text-xs sm:text-sm text-zinc-400 dark:text-zinc-500 font-sans mt-1.5 max-w-xl leading-relaxed">Expert essays on emotional resilience, attachment, and relationship wellness — written by clinicians, curated with care.</p>
+                    <p className="text-xs sm:text-sm text-zinc-400 dark:text-zinc-500 font-sans mt-1.5 max-w-xl leading-relaxed">Expert essays on emotional resilience, attachment, and relationship wellness  - written by clinicians, curated with care.</p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3279,7 +3279,7 @@ export default function App() {
             )}
             {/* 3. SINGLE ARTICLE DETAIL PAGE VIEW */}
             {currentTab === 'article' && activeArticle && (() => {
-              // Wired article design settings (AdminConsole > Article Design) — previously dead
+              // Wired article design settings (AdminConsole > Article Design)  - previously dead
               const artLayout = siteSettings.article_layout || 'standard';
               const sidebarWidthRaw = siteSettings.article_desktop_sidebar_width || 'w-80';
               const sidebarSpanClass = sidebarWidthRaw === 'w-96' ? 'lg:col-span-5'
@@ -3495,7 +3495,7 @@ export default function App() {
                           </div>
 
                           {/* Image Caption & Credit line */}
-                          {siteSettings.article_image_caption_enabled !== false && (
+                          {siteSettings.article_image_caption_enabled === true && (
                             <p className="text-[10px] text-zinc-400 dark:text-zinc-500 italic px-2 font-sans flex justify-between">
                               <span>{activeArticle.excerpt || "Figure 1: Relational bonding session workflow description."}</span>
                               {siteSettings.article_image_credit_enabled !== false && (
@@ -3693,7 +3693,7 @@ export default function App() {
                       <Heart className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
                       <div className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">
                         <span className="font-bold">Editor's review.</span>{' '}
-                        {siteSettings.expert_reviewer_signature_text && <>{siteSettings.expert_reviewer_signature_text} — </>}
+                        {siteSettings.expert_reviewer_signature_text && <>{siteSettings.expert_reviewer_signature_text}  - </>}
                         {siteSettings.expert_reviewer_credentials_desc}
                       </div>
                     </div>
@@ -3754,7 +3754,7 @@ export default function App() {
                                 </>
                               )}
 
-                              {/* Contents (TOC) Widget embedded in sticky region — Frelux-style */}
+                              {/* Contents (TOC) Widget embedded in sticky region  - Frelux-style */}
                               {siteSettings.article_table_of_contents_enabled !== false && headings.length > 0 && (
                                 <div className="pt-4 border-t border-zinc-200/50 dark:border-zinc-800/50 text-left">
                                   <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
@@ -4090,7 +4090,7 @@ export default function App() {
                           >
                             <ArticleBodyWithInserts
                               content={activeArticle.content}
-                              inserts={activeArticle.in_article_inserts}
+                              inserts={siteSettings.article_inserts_enabled !== false ? activeArticle.in_article_inserts : undefined}
                               markdownComponents={markdownComponents}
                               className={`markdown-body prose dark:prose-invert ${bodyWidthClass}${bodyWidthClass !== 'max-w-none' ? ' mx-auto' : ''} text-zinc-850 dark:text-zinc-200 ${lineHeightClass} ${spacingClass} ${headingsClass} ${
                                 siteSettings.article_font_size === 'sm' ? 'text-xs sm:text-sm' :
@@ -4205,7 +4205,7 @@ export default function App() {
                         </div>
                       )}
 
-                      {/* Previous / Next Article Navigation — Frelux-style */}
+                      {/* Previous / Next Article Navigation  - Frelux-style */}
                       {(() => {
                         const sorted = [...publishedArticles].sort((a, b) =>
                           new Date(a.publish_date || 0).getTime() -
@@ -4627,11 +4627,11 @@ export default function App() {
                       relative to the animated page wrapper instead of the viewport -- so it scrolled
                       away with the article instead of staying pinned to the bottom of the screen. */}
                   {showMobileDock && createPortal(
-                  <div className="fixed bottom-0 inset-x-0 bg-white/95 dark:bg-zinc-950/95 border-t border-zinc-200/80 dark:border-zinc-850 p-2.5 z-40 flex items-center justify-around md:hidden shadow-2xl backdrop-blur-md">
+                  <div className="fixed bottom-0 inset-x-0 bg-white/95 dark:bg-zinc-950/95 border-t border-zinc-200/80 dark:border-zinc-850 p-1 z-40 flex items-center justify-around md:hidden shadow-2xl backdrop-blur-md">
                     <button
                       type="button"
                       onClick={() => navigateTo('articles')}
-                      className="p-2 text-zinc-400 dark:text-zinc-500 hover:text-rose-500 cursor-pointer flex flex-col items-center gap-0.5"
+                      className="p-1 text-zinc-400 dark:text-zinc-500 hover:text-rose-500 cursor-pointer flex flex-col items-center gap-0.5"
                     >
                       <ArrowLeft className="w-5 h-5" />
                       <span className="text-[8px] uppercase tracking-wider">Back</span>
@@ -4646,7 +4646,7 @@ export default function App() {
                           setTimeout(() => setCopyFeedbackToast(false), 2000);
                         } catch (_) {}
                       }}
-                      className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 cursor-pointer relative flex flex-col items-center gap-0.5"
+                      className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 cursor-pointer relative flex flex-col items-center gap-0.5"
                     >
                       <LinkIcon className="w-5 h-5" />
                       <span className="text-[8px] uppercase tracking-wider">Copy URL</span>
@@ -4661,7 +4661,7 @@ export default function App() {
                       href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex flex-col items-center gap-0.5"
+                      className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex flex-col items-center gap-0.5"
                     >
                       <Facebook className="w-5 h-5" />
                       <span className="text-[8px] uppercase tracking-wider">Share</span>
@@ -4671,7 +4671,7 @@ export default function App() {
                       href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(activeArticle.title)}&url=${encodeURIComponent(window.location.href)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex flex-col items-center gap-0.5"
+                      className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex flex-col items-center gap-0.5"
                     >
                       <Twitter className="w-5 h-5" />
                       <span className="text-[8px] uppercase tracking-wider">Post</span>
@@ -4681,7 +4681,7 @@ export default function App() {
                       href={`https://wa.me/?text=${encodeURIComponent(`${activeArticle.title} ${window.location.href}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex flex-col items-center gap-0.5"
+                      className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex flex-col items-center gap-0.5"
                     >
                       <Send className="w-5 h-5" />
                       <span className="text-[8px] uppercase tracking-wider">Send</span>
@@ -5285,7 +5285,7 @@ export default function App() {
                           Heartsync was established as an aesthetic response to swipe-culture burnout. We believe modern digital products gamify dating, shortening conversations into instant judgements. This speed leaves individuals with deep relationship anxieties, defense patterns, and decision overload.
                         </p>
                         <p>
-                          Our mission is to translate expert psychology concepts—specifically Bowlby's Attachment styles, Gottman's communication parameters, and nervous-system co-regulation templates—into beautiful, actionable lifestyle essays. We compile readable schemas so you can map your relational landscape safely.
+                          Our mission is to translate expert psychology concepts - specifically Bowlby's Attachment styles, Gottman's communication parameters, and nervous-system co-regulation templates - into beautiful, actionable lifestyle essays. We compile readable schemas so you can map your relational landscape safely.
                         </p>
                       </div>
                     </>
@@ -5488,22 +5488,22 @@ export default function App() {
               <SubscriptionPage onNavigate={navigateTo} />
             )}
 
-            {/* 17d. AI ADVICE ENGINE — the HeartSync Guide */}
+            {/* 17d. AI ADVICE ENGINE  - the HeartSync Guide */}
             {currentTab === 'ai_copilot' && (
               <AiCopilot onNavigate={navigateTo} />
             )}
 
-            {/* 17e. LOVEVAULT — private vault, journal, boundary scripts */}
+            {/* 17e. LOVEVAULT  - private vault, journal, boundary scripts */}
             {currentTab === 'lovevault' && (
               <LoveVault />
             )}
 
-            {/* 18. ADMIN AUTHENTICATION — real sign-in gate */}
+            {/* 18. ADMIN AUTHENTICATION  - real sign-in gate */}
             {currentTab === 'login' && (
               <AdminLogin onNavigate={navigateTo} onSuccess={() => navigateTo('admin')} />
             )}
 
-            {/* 18b. ADMIN CONSOLE PANES (admins only — gated in verifyAndSetTab) */}
+            {/* 18b. ADMIN CONSOLE PANES (admins only  - gated in verifyAndSetTab) */}
             {(currentTab === 'admin' || currentTab === 'access-denied') && (
               <React.Suspense fallback={<div className="min-h-screen" />}>
               <AdminConsole 
@@ -5531,7 +5531,7 @@ export default function App() {
           {/* Site-wide ad-network scripts (Monetag / Adsterra), consent-gated */}
           <AdNetworkScripts />
 
-          {/* Footer Ad Banner (Google AdSense) — never on admin/auth/error views */}
+          {/* Footer Ad Banner (Google AdSense)  - never on admin/auth/error views */}
           {['admin', 'login', 'error', 'access-denied'].every((t) => t !== currentTab) && (
             <AdPlacement slot="footer" lazy />
           )}
@@ -5572,7 +5572,7 @@ export default function App() {
               <div className="space-y-5">
                 <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800 space-y-2">
                   <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider block">How Free Access Works</span>
-                  <p className="text-[11px] text-zinc-300 leading-relaxed">Stay on this screen for a short 15-second moment. No sponsor, no payment — this brief wait helps keep Heartsync's coaching content free to run.</p>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">Stay on this screen for a short 15-second moment. No sponsor, no payment  - this brief wait helps keep Heartsync's coaching content free to run.</p>
                 </div>
 
                 <div className="space-y-2 text-xs text-zinc-300 leading-relaxed">

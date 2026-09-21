@@ -10,7 +10,7 @@
  *
  * Path handling: Netlify v1 events carry rawUrl (the ORIGINAL public URL).
  * serverless-http routes on event.path, which for internal redirects can
- * be the /.netlify/functions/... path — so we restore the public path from
+ * be the /.netlify/functions/... path  - so we restore the public path from
  * rawUrl before handing the event over. A fallback normalizing middleware
  * in server.ts strips the internal prefix if rawUrl is ever absent.
  */

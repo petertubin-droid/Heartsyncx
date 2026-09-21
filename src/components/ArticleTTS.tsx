@@ -3,7 +3,7 @@ import { Volume2, Square, Loader2 } from 'lucide-react';
 import { heartsync } from '../store';
 
 /**
- * Article TTS reader — the server-side /api/tts endpoint (ElevenLabs, with
+ * Article TTS reader  - the server-side /api/tts endpoint (ElevenLabs, with
  * the admin-configured voice) existed but the site never exposed a player.
  * This revives the feature: chunked sequential playback of the article.
  */

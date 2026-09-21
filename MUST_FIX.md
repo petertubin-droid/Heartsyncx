@@ -1,10 +1,10 @@
-# MUST_FIX — HeartSync XHub Remediation Roadmap
+# MUST_FIX  - HeartSync XHub Remediation Roadmap
 
 Living document. Phases 1 and 2 are COMPLETE (see git history: "security(phase-1)" and
 "phase-2" commits). Everything below REMAINS and must be executed before the platform
 can be considered production-ready.
 
-## IMMEDIATE — ACTION REQUIRED OUTSIDE THE REPO (BLOCKER)
+## IMMEDIATE  - ACTION REQUIRED OUTSIDE THE REPO (BLOCKER)
 
 **DONE (2026-09-20): the live project (`pdtibsfasvicjptqirro`, Hearty) HAS been
 migrated.** `supabase/schema.sql` was run end-to-end against production. Along the way
@@ -18,7 +18,7 @@ predicate fixes (live `subscriptions`/`user_settings` use uuid `user_id`).
 Post-migration verification (all checked live):
 - [x] `public.handle_new_user()` sets `role = 'user'` (no client metadata trust)
 - [x] `is_admin()` role list matches the JS `ADMIN_ROLES` list (incl. 'Super Admin')
-- [x] `profiles.email` NOT selectable by `anon` — REST test with the anon key:
+- [x] `profiles.email` NOT selectable by `anon`  - REST test with the anon key:
       `?select=email` => 401 permission denied; `?select=id,full_name` => 200
 - [x] `site_settings` has the new `ads_*`, `tts_*`, `raw_settings`, `ad_slots` columns
 - [x] `integration_settings` / `integration_logs` match the key/value model
@@ -27,7 +27,7 @@ Post-migration verification (all checked live):
 - [x] `digital_products` + `digital_product_orders` tables + RLS policies exist and
       the `digital_product_download(p_token)` RPC exists (anon can redeem by token only)
 - [ ] a test purchase webhook creates an order with a working download token
-      (deferred: E2E requires a live gateway key — see Phase 3 checkout E2E)
+      (deferred: E2E requires a live gateway key  - see Phase 3 checkout E2E)
 - [x] `user_settings` has the "Users insert own settings" policy
 - [x] storage bucket upload policies require `is_admin()` (with_check verified)
 - [x] no legacy API key values remain in `site_settings` (secret-cleanup DO block ran;
@@ -37,15 +37,15 @@ Post-migration verification (all checked live):
 
 ## PHASE 2 (remaining items)
 
-- [x] M-08: DONE — /api/subscribe now persists directly to the subscribers table
+- [x] M-08: DONE  - /api/subscribe now persists directly to the subscribers table
       (email UNIQUE); duplicates resolve to idempotent success and welcome emails
       fire only for genuinely new subscribers.
-- [x] H-06: DONE — digital products fully DB-backed (digital_products +
+- [x] H-06: DONE  - digital products fully DB-backed (digital_products +
       digital_product_orders, admin CRUD, webhook-only order fulfilment, token
       download RPC). The fake seed products and dead heartsync.app URLs are gone;
       the catalog starts empty. Pending: real signed storage URLs when products
       are created (file_url currently admin-supplied).
-- [x] H-08: DONE (2026-09-20) — decision: the serverless model wins; every durable
+- [x] H-08: DONE (2026-09-20)  - decision: the serverless model wins; every durable
       store now lives in Supabase, applied live to Hearty (pdtibsfasvicjptqirro) and
       verified with smoke tests:
       - GDPR engine: gdpr_audit_log / gdpr_dsr_requests / diagnostic_results tables
@@ -64,9 +64,9 @@ Post-migration verification (all checked live):
         site-state read cache (caches with DB sync). Cold starts now lose nothing that
         matters: user data, GDPR records, analytics and module installs all survive.
 
-## PHASE 3 — Missing tests
+## PHASE 3  - Missing tests
 
-- [x] Server route tests: DONE — `server/__tests__/server-security.test.ts` runs the
+- [x] Server route tests: DONE  - `server/__tests__/server-security.test.ts` runs the
       real Express app on an ephemeral port with mocked Supabase: 21-route auth
       matrix (401 anon / 403 non-admin / admin admitted), suspended-admin block,
       public-route contract, state-sync sanitization end-to-end, subscribe
@@ -78,17 +78,17 @@ Post-migration verification (all checked live):
       hardcode, is_admin vocabulary, profiles column grants, engagement RPC
       guards, digital-product policies, subscribers UNIQUE). Live RLS behavior is
       verified by the post-migration checklist above (requires the live DB).
-- [x] Admin flow tests: DONE — admin settings save, integrations save/read with
+- [x] Admin flow tests: DONE  - admin settings save, integrations save/read with
       error surfacing, service-role honesty. Setup-wizard live promotion test runs
       after migration when SUPABASE_SERVICE_ROLE_KEY is present.
 - [ ] Checkout E2E: /api/subscriptions/checkout -> gateway -> webhook ->
       subscription row. Requires live gateway keys; do after migration + keys.
 
-## PHASE 4 — Architecture / duplication
+## PHASE 4  - Architecture / duplication
 
 - [x] DONE (2026-09-20): ad config collapsed to a single source. The production
       publisher ID (ca-pub-3404100134534192) now lives ONLY in site_settings
-      (migrated into the live DB — identical value the old code fallback served,
+      (migrated into the live DB  - identical value the old code fallback served,
       so live behavior unchanged). server getAdsenseConfig has NO hardcoded
       fallback anymore (honest absence when unconfigured) and the dist-HTML swap
       is guarded on a non-empty ID. AdminConsole ad-provider/auto-script templates
@@ -100,7 +100,7 @@ Post-migration verification (all checked live):
       site_settings via /api/state; the LocalStorage auto-migrate block is gone.
 - [x] DONE (2026-09-20): ALL client creation unified through
       createSupabaseClient() in src/lib/supabaseConfig.ts (the shared
-      dependency-free config module) — store boot client, server
+      dependency-free config module)  - store boot client, server
       getSupabaseClient, adminAuthMiddleware verify client, getAdminDbClient,
       getServiceRoleSupabase, and the subscription-mirror user-scoped client
       (6 call sites). Same cleaning rules for every client; user-scoped
@@ -109,7 +109,7 @@ Post-migration verification (all checked live):
 - [x] DONE (2026-09-20): dead code removed. The whole Cloud SQL path is gone:
       `getPgPool`/`getAdminPgPool`/`decoratePoolWithRetry`, the `pg` import and
       dependency (lockfile pruned), the 9 call-site `if (pool) {direct SQL} else
-      {Supabase}` branches (only the live Supabase path remains — behavior
+      {Supabase}` branches (only the live Supabase path remains  - behavior
       identical since pool was always null), `tuneSupabaseDatabase`, the unused
       routes `/api/gemini/summarize`, `/api/gemini/run-ai-feature`,
       `/api/gemini/generate-page` (verified zero callers), and
@@ -141,45 +141,45 @@ Post-migration verification (all checked live):
       10 hardcoded slugs, so the client Supabase sync dropped EVERY category.
       The DB is now the single source of truth for category visibility.
 
-## PHASE 5 — Performance
+## PHASE 5  - Performance
 
 - [x] DONE (2026-09-20): boot payload fully projected. Posts ship list-only
       (per-article body via public GET /api/posts/:slug + ensureArticleContent);
       subscribers ship (email, source, subscribed_at) only; comments ship public
-      columns only — author_email (PII) is projected out at the query AND
+      columns only  - author_email (PII) is projected out at the query AND
       stripped at state assembly (defense in depth, regression-tested), and
       the admin state-sync upsert omits the column when absent so stored
       emails can never be blanked. pages.content stays by design (reader tabs
       render it directly; table is bounded ~16 rows). audit_logs/payments
-      remain capped. Remaining ~20 tables are small config/domain tables —
+      remain capped. Remaining ~20 tables are small config/domain tables - 
       pagination deferred until any of them grows unbounded.
 - [x] DONE (2026-09-20): AdminConsole split out of the reader bundle via
-      React.lazy + Suspense (own chunk, ~1.16 MB / 270 KB gzip) — it only
+      React.lazy + Suspense (own chunk, ~1.16 MB / 270 KB gzip)  - it only
       downloads when an admin opens the admin tab. Reader bundle dropped to
       ~1.70 MB / 488 KB gzip. Verified in a real vite build (AdminConsole-*.js
       emitted as a separate dynamic chunk).
 - [x] DONE (2026-09-20): double boot fetch eliminated. /api/state (fresh from
-      Supabase with a 15s TTL) is the single boot fetch — initSupabaseConnection
+      Supabase with a 15s TTL) is the single boot fetch  - initSupabaseConnection
       no longer fires a redundant full-table syncWithSupabase() on top of it.
       syncWithSupabase stays for explicit re-syncs (admin login refresh).
       Bonus: realtime postgres-change events (which arrive in bursts) now
       debounced to one trailing /api/state refresh instead of one per event.
-- [x] DONE (2026-09-20): posts projected to list columns everywhere — the
+- [x] DONE (2026-09-20): posts projected to list columns everywhere  - the
       server boot state (POST_LIST_COLUMNS), the client store's direct sync,
       and all existing list consumers (sitemap/RSS) were already projected.
       Per-article bodies load lazily via GET /api/posts/:slug (public,
       published-only) + store.ensureArticleContent; reader open and the admin
       quiz-generator flow both enrich on demand. 3 new route tests.
 
-## PHASE 6 — SEO / PWA / a11y
+## PHASE 6  - SEO / PWA / a11y
 
 - [x] DONE (2026-09-20): canonical/OG URLs, robots.txt, sitemap.xml,
       sitemap-images, and RSS all already derive from the request host at
       runtime (no hardcoded heartsyncxhub.vercel.app in served responses).
       Outbound-email links (footer CTA + unsubscribe) now flow through
-      getPublicSiteUrl() — env-driven (PUBLIC_SITE_URL). OWNER DECISION
+      getPublicSiteUrl()  - env-driven (PUBLIC_SITE_URL). OWNER DECISION
       UPDATED (2026-09-21): the canonical public domain is now
-      https://heartsyncx.netlify.app (owner-confirmed) — the getPublicSiteUrl()
+      https://heartsyncx.netlify.app (owner-confirmed)  - the getPublicSiteUrl()
       default, sitemap generator default, robots.txt, static sitemap.xml and
       index.html canonical/OG tags all match it.
       Recommended (not required): still set PUBLIC_SITE_URL/SITE_URL in the
@@ -189,17 +189,17 @@ Post-migration verification (all checked live):
       WAI-ARIA dialog pattern (Escape closes, Tab/Shift+Tab trapped, focus lands
       inside on open, focus restored to the invoker on close) via a shared
       useDialogA11y hook. Applied to: the article image lightbox (NEW
-      ImageLightbox.tsx — the lightboxImage state existed since the original
+      ImageLightbox.tsx  - the lightboxImage state existed since the original
       build but nothing ever rendered it, so clicking article images did
       nothing despite the zoom cursor) and the CookieBanner preferences modal
       (previously aria-modal without Escape/trap; MobileMenu already had its
       own). Form label audit: all 28 reader-facing inputs now have accessible
-      names — purchase forms got real <label htmlFor> associations (span
+      names  - purchase forms got real <label htmlFor> associations (span
       pseudo-labels), comment/newsletter/LiveChat/LoveVault inputs got
       aria-labels, SubscriptionPage got id+htmlFor pairs for its 10 inputs.
       Contrast: 15 previously-UNDEFINED theme color steps (zinc-450 used 53x,
       zinc-550 18x, zinc-750 23x, zinc-905 4x, plus 11 single-use typos) were
-      silently resolving to inherited colors — all defined now; zinc-450 maps
+      silently resolving to inherited colors  - all defined now; zinc-450 maps
       to zinc-500 (not 400) because zinc-400 on white is ~2.9:1 and fails WCAG
       AA for the small caption text using it. 5 new tests (lightbox dialog
       contract + cookie-modal Escape). Suite 192/192, tsc clean.
@@ -209,12 +209,12 @@ Post-migration verification (all checked live):
       sitemap step) replaces it with the deploy commit sha (VERCEL_GIT_COMMIT_SHA)
       or a local build timestamp. Every deploy publishes fresh cache names, so
       the browser's byte-compare triggers the SW update and the existing
-      activation cleanup deletes the old-version caches — no manual bumping.
+      activation cleanup deletes the old-version caches  - no manual bumping.
       Unstamped file (raw dev serve) falls back to a 'dev' version safely.
 
-## PHASE 7 — Documentation honesty
+## PHASE 7  - Documentation honesty
 
-- [x] DONE (2026-09-20): README rewritten to match reality — the blanket
+- [x] DONE (2026-09-20): README rewritten to match reality  - the blanket
       "no mock integrations" claim replaced with a precise honesty statement,
       plus an explicit "Honest limitations" section (GDPR store in-memory,
       module registry server-local, payments live-E2E unverified, M-01/M-02)
@@ -228,10 +228,10 @@ Post-migration verification (all checked live):
 - M-01: rate limiter trusts spoofable `x-forwarded-for` (needs a durable store first).
 - M-02: CSP still allows `unsafe-inline`/`unsafe-eval`; CORS defaults to an AI Studio
   dev origin (needs an ad-network/script-inventory decision before tightening).
-- H-09: subscriptions/payments must never be serialized into public GET /api/state —
+- H-09: subscriptions/payments must never be serialized into public GET /api/state - 
   currently empty only because RLS blocks anon reads; enforce explicitly in Phase 3.
 
-## AUTH / LOGIN AUDIT (2026-09-21) — root causes found + fixed
+## AUTH / LOGIN AUDIT (2026-09-21)  - root causes found + fixed
 
 User report: email signup creates no account, Google sign-in creates no account,
 admin cannot log in. Findings, verified live against the Hearty project
@@ -239,21 +239,21 @@ admin cannot log in. Findings, verified live against the Hearty project
 
 - **BLOCKER: the /api serverless function crashed on EVERY invocation**
   (500 FUNCTION_INVOCATION_FAILED). The api/index.ts + vercel.json entrypoint
-  (58b3382) had never deployed before — its build was broken (includeFiles
+  (58b3382) had never deployed before  - its build was broken (includeFiles
   schema) until the c2fcc61 fix, so the first successful deploy ran it cold.
   Every auth flow dies here: /api/auth/sync-profile 500s right after a
   successful Supabase sign-in, so the client signs the user back out.
   Fixes (commit b511558):
   1. api/index.ts catches boot/register failures and answers a visible 500
-     JSON with the error detail — a rejected handler promise was rendering
+     JSON with the error detail  - a rejected handler promise was rendering
      as an opaque FUNCTION_INVOCATION_FAILED on every route.
-  2. server.ts isProduction now includes `!!process.env.VERCEL` — the dev
+  2. server.ts isProduction now includes `!!process.env.VERCEL`  - the dev
      branch `await import('vite')` runs in the lambda only if NODE_ENV is
      unset AND dist/ is absent; vite is a devDependency that is never traced
      into the bundle → MODULE_NOT_FOUND at cold start.
 - **Supabase Auth: Confirm email is now OFF** (mailer_autoconfirm=true, set
   via Management API 2026-09-21). No SMTP was configured, so confirmation
-  emails never arrived — every new signup sat unconfirmed and could never
+  emails never arrived  - every new signup sat unconfirmed and could never
   sign in. Signups now get an immediate session.
 - **admin@heartsync.app repaired**: created 2026-07-24 via the setup wizard,
   which died at the unconfirmed-email step (so the account stayed
@@ -261,7 +261,7 @@ admin cannot log in. Findings, verified live against the Hearty project
   promoted to admin in the DB (2026-09-21), completing the wizard's intent.
   petertubin@gmail.com was already admin and confirmed.
 - **Google OAuth verified live**: the authorize endpoint redirects to the
-  Google consent page (no redirect_uri_mismatch) — client
+  Google consent page (no redirect_uri_mismatch)  - client
   66066586618-...apps.googleusercontent.com has
   https://pdtibsfasvicjptqirro.supabase.co/auth/v1/callback registered, and
   site/redirect host heartsyncxhub.vercel.app is valid. Google sign-in was
@@ -273,13 +273,13 @@ admin cannot log in. Findings, verified live against the Hearty project
   3. admin login at /admin with admin@heartsync.app
   4. Google sign-in roundtrip → account + profile created
 
-## UI / UX AUDIT (2026-09-21) — sticky dock fix + broken/dead UI inventory
+## UI / UX AUDIT (2026-09-21)  - sticky dock fix + broken/dead UI inventory
 
 ### FIXED (commit pending deploy)
 - **Sticky mobile share dock + reading-progress bar scrolled away with the page.**
   Root cause: the page-transition wrapper (`motion.div` in `<main>`) carries
   `transform: translateZ(0)` for GPU animation. Per CSS spec, any ancestor
-  transform creates a NEW containing block for `position: fixed` descendants —
+  transform creates a NEW containing block for `position: fixed` descendants - 
   so the dock/progress bar were "fixed" relative to the animated page wrapper,
   not the viewport, and scrolled away. Both now render via createPortal to
   document.body, escaping the transformed ancestor. Same class of bug cannot
@@ -287,7 +287,7 @@ admin cannot log in. Findings, verified live against the Hearty project
   animated wrapper will need the same treatment.
 
 ### BROKEN / DEAD UI (needs decisions or fixes)
-1. **~39 admin settings are dead toggles/selects** — settable in AdminConsole,
+1. **~39 admin settings are dead toggles/selects**  - settable in AdminConsole,
    stored in site_settings, but ZERO code on the live site reads them:
    - Article reading: article_layout, article_content_width,
      article_desktop_content_width, article_line_height,
@@ -296,7 +296,7 @@ admin cannot log in. Findings, verified live against the Hearty project
      article_atmospheric_linen, article_editorial_notes_enabled
    - Sidebar: article_desktop_sidebar_sticky/visible/width/position,
      article_desktop_related_placement
-   - Mobile: article_mobile_share_style (dock/inline/floating — always dock),
+   - Mobile: article_mobile_share_style (dock/inline/floating  - always dock),
      article_mobile_sticky_actions, article_mobile_progress_bar
    - Brand: brand_font, brand_theme, brand_button_radius, brand_heading_weight,
      brand_hover_animation, brand_glow_accent
@@ -317,29 +317,29 @@ admin cannot log in. Findings, verified live against the Hearty project
    behavior that doesn't exist. The TTS and security panels are the most
    misleading.
 2. **"Table of Connections" sidebar widget** (static fallback sidebar): items
-   have cursor-pointer + hover styling but NO click handler — dead interactive
+   have cursor-pointer + hover styling but NO click handler  - dead interactive
    element (App.tsx ~line 4762).
 3. **Rewarded-ad overlay is a hardcoded fake**: the "Heartsync Ad Exchange"
    overlay presents "Aura Meditation App" as the sponsor with a 15s fake watch
-   flow — no real sponsor content. It "unlocks 3 hours of access" that the
+   flow  - no real sponsor content. It "unlocks 3 hours of access" that the
    platform doesn't enforce. Either wire to a real ad network or remove.
 4. **alert() used for error UX** in AdminConsole (category save, newsletter
-   send), LiveChatWidget (attachments), RichTextEditor (validation/upload) —
+   send), LiveChatWidget (attachments), RichTextEditor (validation/upload) - 
    blocks the JS thread and reads as a browser error, not app UI. Replace
    with the existing toast system.
 5. **5 console.log calls** left in production frontend code.
 6. Newsletter template preview link is a literal `href="#"` placeholder
-   (minor — it's an editable template).
+   (minor  - it's an editable template).
 
 ### VERIFIED WORKING (no action)
 - Header sticky toggle (Header.tsx) IS wired (headerPositionClass).
-- Adsterra key slots, monetag_script_code, adsense publisher id — used by
+- Adsterra key slots, monetag_script_code, adsense publisher id  - used by
   AdPlacement/AdNetworkScripts.
 - CookieBanner/LiveChat/MobileMenu/Lightbox/LoadingSystem fixed-position
-  elements render OUTSIDE the transformed wrapper — unaffected by the
+  elements render OUTSIDE the transformed wrapper  - unaffected by the
   containing-block bug.
 
-## UI / UX AUDIT — FIX ROUND 2 (2026-09-21)
+## UI / UX AUDIT  - FIX ROUND 2 (2026-09-21)
 
 ### WIRED (previously dead settings, now functional)
 - Article layout: article_layout (narrow = centered no-sidebar), article_desktop_sidebar_visible,
@@ -358,7 +358,7 @@ admin cannot log in. Findings, verified live against the Hearty project
 - alert() -> triggerToast() in AdminConsole (category save, newsletter send)
 - 5 console.log statements removed from AdminLogin (they logged admin emails to the console)
 
-### STILL DEAD — needs removal from AdminConsole (settings that lie)
+### STILL DEAD  - needs removal from AdminConsole (settings that lie)
 TTS panel (tts_*), security panel (security_2fa/max_attempts/session_timeout),
 newsletter_subject/template, expert_reviewer_*, monetag_format, adsterra_script_code,
 adsense_auto_script, rewarded_ad_config, ai_model_selected, ai_prompt_prefix,
@@ -367,17 +367,17 @@ brand_* (needs a real CSS-variable theme system to wire honestly),
 article_editorial_notes_enabled (no editor-note data field exists to gate).
 Also remaining: alert() in LiveChatWidget + RichTextEditor, newsletter template href="#" placeholder.
 
-## UI / UX AUDIT — FIX ROUND 3 (2026-09-21): honesty pass + audit corrections
+## UI / UX AUDIT  - FIX ROUND 3 (2026-09-21): honesty pass + audit corrections
 
-### CORRECTIONS to earlier audit claims (server.ts uses these — NOT dead)
-- TTS panel: real server endpoints (/api/tts, /api/admin/tts/*) — voice config is functional
+### CORRECTIONS to earlier audit claims (server.ts uses these  - NOT dead)
+- TTS panel: real server endpoints (/api/tts, /api/admin/tts/*)  - voice config is functional
 - digital_products: real Supabase table + full server CRUD (storefront page not built yet, but admin is real)
 - monetag_format: used by server rendering
 - brand_font / brand_theme: used by server
 - newsletter_subject / newsletter_template: sent in the /api/newsletter/send payload
 - ai_prompt_prefix: sent to /api/gemini/assist as promptType (alive)
 
-### REMOVED (settings that lied — no reader on server or site)
+### REMOVED (settings that lied  - no reader on server or site)
 - Security pane: 2FA toggle, lockout retries, session timeout card (nothing enforced them;
   the pane keeps its real LocalStorage Audit & Sanitizer)
 - AI pane: fake "Core Engine Selection" model dropdown (the model value went nowhere)
@@ -403,7 +403,7 @@ Also remaining: alert() in LiveChatWidget + RichTextEditor, newsletter template 
 Per AdSense site review requirements: the reviewer's crawler must SEE ad
 placements and content (no consent walls hiding everything, no blocked
 resources, no empty slots). robots.txt already only blocks /admin /api /login
-/search /access-denied — compliant.
+/search /access-denied  - compliant.
 
 ### Changes
 1. AdPlacement: slot containers + <ins class="adsbygoogle"> markup now ALWAYS
@@ -447,7 +447,7 @@ Round 4 (markup renders regardless of consent).
 Admin: new "Automatic In-Article Ad Density" toggle in Admin > Ads
 (in_article_ads_auto_enabled, default ON; off = single mid-article unit).
 
-### TTS reader (ArticleTTS.tsx) — revived
+### TTS reader (ArticleTTS.tsx)  - revived
 "Listen to this article" button under every article headline. Chunks the
 markdown (images/code stripped, sentence-boundary splits under the server's
 1500-char cap), calls the existing /api/tts endpoint with the admin-configured
@@ -461,14 +461,14 @@ voice, plays chunks sequentially with stop control and honest error states.
 
 ## ROUND 6 (2026-09-21): article reader polish + Google login root cause
 
-### Google OAuth login failure — ROOT CAUSE FOUND (owner action required)
+### Google OAuth login failure  - ROOT CAUSE FOUND (owner action required)
 Supabase project pdtibsfasvicjptqirro (Hearty) has Site URL =
-https://heartsyncx-petertubin-droids-projects.vercel.app — a DEAD Vercel
+https://heartsyncx-petertubin-droids-projects.vercel.app  - a DEAD Vercel
 deployment (now redirects to a Vercel login interstitial). After Google
 consent, Supabase redirects users there (https://heartsyncxhub.vercel.app is
 NOT in the Redirect URL allow-list), so the phone shows a desktop-styled
 Vercel page and login never completes. Verified: authorize endpoint is
-healthy, Google accepts the callback URI — only the redirect target is wrong.
+healthy, Google accepts the callback URI  - only the redirect target is wrong.
 OWNER ACTION (Supabase Dashboard → Authentication → URL Configuration):
 1. Site URL: https://heartsyncx.netlify.app
 2. Redirect URLs: add https://heartsyncx.netlify.app/** (and keep any still-live hosts)
@@ -480,7 +480,7 @@ OWNER ACTION (Supabase Dashboard → Authentication → URL Configuration):
 - App.tsx: removed the ambient soundscape feature entirely (Web Audio synth
   engine, "Sound: Off" toolbar dropdown, admin toggle "Subtle Somatic Acoustic
   Pulses" in AdminConsole). No dead setting left behind.
-- App.tsx: article reader header redesigned — "Back to Journal / Premium
+- App.tsx: article reader header redesigned  - "Back to Journal / Premium
   Reader" mono row replaced with a clean "All Articles" back link + compact
   professional toolbar (theme color swatches with tooltips, A-/A+ text size,
   bookmark, print).

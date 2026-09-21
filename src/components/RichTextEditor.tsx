@@ -1280,7 +1280,7 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
                 </p>
                 {inArticleQuoteAuthor && (
                   <cite className="block mt-3 text-xs font-sans not-italic font-bold text-zinc-550 dark:text-zinc-400 uppercase tracking-widest">
-                    — {inArticleQuoteAuthor}
+                     - {inArticleQuoteAuthor}
                   </cite>
                 )}
               </div>

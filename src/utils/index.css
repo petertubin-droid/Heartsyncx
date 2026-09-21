@@ -434,7 +434,7 @@ html.dark, html.dark body {
 
 /* =========================================================
    Mobile article fit (2026-09-21): grid columns get min-w-0 in
-   App.tsx, and here the reading body itself is made blowout-proof —
+   App.tsx, and here the reading body itself is made blowout-proof - 
    wide media and long words can no longer overlap the viewport or
    push the layout sideways on small screens.
    ========================================================= */

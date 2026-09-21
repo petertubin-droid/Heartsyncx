@@ -1,5 +1,5 @@
 // @vitest-environment node
-// PHASE 3 TEST SUITE — security contract, auth matrix, and persistence behaviors
+// PHASE 3 TEST SUITE  - security contract, auth matrix, and persistence behaviors
 // for the HeartSync XHub backend. The Express app runs for real on an ephemeral
 // port with @supabase/supabase-js fully mocked; everything else executes as-is.
 import './env-setup';
@@ -164,7 +164,7 @@ const PROTECTED_ROUTES: Array<[string, string]> = [
 ];
 
 // ===========================================================================
-// 1. LIVE AUTH MATRIX — every protected route, three identities
+// 1. LIVE AUTH MATRIX  - every protected route, three identities
 // ===========================================================================
 describe('auth matrix (live app, mocked Supabase)', () => {
   it.each(PROTECTED_ROUTES)('%s %s -> 401 for anonymous callers', async (method, route) => {
@@ -454,7 +454,7 @@ describe('GET /api/state comment PII boundary', () => {
       content: 'Loved this', is_approved: true, parent_id: null,
       created_at: new Date().toISOString()
     }];
-    // The server caches /api/state for 15s (CACHE_TTL) — wait past it so the
+    // The server caches /api/state for 15s (CACHE_TTL)  - wait past it so the
     // fresh fetch sees the seeded comment row.
     await new Promise((r) => setTimeout(r, 15500));
     const res = await req('GET', '/api/state');

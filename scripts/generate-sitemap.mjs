@@ -3,7 +3,7 @@
  * Build-time sitemap + robots generation for the static (Vercel) deployment.
  *
  * The Express server generates these dynamically on Cloud Run, but on Vercel
- * only the static Vite build is served — so this script regenerates them in
+ * only the static Vite build is served  - so this script regenerates them in
  * dist/ with the production base URL and the FULL article corpus, including
  * articles that live in the codebase (src/utils/data/articles) and never
  * touch the database.
@@ -37,7 +37,7 @@ const STATIC_PAGES = [
   { loc: '/advertise', changefreq: 'monthly', priority: '0.3' }
 ];
 
-// Category slugs — the real site categories from src/utils/data/moreArticles.ts
+// Category slugs  - the real site categories from src/utils/data/moreArticles.ts
 const CATEGORY_SLUGS = [
   'love-relationships',
   'dating-romance',
@@ -67,7 +67,7 @@ const moreArticleSlugs = (() => {
   if (!existsSync(file)) return [];
   const content = readFileSync(file, 'utf8');
   // moreArticles.ts contains BOTH category objects and post objects with slug
-  // fields — filter the category slugs out so only real article URLs ship.
+  // fields  - filter the category slugs out so only real article URLs ship.
   const slugs = [];
   for (const match of content.matchAll(/slug:\s*'([^']+)'/g)) {
     if (!CATEGORY_SLUGS.includes(match[1])) {
@@ -91,7 +91,7 @@ for (const slug of CATEGORY_SLUGS) {
 }
 
 for (const slug of allSlugs) {
-  if (CATEGORY_SLUGS.includes(slug)) continue; // slug collision with a category — article URLs win below
+  if (CATEGORY_SLUGS.includes(slug)) continue; // slug collision with a category  - article URLs win below
   urls.push({ loc: `${BASE_URL}/article/${slug}`, changefreq: 'monthly', priority: '0.6' });
 }
 

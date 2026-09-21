@@ -135,13 +135,13 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
-    // Advertising providers — consent-split, honest configuration only.
+    // Advertising providers  - consent-split, honest configuration only.
     // AdSense may serve after ANY explicit consent choice because AdPlacement
     // requests non-personalized ads (requestNonPersonalizedAds: 1) when
     // marketing is denied (Google NPA policy). Monetag, Adsterra and Meta
     // Pixel are personalization-only networks: they inject ONLY with
     // explicit marketing consent. No demo/test publisher, zone or key IDs
-    // are ever injected — an unconfigured network injects nothing.
+    // are ever injected  - an unconfigured network injects nothing.
     if (hasConsented) {
       // 1. Google AdSense
       const adsenseActive = heartsync?.site_settings?.adsense_active ?? true;
@@ -216,7 +216,7 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       functional: true,
     };
     heartsync.setLocalStorage('heartsync_cookie_consent', 'accepted');
-    heartsync.setLocalStorage('heartsync_cookie_preferences', fullPrefs); // setLocalStorage stringifies — passing a pre-stringified value double-encodes it and breaks reload restore
+    heartsync.setLocalStorage('heartsync_cookie_preferences', fullPrefs); // setLocalStorage stringifies  - passing a pre-stringified value double-encodes it and breaks reload restore
     document.cookie = "heartsync_cookie_consent=accepted; max-age=31536000; path=/; SameSite=Lax";
     
     setPreferences(fullPrefs);

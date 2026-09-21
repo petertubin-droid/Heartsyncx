@@ -2,7 +2,7 @@
 
 **Mindful insights for connected hearts.** A premium relationship, emotional-wellness, and dating-advice publishing platform: an editorial front end for readers, a full admin console for the team, and an Express API that serves both.
 
-> Honest platform, honest software. Features either work against real services or clearly report that they are not configured yet. Where a subsystem is intentionally still in-memory or simulated while we finish persisting it, we say so below — in this codebase, honesty means matching the docs to reality, not claiming perfection.
+> Honest platform, honest software. Features either work against real services or clearly report that they are not configured yet. Where a subsystem is intentionally still in-memory or simulated while we finish persisting it, we say so below  - in this codebase, honesty means matching the docs to reality, not claiming perfection.
 
 ## Features
 
@@ -70,10 +70,10 @@ Every integration degrades honestly: without a key, the related feature reports 
 
 ```bash
 npm run build   # vite build (SPA) + esbuild server bundle -> dist/
-npm start       # node dist/server.cjs — serves the API and the SPA on one origin
+npm start       # node dist/server.cjs  - serves the API and the SPA on one origin
 ```
 
-The platform is designed as a **single-origin deployment**: one Express process serves both `dist/` static files and the `/api/*` routes. On Vercel, pair the static frontend with a hosted instance of `dist/server.cjs` (or rewrites that proxy `/api/*` to it) — a static-only Vercel deploy cannot serve the API.
+The platform is designed as a **single-origin deployment**: one Express process serves both `dist/` static files and the `/api/*` routes. On Vercel, pair the static frontend with a hosted instance of `dist/server.cjs` (or rewrites that proxy `/api/*` to it)  - a static-only Vercel deploy cannot serve the API.
 
 First-run setup: visit `/admin` and complete the first-admin registration wizard (`/api/setup/register` creates the initial administrator; further sign-ins use Supabase email/password).
 
@@ -97,7 +97,7 @@ First-run setup: visit `/admin` and complete the first-admin registration wizard
 
 ## Security notes
 
-- Admin routes require a valid Supabase session JWT **and** an admin role in `profiles` — verified server-side on every request.
+- Admin routes require a valid Supabase session JWT **and** an admin role in `profiles`  - verified server-side on every request.
 - Payment records are written only by gateway-verified webhooks, never by client calls.
 - The service-role key belongs in server environment variables only. `site_settings` is readable by the public API, so it must never carry privileged keys.
 
@@ -122,15 +122,15 @@ These are real gaps still open on the roadmap (`MUST_FIX.md`), not surprises:
 All credentials are **environment-only**. There are no key fallbacks in code,
 and `site_settings` (served publicly by `/api/state`) never stores keys:
 
-- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — client + server connection
+- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`  - client + server connection
   (server may also use `SUPABASE_URL` / `SUPABASE_ANON_KEY`).
-- `SUPABASE_SERVICE_ROLE_KEY` — server-only, privileged writes (payments, admin
+- `SUPABASE_SERVICE_ROLE_KEY`  - server-only, privileged writes (payments, admin
   promotion). Never exposed to any client path.
 - `GEMINI_API_KEY`, `ELEVENLABS_API_KEY`, ad-network secrets, payment gateway
-  secrets — server environment only.
+  secrets  - server environment only.
 - Historical keys found in `site_settings` are scrubbed by a SQL cleanup block
   in `supabase/schema.sql`; the admin UI stores only non-secret configuration.
 
 ## License
 
-Proprietary — © HeartSync. All rights reserved.
+Proprietary  - © HeartSync. All rights reserved.

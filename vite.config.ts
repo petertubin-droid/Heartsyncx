@@ -5,7 +5,7 @@ import { defineConfig, loadEnv } from 'vite';
 
 // Build-time guard: a Supabase service_role key must NEVER be inlined
 // into the public client bundle. If the anon-key env slot contains a
-// service_role JWT (easy paste mistake), fail the build LOUDLY here —
+// service_role JWT (easy paste mistake), fail the build LOUDLY here - 
 // otherwise Netlify's deploy-time secrets scanning silently blocks it.
 function assertAnonOnly(name: string, value: string): string {
   if (!value || value.split('.').length !== 3) return value;
@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
-      // Inject Supabase PUBLIC config into the client bundle — anon key only.
+      // Inject Supabase PUBLIC config into the client bundle  - anon key only.
       // assertAnonOnly makes a service_role paste mistake fail the build
       // here, where the error is readable, instead of Netlify secrets
       // scanning silently blocking the deploy.
@@ -61,7 +61,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
+      // Do not modify - file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},

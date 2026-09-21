@@ -1,7 +1,7 @@
 /**
  * Stamps __SW_VERSION__ in dist/sw.js with the deploy commit sha (or a UTC
  * timestamp for local builds) so every deploy publishes fresh service-worker
- * cache names automatically — the manual 'v2' bump process is gone.
+ * cache names automatically  - the manual 'v2' bump process is gone.
  */
 import { readFileSync, writeFileSync } from 'fs';
 

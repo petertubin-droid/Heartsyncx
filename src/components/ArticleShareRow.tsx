@@ -20,7 +20,7 @@ const flatBtn = 'p-2 text-zinc-500 dark:text-zinc-400 hover:text-rose-500 flex f
  * Web-intent platforms (X, Facebook, LinkedIn, WhatsApp, Telegram, Reddit,
  * email, native share) open directly. TikTok and Instagram have NO web share
  * intent (both are app-only posting surfaces), so their buttons copy the
- * article link and prompt the reader to paste it into a post — the honest,
+ * article link and prompt the reader to paste it into a post  - the honest,
  * working pattern used by every major publisher.
  */
 export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, compact = false, className = '' }) => {
@@ -35,9 +35,9 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
   const copyLink = async (platformHint?: string) => {
     try {
       await navigator.clipboard.writeText(shareUrl);
-      flashHint(platformHint ? `Link copied — ${platformHint}` : 'Copied link!');
+      flashHint(platformHint ? `Link copied  - ${platformHint}` : 'Copied link!');
     } catch {
-      flashHint('Copy failed — select the address bar instead');
+      flashHint('Copy failed  - select the address bar instead');
     }
   };
 
@@ -128,7 +128,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
           {!compact && <span className="text-[8px] uppercase tracking-wider">Post</span>}
         </a>
 
-        {/* Instagram — app-only posting: copy link, prompt to paste */}
+        {/* Instagram  - app-only posting: copy link, prompt to paste */}
         <button
           type="button"
           onClick={() => copyLink('paste it in your Instagram story or post')}
@@ -140,7 +140,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
           {!compact && <span className="text-[8px] uppercase tracking-wider">Insta</span>}
         </button>
 
-        {/* TikTok — app-only posting: copy link, prompt to paste */}
+        {/* TikTok  - app-only posting: copy link, prompt to paste */}
         <button
           type="button"
           onClick={() => copyLink('paste it in your TikTok video or bio')}

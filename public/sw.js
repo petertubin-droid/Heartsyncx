@@ -1,12 +1,12 @@
 /* ============================================================================
-   HEARTSYNC COZY OFFLINE READER — SERVICE WORKER
+   HEARTSYNC COZY OFFLINE READER  - SERVICE WORKER
    Provides offline caching, stale-while-revalidate for articles, and instant 
    pre-caching of bookmarked/saved relationship guides.
    ============================================================================ */
 
 // __SW_VERSION__ is stamped at build time by scripts/stamp-sw-version.mjs
 // (deploy commit sha, or timestamp locally). Every deploy therefore publishes
-// new cache names, and the existing cleanup pass deletes the old caches —
+// new cache names, and the existing cleanup pass deletes the old caches - 
 // no manual 'v2' bumping. Unstamped file (raw dev serve) falls back to 'dev'.
 const SW_VERSION = (() => {
   const v = '__SW_VERSION__';
@@ -28,7 +28,7 @@ const PRECACHE_ASSETS = [
   '/robots.txt',
 ];
 
-// 1. INSTALL EVENT — Pre-cache App Shell
+// 1. INSTALL EVENT  - Pre-cache App Shell
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
@@ -40,7 +40,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// 2. ACTIVATE EVENT — Clean up stale caches
+// 2. ACTIVATE EVENT  - Clean up stale caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -56,7 +56,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. FETCH EVENT — Smart Caching Strategy
+// 3. FETCH EVENT  - Smart Caching Strategy
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
@@ -66,7 +66,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // A. Navigation / HTML Requests — Network First, Fallback to Cached SPA Index or Offline Fallback
+  // A. Navigation / HTML Requests  - Network First, Fallback to Cached SPA Index or Offline Fallback
   if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
       fetch(req)
@@ -93,7 +93,7 @@ self.addEventListener('fetch', (event) => {
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Heartsync — Offline Cozy Reader</title>
+              <title>Heartsync  - Offline Cozy Reader</title>
               <style>
                 body { font-family: system-ui, -apple-system, sans-serif; background: #09090b; color: #f4f4f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; text-align: center; }
                 .card { background: #18181b; border: 1px solid #27272a; padding: 32px; border-radius: 24px; max-width: 480px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -107,7 +107,7 @@ self.addEventListener('fetch', (event) => {
             <body>
               <div class="card">
                 <div class="icon">🌿</div>
-                <h1>Cozy Reader — Offline Mode</h1>
+                <h1>Cozy Reader  - Offline Mode</h1>
                 <p>Your internet connection is currently taking a peaceful break. Reconnect or tap below to open your saved relationship guides.</p>
                 <a href="/" class="btn">View Saved Bookmarks</a>
               </div>
@@ -120,7 +120,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // B. Article API Requests (/api/posts, /api/articles, etc.) — Network First with Article Cache Fallback
+  // B. Article API Requests (/api/posts, /api/articles, etc.)  - Network First with Article Cache Fallback
   if (url.pathname.includes('/api/posts') || url.pathname.includes('/api/article')) {
     event.respondWith(
       fetch(req)
@@ -142,7 +142,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // C. Image Assets — Cache First with Stale-While-Revalidate Fallback
+  // C. Image Assets  - Cache First with Stale-While-Revalidate Fallback
   if (req.destination === 'image' || url.pathname.match(/\.(jpg|jpeg|png|webp|svg|gif|ico)$/i)) {
     event.respondWith(
       caches.match(req).then((cachedImage) => {
@@ -179,7 +179,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // D. Other Static Assets (JS, CSS, Fonts) — Stale-While-Revalidate
+  // D. Other Static Assets (JS, CSS, Fonts)  - Stale-While-Revalidate
   event.respondWith(
     caches.match(req).then((cachedResponse) => {
       const fetchPromise = fetch(req).then((networkResponse) => {
@@ -195,7 +195,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// 4. MESSAGE EVENT — Manual Pre-caching for Bookmarked Articles
+// 4. MESSAGE EVENT  - Manual Pre-caching for Bookmarked Articles
 self.addEventListener('message', async (event) => {
   const { type, payload } = event.data || {};
 

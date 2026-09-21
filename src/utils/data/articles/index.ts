@@ -30,7 +30,7 @@ import { COMM_RITUALS_OF_CONNECTION } from './comm-rituals-of-connection';
 import { BREAKUPS_GRIEVING_SOMEONE_ALIVE } from './breakups-grieving-someone-alive';
 import { LOVE_LANGUAGES_HONESTLY } from './love-languages-honestly';
 
-// HeartSync long-form corpus — genuinely written editorial pieces, added over
+// HeartSync long-form corpus  - genuinely written editorial pieces, added over
 // time in batches. Word target per article: ~2000 words. Never filler.
 export const HEARTSYNC_ARTICLES: Post[] = [
   ...LOVE_QUIET_ECONOMICS,

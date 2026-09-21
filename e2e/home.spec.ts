@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Home section (/) — hero, editorial sections, newsletter block, footer.
+ * Home section (/)  - hero, editorial sections, newsletter block, footer.
  */
 test.describe('Home section', () => {
   test('renders the landing page with hero and header landmarks', async ({ page }) => {
@@ -14,7 +14,7 @@ test.describe('Home section', () => {
 
   test('renders editorial sections (hero + journals + footer content)', async ({ page }) => {
     await page.goto('/');
-    // NOTE: never wait for networkidle — realtime/polling keeps sockets open.
+    // NOTE: never wait for networkidle  - realtime/polling keeps sockets open.
     await page.waitForTimeout(2000);
     const body = await page.locator('body').innerText();
     const hasEditorialContent =

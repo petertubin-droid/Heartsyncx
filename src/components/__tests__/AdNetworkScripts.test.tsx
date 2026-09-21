@@ -22,7 +22,7 @@ function renderWithGrant() {
 describe('AdNetworkScripts (site-wide Monetag/Adsterra snippet injection)', () => {
   beforeEach(() => {
   // The store mirrors localStorage in an in-memory virtualStorageMap that
-  // survives localStorage.clear() — clear consent keys through the store so
+  // survives localStorage.clear()  - clear consent keys through the store so
   // consent state never leaks between tests.
   heartsync.setLocalStorage('heartsync_cookie_consent', null);
   heartsync.setLocalStorage('heartsync_cookie_preferences', null);
