@@ -26,3 +26,27 @@
   # vite's own optional deps.
   node_bundler = "esbuild"
   external_node_modules = ["vite"]
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Server bridge: the Express app in server.ts serves the API and the
+# crawlable HTML for public SEO routes. Redirects are skipped automatically
+# for paths that match real static files in dist/, so hashed assets and
+# any prerendered pages are still served straight off the CDN.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/article/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/category/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
