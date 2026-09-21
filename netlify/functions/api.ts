@@ -2,10 +2,11 @@
  * Netlify serverless bridge for the Heartsync Express app.
  *
  * The same server (server.ts) that runs on Vercel (api/index.ts) and Cloud
- * Run also backs this function. Netlify redirects /api/*, /article/* and
- * /category/* here with status 200; static assets are served straight from
- * the publish directory (dist/) by Netlify's CDN and never hit this
- * function (redirects are skipped for paths that match existing files).
+ * Run also backs this function. netlify.toml routes /api/*, /article/*,
+ * /category/*, and (as the required catch-all) everything else here with
+ * status 200; static assets are served straight from the publish directory
+ * (dist/) by Netlify's CDN and never hit this function (redirects are
+ * skipped for paths that match existing files on disk).
  *
  * Path handling: Netlify v1 events carry rawUrl (the ORIGINAL public URL).
  * serverless-http routes on event.path, which for internal redirects can
