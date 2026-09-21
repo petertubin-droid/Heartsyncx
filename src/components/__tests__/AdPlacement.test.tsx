@@ -46,12 +46,17 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
     heartsync.site_settings.adsterra_active = false;
   });
 
-  it('renders nothing before consent, even when fully configured (default-denied)', () => {
+  it('renders crawler-visible slot markup before consent (AdSense review: slots must be visible to the crawler)', () => {
     heartsync.site_settings.adsense_client_id = 'ca-pub-3404100134534192';
     heartsync.site_settings.adsense_slot_header = '1234567890';
     const { container } = renderPlacement();
-    expect(container.querySelector('[data-ad-slot-family]')).toBeNull();
-    expect(container.querySelector('ins.adsbygoogle')).toBeNull();
+    // Markup exists for the crawler...
+    expect(container.querySelector('[data-ad-slot-family="header"]')).not.toBeNull();
+    const ins = container.querySelector('ins.adsbygoogle');
+    expect(ins?.getAttribute('data-ad-client')).toBe('ca-pub-3404100134534192');
+    expect(ins?.getAttribute('data-ad-slot')).toBe('1234567890');
+    // ...but the unit is not ACTIVATED (no adsbygoogle push) until consent.
+    expect(window.adsbygoogle ?? []).toEqual([]);
   });
 
   it('renders a labelled AdSense unit after consent with client + slot set', () => {
@@ -103,10 +108,13 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
     expect(pushes[0]).toEqual({}); // personalization request — no NPA flag
   });
 
-  it('renders NOTHING when no provider is configured (honest absence — no fake placeholders)', () => {
+  it('renders a visible reserved ad space when no provider is configured (crawlable slot, no layout shift)', () => {
     const { container } = renderPlacement();
-    act(() => { screen.getByTestId('grant').click(); });
-    expect(container.querySelector('[data-ad-slot-family]')).toBeNull();
+    const slot = container.querySelector('[data-ad-slot-family="header"]');
+    expect(slot).not.toBeNull();
+    expect(slot?.getAttribute('aria-label')).toBe('Advertisement');
+    expect(container.querySelector('[data-ad-slot-reserved="true"]')).not.toBeNull();
+    expect(container.textContent).toContain('Reserved ad space');
   });
 
   it('honors the per-slot visibility toggle (banner_header_enabled=false)', () => {

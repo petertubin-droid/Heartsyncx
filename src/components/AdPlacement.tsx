@@ -180,13 +180,16 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
   }, [inView, publisherId, marketingConsent, hasConsented, slotHiddenByToggle, adsenseConfigured]);
 
   if (slotHiddenByToggle) return null;
-  if (!hasConsented) return null; // default-denied until the visitor consents
+  // NOTE: the slot container + <ins> markup ALWAYS render (except when the
+  // admin toggle hides the slot) so Google's review crawler can see every ad
+  // slot. Consent only gates the adsbygoogle *activation push*, not the markup;
+  // non-personalized ads are requested when marketing consent is absent.
 
   const dims = SLOT_DIMENSIONS[slot];
 
   if (!adsenseConfigured) {
-    // No AdSense config for this slot — try Adsterra banner
-    if (!adsterraKey) return null;
+    // No AdSense config for this slot — Adsterra banner if configured, else a
+    // visible, labelled reserved ad space (crawlable, no layout shift).
     const fmt = ADSTERRA_FORMAT[slot];
     return (
       <div
@@ -197,7 +200,17 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
         aria-label="Advertisement"
       >
         <span className="text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-600 select-none mb-1">{dims.label}</span>
-        {inView ? <AdsterraBanner slot={slot} /> : <div style={{ width: fmt.width, height: fmt.height }} />}
+        {inView
+          ? (adsterraKey && hasConsented
+              ? <AdsterraBanner slot={slot} />
+              : <div
+                  className="flex items-center justify-center rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 text-[10px] text-zinc-300 dark:text-zinc-600 select-none"
+                  style={{ width: fmt.width, height: fmt.height }}
+                  data-ad-slot-reserved="true"
+                >
+                  Reserved ad space
+                </div>)
+          : <div style={{ width: fmt.width, height: fmt.height }} />}
       </div>
     );
   }

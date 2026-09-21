@@ -5478,6 +5478,7 @@ export default function AdminConsole({
                         e.preventDefault();
                         heartsync.updateSettings({
                           adsense_client_id: siteSettings.adsense_client_id,
+                          adsense_auto_script: siteSettings.adsense_auto_script,
                           adsense_active: siteSettings.adsense_active,
                           adsense_slot_header: siteSettings.adsense_slot_header,
                           adsense_slot_sidebar: siteSettings.adsense_slot_sidebar,
@@ -5524,6 +5525,17 @@ export default function AdminConsole({
                             onChange={(e) => setSiteSettings({ ...siteSettings, adsense_client_id: e.target.value })}
                             className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-rose-550 dark:focus:border-rose-450 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-mono text-xs" 
                           />
+                        </div>
+<div className="space-y-1.5">
+                          <label className="text-[10.5px] font-semibold text-zinc-800 dark:text-zinc-200">AdSense Auto Script (loader snippet, auto-injected on every page)</label>
+                          <textarea
+                            rows={3}
+                            value={siteSettings.adsense_auto_script || ''}
+                            onChange={(e) => setSiteSettings({ ...siteSettings, adsense_auto_script: e.target.value })}
+                            placeholder='<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>'
+                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 font-mono text-[10px] focus:outline-none focus:ring-1 focus:ring-rose-500"
+                          />
+                          <span className="text-[8.5px] text-zinc-400 block leading-tight">Paste your AdSense loader tag from the AdSense dashboard. It is injected into every page for the Google crawler to read. Per-slot unit ids are configured below.</span>
                         </div>
 
                         <div className="space-y-2">

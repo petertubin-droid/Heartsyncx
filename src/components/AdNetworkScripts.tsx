@@ -57,6 +57,29 @@ export const AdNetworkScripts: React.FC = () => {
   const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
   const shouldInject = hasConsented && marketingConsent && (hasConsented) && (monetagSnippet || adsterraSnippets.length > 0);
 
+  // Revived feature: adsense_auto_script — the site-owner's own AdSense
+  // loader snippet, injected on mount WITHOUT a consent gate (the loader is
+  // the site's own ad infrastructure; the ad units inside AdPlacement still
+  // honor consent and serve non-personalized ads without marketing consent).
+  useEffect(() => {
+    const code = str((heartsync.site_settings as Record<string, unknown>).adsense_auto_script);
+    const marker = 'script[data-heartsync-injected="adsense-auto"]';
+    if (!code || document.querySelector(marker)) return;
+    try {
+      const doc = new DOMParser().parseFromString(code, 'text/html');
+      const targets = [...doc.head.querySelectorAll('script'), ...doc.body.querySelectorAll('script')];
+      targets.forEach((oldScript) => {
+        const fresh = document.createElement('script');
+        Array.from(oldScript.attributes).forEach((a) => fresh.setAttribute(a.name, a.value));
+        fresh.setAttribute('data-heartsync-injected', 'adsense-auto');
+        fresh.textContent = oldScript.textContent;
+        document.head.appendChild(fresh);
+      });
+    } catch {
+      // Malformed snippet — do nothing rather than break the page.
+    }
+  }, [version]);
+
   useEffect(() => {
     if (!shouldInject || injectedRef.current) return;
     injectedRef.current = true;

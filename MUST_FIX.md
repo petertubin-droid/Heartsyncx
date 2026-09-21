@@ -395,3 +395,39 @@ Also remaining: alert() in LiveChatWidget + RichTextEditor, newsletter template 
 - homepage_categories_columns_mobile / card_style / premium_enabled fields still dead
 - alert() in LiveChatWidget + RichTextEditor (should use inline errors)
 - newsletter template preview href="#" placeholder
+
+## ROUND 4 (2026-09-21): AdSense crawler visibility + adsense_auto_script revived
+
+### AdSense policy applied (researched first)
+Per AdSense site review requirements: the reviewer's crawler must SEE ad
+placements and content (no consent walls hiding everything, no blocked
+resources, no empty slots). robots.txt already only blocks /admin /api /login
+/search /access-denied — compliant.
+
+### Changes
+1. AdPlacement: slot containers + <ins class="adsbygoogle"> markup now ALWAYS
+   render (unless the admin toggle hides the slot). Cookie consent gates only
+   the adsbygoogle activation push, not the markup. Non-personalized ads are
+   requested when marketing consent is absent (unchanged).
+2. Unconfigured slots render a visible, labelled "Reserved ad space" box
+   (crawlable, no layout shift) instead of null.
+3. adsense_auto_script REVIVED: admin field restored next to the AdSense
+   publisher id; the snippet is auto-injected on every page via
+   AdNetworkScripts (no consent gate on the loader itself; units stay
+   consent-gated). Paste the loader tag from the AdSense dashboard.
+4. Tests updated to pin the new crawler-visibility policy (2 tests changed).
+
+### Owner actions for AdSense approval
+- Set adsense_client_id (ca-pub-...) + per-slot unit ids in Admin > Ads, or
+  paste the loader tag in the new AdSense Auto Script field.
+- Ensure About/Contact/Privacy/Terms pages exist and are footer-linked
+  (About link confirmed; verify the rest in the live footer).
+- After approval: add ads.txt with the publisher id at the domain root.
+
+### Remaining feature revives (not built yet)
+- TTS reader on articles (server /api/tts exists; no site player yet)
+- Digital storefront page (digital_products table + CRUD exist server-side)
+- brand_button_radius/heading_weight/hover_animation/glow_accent (needs a
+  CSS-variable theme refactor)
+- homepage_categories_columns_mobile / card_style / premium_enabled
+- alert() in LiveChatWidget + RichTextEditor
