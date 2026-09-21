@@ -6924,7 +6924,11 @@ async function registerProductionRoutes() {
   serverCacheState = serverCacheState || {};
 
   // 2. Set up development / production routing (non-blocking)
-  const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(path.join(process.cwd(), 'dist'));
+  // On Vercel the app is ALWAYS production: process.env.VERCEL is set by the
+  // platform at runtime. Falling back to the Vite dev middleware there would
+  // import 'vite' (a devDependency) that is NOT traced into the serverless
+  // bundle and crash every invocation with MODULE_NOT_FOUND.
+  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.VERCEL || fs.existsSync(path.join(process.cwd(), 'dist'));
   if (!isProduction) {
     // Inject Vite middleware inside Dev sandboxes. Lazy import: keeps Vite
     // out of the serverless bundle (only the dev sandbox ever loads it).
