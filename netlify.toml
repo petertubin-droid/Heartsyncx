@@ -1,0 +1,15 @@
+# Netlify build config.
+#
+# Secrets scanning false positive: SUPABASE_ANON_KEY / SUPABASE_URL (and
+# their VITE_ aliases) are Supabase's PUBLIC anon key and project URL —
+# by design they are inlined into the client bundle (dist/assets/*.js) so
+# the browser can talk to Supabase. Netlify's secrets scanner still flags
+# any configured env var whose literal value appears in the build output,
+# even intentionally-public ones, so we omit exactly these four from the
+# scan. Nothing else is omitted — verified via a real build with stand-in
+# fake secrets that GEMINI_API_KEY, SUPABASE_SERVICE_ROLE_KEY,
+# STRIPE_SECRET_KEY, PAYSTACK_SECRET_KEY and RESEND_API_KEY never appear
+# in dist/. Those stay unlisted here on purpose: if one of them ever shows
+# up in a scan again, that's a real leak to fix in code, not to omit.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY,VITE_SUPABASE_ANON_KEY,SUPABASE_URL,VITE_SUPABASE_URL"
