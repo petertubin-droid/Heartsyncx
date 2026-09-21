@@ -287,17 +287,37 @@ export default function App() {
     if (lang === 'en' || isAdminView) return activeArticleState;
     return translatedPosts.find(p => p.id === activeArticleState.id) || activeArticleState;
   }, [activeArticleState, lang, translatedPosts, isAdminView]);
+  // The hero already shows the title; if the article's own markdown
+  // opens with a "# <same title>" line, strip it so the body doesn't
+  // repeat it as a second, unstyled heading right before the first
+  // (dropcap) paragraph.
+  const articleBody = useMemo(() => {
+    const raw = activeArticle?.content || '';
+    if (!raw) return raw;
+    const lines = raw.split('\n');
+    if (lines.length && /^#\s+/.test(lines[0].trim())) {
+      const h1Text = lines[0].replace(/^#\s+/, '').trim().toLowerCase();
+      const titleText = (activeArticle?.title || '').trim().toLowerCase();
+      if (h1Text && h1Text === titleText) {
+        let rest = lines.slice(1);
+        while (rest.length && rest[0].trim() === '') rest = rest.slice(1);
+        return rest.join('\n');
+      }
+    }
+    return raw;
+  }, [activeArticle?.content, activeArticle?.title]);
+
   const splitArticleContent = useMemo(() => {
-    if (!activeArticle?.content) return null;
-    const sections = activeArticle.content.split(/\n\s*\n/);
+    if (!articleBody) return null;
+    const sections = articleBody.split(/\n\s*\n/);
     if (sections.length <= 3) {
-      return { firstHalf: activeArticle.content, secondHalf: null };
+      return { firstHalf: articleBody, secondHalf: null };
     }
     const midPoint = Math.floor(sections.length / 2);
     const firstHalf = sections.slice(0, midPoint).join('\n\n');
     const secondHalf = sections.slice(midPoint).join('\n\n');
     return { firstHalf, secondHalf };
-  }, [activeArticle?.content]);
+  }, [articleBody]);
 
   // Premium dynamic headings parsing for table of contents
   const headings = useMemo(() => {
@@ -3457,7 +3477,7 @@ export default function App() {
 
                           {/* Right cluster: compact Listen + Share (small round icon buttons, never touching the body) */}
                           <div className="flex items-center gap-2 shrink-0">
-                            <ArticleTTS content={activeArticle.content} compact />
+                            <ArticleTTS content={articleBody} compact />
                             <button
                               type="button"
                               onClick={() => setShareMenuOpen((v) => !v)}
@@ -3531,7 +3551,7 @@ export default function App() {
                       return (
                         <div className="space-y-4">
                           {renderBreadcrumbs()}
-                          <div className={`relative rounded-2xl md:rounded-[2rem] overflow-hidden ${siteSettings.article_mobile_image_height && siteSettings.article_mobile_image_height !== 'h-auto' ? siteSettings.article_mobile_image_height : 'aspect-video'} sm:aspect-[2.4] mb-4 group shadow-xl`}>
+                          <div className={`relative rounded-2xl md:rounded-[2rem] overflow-hidden ${siteSettings.article_mobile_image_height && siteSettings.article_mobile_image_height !== 'h-auto' ? siteSettings.article_mobile_image_height : 'aspect-[4/3]'} sm:aspect-[2.1] mb-4 group shadow-xl`}>
                             <img 
                               src={activeArticle.featured_image || 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200'} 
                               alt={activeArticle.title} 
@@ -3557,6 +3577,7 @@ export default function App() {
                               </p>
                             </div>
                           </div>
+                          {renderMetadataAndAuthorRow()}
                         </div>
                       );
                     }
@@ -3882,7 +3903,7 @@ export default function App() {
                               {/* Locked Teaser Paragraph Preview */}
                               <div className="opacity-80 dark:opacity-75 blur-[0.2px] select-none pointer-events-none line-clamp-4 leading-relaxed text-zinc-500">
                                 <ReactMarkdown urlTransform={(url) => url} components={markdownComponents}>
-                                  {activeArticle.content.substring(0, 320) + '...'}
+                                  {articleBody.substring(0, 320) + '...'}
                                 </ReactMarkdown>
                               </div>
                               
@@ -4095,7 +4116,7 @@ export default function App() {
                             }`}
                           >
                             <ArticleBodyWithInserts
-                              content={activeArticle.content}
+                              content={articleBody}
                               inserts={siteSettings.article_inserts_enabled !== false ? activeArticle.in_article_inserts : undefined}
                               markdownComponents={markdownComponents}
                               className={`markdown-body prose dark:prose-invert ${bodyWidthClass}${bodyWidthClass !== 'max-w-none' ? ' mx-auto' : ''} text-zinc-850 dark:text-zinc-200 ${lineHeightClass} ${spacingClass} ${headingsClass} ${
