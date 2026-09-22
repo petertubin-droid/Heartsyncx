@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { heartsync } from '../store';
+import { isAdminLocation } from '../utils/adminArea';
 
 export interface CookiePreferences {
   necessary: boolean;
@@ -159,7 +160,11 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Pixel are personalization-only networks: they inject ONLY with
     // explicit marketing consent. No demo/test publisher, zone or key IDs
     // are ever injected  - an unconfigured network injects nothing.
-    if (hasConsented) {
+    if (hasConsented && !isAdminLocation()) {
+      // 0. Admin-area guard: ad tags (popunder / OnClick zones especially)
+      // hijack clicks with redirects and must never run while the admin
+      // panel is open. injectProductionScripts fires on mount, on consent
+      // and on preference changes, so this guard covers every call site.
       // 1. Google AdSense
       const adsenseActive = heartsync?.site_settings?.adsense_active ?? true;
       const clientPubId = 

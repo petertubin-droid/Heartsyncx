@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { heartsync } from '../store';
+import { isAdminLocation, removeInjectedAdScripts } from '../utils/adminArea';
 import { useCookieConsent } from './useCookieConsent';
 
 /**
@@ -46,6 +47,29 @@ export const AdNetworkScripts: React.FC = () => {
     const unsub = heartsync.subscribe(() => setVersion((v) => v + 1));
     return () => unsub();
   }, []);
+
+  // Admin-area suspension: App.tsx dispatches these events whenever the
+  // active tab changes; a direct load at /admin starts suspended via
+  // isAdminLocation().
+  const [adsSuspended, setAdsSuspended] = useState<boolean>(isAdminLocation);
+  useEffect(() => {
+    const suspend = () => setAdsSuspended(true);
+    const resume = () => setAdsSuspended(false);
+    window.addEventListener('heartsync-ads-suspend', suspend);
+    window.addEventListener('heartsync-ads-resume', resume);
+    return () => {
+      window.removeEventListener('heartsync-ads-suspend', suspend);
+      window.removeEventListener('heartsync-ads-resume', resume);
+    };
+  }, []);
+
+  // Entering the admin: strip every injected ad element so already-loaded
+  // tags stop getting new trigger hooks, and allow re-injection on resume.
+  useEffect(() => {
+    if (!adsSuspended) return;
+    removeInjectedAdScripts();
+    injectedRef.current = false;
+  }, [adsSuspended]);
 
   const s = heartsync.site_settings as Record<string, unknown>;
   const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -96,7 +120,7 @@ export const AdNetworkScripts: React.FC = () => {
   useEffect(() => {
     const code = str((heartsync.site_settings as Record<string, unknown>).adsense_auto_script);
     const marker = 'script[data-heartsync-injected="adsense-auto"]';
-    if (!code || document.querySelector(marker)) return;
+    if (adsSuspended || !code || document.querySelector(marker)) return;
     try {
       const doc = new DOMParser().parseFromString(code, 'text/html');
       const targets = [...doc.head.querySelectorAll('script'), ...doc.body.querySelectorAll('script')];
@@ -110,10 +134,10 @@ export const AdNetworkScripts: React.FC = () => {
     } catch {
       // Malformed snippet  - do nothing rather than break the page.
     }
-  }, [version]);
+  }, [version, adsSuspended]);
 
   useEffect(() => {
-    if (!shouldInject || injectedRef.current) return;
+    if (!shouldInject || adsSuspended || injectedRef.current) return;
     injectedRef.current = true;
 
     const inject = (html: string) => {
@@ -146,7 +170,7 @@ export const AdNetworkScripts: React.FC = () => {
     if (monetagSnippet && !document.getElementById('heartsync-monetag-script')) inject(monetagSnippet);
     adsterraSnippets.forEach(inject);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldInject]);
+  }, [shouldInject, adsSuspended]);
 
   return null;
 };

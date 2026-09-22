@@ -26,6 +26,7 @@ import OfflineReaderBanner from './components/OfflineReaderBanner';
 import { AdPlacement } from './components/AdPlacement';
 import { AdNetworkScripts } from './components/AdNetworkScripts';
 import { heartsync, getAuthors } from './store';
+import { ADS_SUSPEND_EVENT, ADS_RESUME_EVENT } from './utils/adminArea';
 import { Post, Category, Author, SiteSettings, Topic } from './types';
 import { HeartsyncLoader, LoadingProgressBar, HeartsyncSuspense, HeartsyncImage } from './components/LoadingSystem';
 import { motion, AnimatePresence } from 'motion/react';
@@ -1084,20 +1085,33 @@ export default function App() {
     `;
   }, [siteSettings]);
 
-  // Sync index and body classes dynamically based on the active tab and its active theme
+  // Theme isolation: the admin panel lives in the same SPA document as the
+  // public site. Toggling the admin theme used to flip the shared
+  // root/body `dark` class, restyling the frontend (and the browser's own
+  // dark-mode UI) with it. The shared document classes now follow ONLY the
+  // frontend theme; the admin area carries its own scoped `.dark` wrapper,
+  // so the two themes are fully independent.
+  const isAdminArea = currentTab === 'admin' || currentTab === 'login' || currentTab === 'access-denied';
+
   useEffect(() => {
     const root = window.document.documentElement;
     const body = window.document.body;
-    const activeTheme = currentTab === 'admin' ? adminTheme : frontendTheme;
-
-    if (activeTheme === 'dark') {
+    if (frontendTheme === 'dark' && !isAdminArea) {
       root.classList.add('dark');
       body.classList.add('dark');
     } else {
       root.classList.remove('dark');
       body.classList.remove('dark');
     }
-  }, [currentTab, frontendTheme, adminTheme]);
+  }, [currentTab, frontendTheme, adminTheme, isAdminArea]);
+
+  // Ad isolation for the admin area: popunder / OnClick ad tags hijack every
+  // click with a redirect, making the admin panel unusable. While the admin
+  // area is active, ad script injection is suspended (and injected scripts
+  // removed); it resumes automatically when navigating back to public pages.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(isAdminArea ? ADS_SUSPEND_EVENT : ADS_RESUME_EVENT));
+  }, [isAdminArea]);
 
   // Sync frontend theme changes
   useEffect(() => {
@@ -5583,22 +5597,26 @@ export default function App() {
 
             {/* 18. ADMIN AUTHENTICATION  - real sign-in gate */}
             {currentTab === 'login' && (
-              <AdminLogin onNavigate={navigateTo} onSuccess={() => navigateTo('admin')} />
+              <div className={adminTheme === 'dark' ? 'dark' : ''} style={{ colorScheme: adminTheme }}>
+                <AdminLogin onNavigate={navigateTo} onSuccess={() => navigateTo('admin')} />
+              </div>
             )}
 
             {/* 18b. ADMIN CONSOLE PANES (admins only  - gated in verifyAndSetTab) */}
             {(currentTab === 'admin' || currentTab === 'access-denied') && (
               <React.Suspense fallback={<div className="min-h-screen" />}>
-              <AdminConsole 
-                onNavigate={navigateTo} 
-                theme={adminTheme} 
-                setTheme={setAdminTheme} 
-                initialPane={tabArg} 
-                lang={lang}
-                translatedPosts={translatedPosts}
-                translatedCategories={translatedCategories}
-                translatedSiteSettings={translatedSiteSettings}
-              />
+              <div className={adminTheme === 'dark' ? 'dark' : ''} style={{ colorScheme: adminTheme }}>
+                <AdminConsole 
+                  onNavigate={navigateTo} 
+                  theme={adminTheme} 
+                  setTheme={setAdminTheme} 
+                  initialPane={tabArg} 
+                  lang={lang}
+                  translatedPosts={translatedPosts}
+                  translatedCategories={translatedCategories}
+                  translatedSiteSettings={translatedSiteSettings}
+                />
+              </div>
               </React.Suspense>
             )}
 

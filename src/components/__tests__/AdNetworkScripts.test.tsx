@@ -57,6 +57,36 @@ describe('AdNetworkScripts (site-wide Monetag/Adsterra snippet injection)', () =
     expect(s?.getAttribute('data-cfasync')).toBe('false');
   });
 
+  it('removes injected ad scripts when the admin area activates and re-injects on resume', async () => {
+    // Regression: popunder / OnClick tags hijacked every click with a
+    // redirect while the admin panel was open ("ads redirecting in the admin").
+    heartsync.site_settings.monetag_active = true;
+    heartsync.site_settings.monetag_zone_id = '284167';
+    renderWithGrant();
+    act(() => { screen.getByTestId('grant').click(); });
+    await waitFor(() => expect(document.getElementById('heartsync-monetag-script')).not.toBeNull());
+    // App.tsx dispatches this when currentTab enters the admin area
+    act(() => { window.dispatchEvent(new Event('heartsync-ads-suspend')); });
+    expect(document.getElementById('heartsync-monetag-script')).toBeNull();
+    expect(document.querySelectorAll('script[data-heartsync-injected]').length).toBe(0);
+    // Navigating back to a public tab resumes injection
+    act(() => { window.dispatchEvent(new Event('heartsync-ads-resume')); });
+    await waitFor(() => expect(document.getElementById('heartsync-monetag-script')).not.toBeNull());
+  });
+
+  it('never injects ad scripts on a direct load at an admin URL (/admin)', async () => {
+    window.history.pushState({}, '', '/admin');
+    heartsync.site_settings.monetag_active = true;
+    heartsync.site_settings.monetag_zone_id = '284167';
+    renderWithGrant();
+    act(() => { screen.getByTestId('grant').click(); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    expect(document.getElementById('heartsync-monetag-script')).toBeNull();
+    expect(document.querySelectorAll('script[data-heartsync-injected]').length).toBe(0);
+    // Restore the public location for subsequent tests
+    window.history.pushState({}, '', '/');
+  });
+
   it('uses the explicit Monetag loader URL override when one is configured', async () => {
     heartsync.site_settings.monetag_active = true;
     heartsync.site_settings.monetag_zone_id = '284167';
