@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
-import { heartsync } from "../store";
-import { useCookieConsent } from "./useCookieConsent";
+import React, { useEffect, useRef, useState } from 'react';
+import { heartsync } from '../store';
+import { useCookieConsent } from './useCookieConsent';
 
 /**
  * Site-wide ad-network script injector.
@@ -48,7 +48,7 @@ export const AdNetworkScripts: React.FC = () => {
   }, []);
 
   const s = heartsync.site_settings as Record<string, unknown>;
-  const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+  const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
   void version;
 
   const monetagActive = s.monetag_active === true;
@@ -60,50 +60,50 @@ export const AdNetworkScripts: React.FC = () => {
   // silently killing ad serving), so whenever a zone id is set the MultiTag
   // loader is derived from it and the stored snippet is ignored.
   const monetagZone = str(s.monetag_zone_id);
+  // Optional explicit loader URL (e.g. a zone-specific tag URL from the
+  // Monetag dashboard). When empty, the canonical MultiTag loader is derived
+  // from the zone id: https://alwingulla.com/<zone>/tag.min.js
+  const monetagLoaderUrl = str(s.monetag_loader_url);
   const monetagSnippet =
-    monetagActive && monetagZone
-      ? `<script id="heartsync-monetag-script" src="https://alwingulla.com/${monetagZone}/tag.min.js" data-zone="${monetagZone}" async data-cfasync="false"></script>`
+    monetagActive && (monetagLoaderUrl || monetagZone)
+      ? `<script id="heartsync-monetag-script" src="${monetagLoaderUrl || `https://alwingulla.com/${monetagZone}/tag.min.js`}" data-zone="${monetagZone}" async data-cfasync="false"></script>`
       : str(s.monetag_script_code);
+
+  // Adsterra Popunder: the dashboard unit is a single script URL
+  // (https://pl<id>.profitableratecpmnetwork.com/<path>.js). A dedicated URL
+  // field takes precedence; a pasted full snippet works as before.
+  const adsterraPopunderUrl = str(s.adsterra_popunder_url);
+  const adsterraPopunderSnippet = adsterraPopunderUrl
+    ? `<script src="${adsterraPopunderUrl}" async data-cfasync="false"></script>`
+    : str(s.adsterra_popunder_script);
 
   const adsterraSnippets = adsterraActive
     ? [
-        str(s.adsterra_popunder_script),
+        adsterraPopunderSnippet,
         str(s.adsterra_social_bar_script),
         str(s.adsterra_interstitial_script),
-        str(s.adsterra_inpage_push_script),
+        str(s.adsterra_inpage_push_script)
       ].filter(Boolean)
     : [];
 
-  const marketingConsent = !!(
-    preferences as unknown as Record<string, unknown> | undefined
-  )?.marketing;
-  const shouldInject =
-    hasConsented &&
-    marketingConsent &&
-    (monetagSnippet || adsterraSnippets.length > 0);
+  const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
+  const shouldInject = hasConsented && marketingConsent && (monetagSnippet || adsterraSnippets.length > 0);
 
   // Revived feature: adsense_auto_script  - the site-owner's own AdSense
   // loader snippet, injected on mount WITHOUT a consent gate (the loader is
   // the site's own ad infrastructure; the ad units inside AdPlacement still
   // honor consent and serve non-personalized ads without marketing consent).
   useEffect(() => {
-    const code = str(
-      (heartsync.site_settings as Record<string, unknown>).adsense_auto_script,
-    );
+    const code = str((heartsync.site_settings as Record<string, unknown>).adsense_auto_script);
     const marker = 'script[data-heartsync-injected="adsense-auto"]';
     if (!code || document.querySelector(marker)) return;
     try {
-      const doc = new DOMParser().parseFromString(code, "text/html");
-      const targets = [
-        ...doc.head.querySelectorAll("script"),
-        ...doc.body.querySelectorAll("script"),
-      ];
+      const doc = new DOMParser().parseFromString(code, 'text/html');
+      const targets = [...doc.head.querySelectorAll('script'), ...doc.body.querySelectorAll('script')];
       targets.forEach((oldScript) => {
-        const fresh = document.createElement("script");
-        Array.from(oldScript.attributes).forEach((a) =>
-          fresh.setAttribute(a.name, a.value),
-        );
-        fresh.setAttribute("data-heartsync-injected", "adsense-auto");
+        const fresh = document.createElement('script');
+        Array.from(oldScript.attributes).forEach((a) => fresh.setAttribute(a.name, a.value));
+        fresh.setAttribute('data-heartsync-injected', 'adsense-auto');
         fresh.textContent = oldScript.textContent;
         document.head.appendChild(fresh);
       });
@@ -118,28 +118,22 @@ export const AdNetworkScripts: React.FC = () => {
 
     const inject = (html: string) => {
       try {
-        const doc = new DOMParser().parseFromString(html, "text/html");
+        const doc = new DOMParser().parseFromString(html, 'text/html');
         // A bare <script src=...> snippet parses into the parsed doc's <head>
         // (HTML parsing rules), so scan BOTH containers  - body-only missed the
         // single-script format that network dashboards emit most often.
-        const targets = [
-          ...doc.head.querySelectorAll("script"),
-          ...doc.body.querySelectorAll("script"),
-        ];
+        const targets = [...doc.head.querySelectorAll('script'), ...doc.body.querySelectorAll('script')];
         targets.forEach((old) => {
-          const fresh = document.createElement("script");
-          Array.from(old.attributes).forEach((a) =>
-            fresh.setAttribute(a.name, a.value),
-          );
-          fresh.setAttribute("data-heartsync-injected", "ad-network-scripts");
+          const fresh = document.createElement('script');
+          Array.from(old.attributes).forEach((a) => fresh.setAttribute(a.name, a.value));
+          fresh.setAttribute('data-heartsync-injected', 'ad-network-scripts');
           fresh.textContent = old.textContent;
           document.head.appendChild(fresh);
         });
         // Non-script markup (rare, e.g. noscript fallbacks) appended at body end
         if (doc.body.children.length > 0) {
           Array.from(doc.body.children).forEach((el) => {
-            if (el.tagName !== "SCRIPT")
-              document.body.appendChild(document.importNode(el, true));
+            if (el.tagName !== 'SCRIPT') document.body.appendChild(document.importNode(el, true));
           });
         }
       } catch {
@@ -149,8 +143,7 @@ export const AdNetworkScripts: React.FC = () => {
 
     // ConsentProvider.injectProductionScripts injects the same zone-derived
     // loader with this id; skip if already present so the tag never double-loads.
-    if (monetagSnippet && !document.getElementById("heartsync-monetag-script"))
-      inject(monetagSnippet);
+    if (monetagSnippet && !document.getElementById('heartsync-monetag-script')) inject(monetagSnippet);
     adsterraSnippets.forEach(inject);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldInject]);

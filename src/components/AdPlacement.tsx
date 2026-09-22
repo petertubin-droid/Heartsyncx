@@ -81,16 +81,67 @@ function ensureAdsenseLibrary(publisherId: string): void {
   document.head.appendChild(s);
 }
 
+/**
+ * Adsterra unit keys are bare hex ids, but publishers routinely paste the
+ * WHOLE dashboard snippet (an atOptions block or an invoke.js <script> tag)
+ * into the per-slot key fields. Extract the key from either form so pasted
+ * snippets work without manual data surgery. When the snippet names a
+ * specific Adsterra banner serving domain (they have several mirrors),
+ * honor it instead of the default.
+ */
+interface AdsterraUnitRef {
+  key: string;
+  domain: string;
+}
+
+const ADSTERRA_DEFAULT_DOMAIN = 'www.highperformanceformat.com';
+const ADSTERRA_BANNER_DOMAINS = /(highperformanceformat|highrevenueformat)\.[a-z]+/i;
+
+/**
+ * The per-slot "URL" field may hold the unit's full invoke.js URL
+ * (https://<domain>/<key>/invoke.js) or just the serving domain
+ * (e.g. www.highperformanceformat.com). Resolve it to a domain; null when
+ * the field is empty or malformed (the key's own snippet domain is then used).
+ */
+function adsterraDomainFromUrlField(raw: string): string | null {
+  const v = raw.trim().replace(/\s+/g, '');
+  if (!v) return null;
+  const full = v.match(/^https?:\/\/(?:www\.)?([a-z0-9.-]+\.[a-z]+)\/[a-f0-9]{20,}\/invoke\.js/i);
+  if (full) return `www.${full[1].toLowerCase().replace(/^www\./, '')}`;
+  const bare = v.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/.*$/, '');
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(bare)) return null;
+  return `www.${bare.toLowerCase()}`;
+}
+
+function normalizeAdsterraUnit(raw: string): AdsterraUnitRef | null {
+  const v = raw.trim();
+  if (!v) return null;
+  if (/^[a-f0-9]{20,}$/i.test(v)) return { key: v.toLowerCase(), domain: ADSTERRA_DEFAULT_DOMAIN };
+  const fromAtOptions = v.match(/['"]key['"]\s*:\s*['"]([a-f0-9]{20,})['"]/i);
+  const fromInvokeUrl = v.match(/([a-f0-9]{20,})\/invoke\.js/i);
+  const key = (fromAtOptions?.[1] || fromInvokeUrl?.[1] || '').toLowerCase();
+  if (!key) return null;
+  const domMatch = v.match(new RegExp(`https?://(?:www\.)?(${ADSTERRA_BANNER_DOMAINS.source})/${key}/invoke\.js`, 'i'));
+  const domain = domMatch ? `www.${domMatch[1].toLowerCase().replace(/^www\./, '')}` : ADSTERRA_DEFAULT_DOMAIN;
+  return { key, domain };
+}
+
 /** Adsterra's documented native-banner snippet, isolated in a sandboxed iframe. */
 const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
   const dims = ADSTERRA_FORMAT[slot];
-  const key = str(settings()[`adsterra_key_${slot}`]);
-  if (!/^[a-f0-9]{20,}$/i.test(key)) return null;
+  // The unit key may live in the key field OR inside the URL field (when the
+  // admin pasted the full invoke.js URL). Prefer an explicit key field.
+  const unit =
+    normalizeAdsterraUnit(str(settings()[`adsterra_key_${slot}`])) ||
+    normalizeAdsterraUnit(str(settings()[`adsterra_url_${slot}`]));
+  if (!unit) return null;
+  const { key } = unit;
+  const domain = adsterraDomainFromUrlField(str(settings()[`adsterra_url_${slot}`])) || unit.domain;
   const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;display:flex;justify-content:center;align-items:flex-start;overflow:hidden}</style></head><body>
 <script type="text/javascript">
 	atOptions = { 'key' : '${key}', 'format' : '${dims.format}', 'height' : ${dims.height}, 'width' : ${dims.width}, 'params' : {} };
 </script>
-<script type="text/javascript" src="//www.highperformanceformat.com/${key}/invoke.js"></script>
+<script type="text/javascript" src="//${domain}/${key}/invoke.js"></script>
 </body></html>`;
   return (
     <iframe
@@ -162,7 +213,10 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
 
   const publisherId = resolvePublisherId();
   const adsenseSlotId = str(settings()[ADSENSE_FIELD[slot]]) || (ADSENSE_ENV[slot] || '').trim();
-  const adsterraKey = str(settings()[`adsterra_key_${slot}`]);
+  const adsterraKey = !!(
+    normalizeAdsterraUnit(str(settings()[`adsterra_key_${slot}`])) ||
+    normalizeAdsterraUnit(str(settings()[`adsterra_url_${slot}`]))
+  );
   const adsenseConfigured = !!(adsenseActive && publisherId && /^\d{9,16}$/.test(adsenseSlotId));
   const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
 
