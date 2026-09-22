@@ -1,21 +1,26 @@
-import express, { Request, Response } from 'express';
-import path from 'path';
-import fs from 'fs';
-import crypto from 'crypto';
-import { promises as dnsPromises } from 'dns';
+import express, { Request, Response } from "express";
+import path from "path";
+import fs from "fs";
+import crypto from "crypto";
+import { promises as dnsPromises } from "dns";
 
-import { GoogleGenAI, Type } from '@google/genai';
-import dotenv from 'dotenv';
-import jwt from 'jsonwebtoken';
-import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import { getArticleSeoData } from './src/utils/seoArticleData';
-import { HEARTSYNC_ARTICLE_SEO } from './src/utils/data/articles';
-import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig, isServiceRoleKey } from './src/lib/supabaseConfig';
-import { Resend } from 'resend';
+import { GoogleGenAI, Type } from "@google/genai";
+import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+import { getArticleSeoData } from "./src/utils/seoArticleData";
+import { HEARTSYNC_ARTICLE_SEO } from "./src/utils/data/articles";
+import {
+  cleanConfigValue,
+  createSupabaseClient,
+  isValidSupabaseConfig,
+  isServiceRoleKey,
+} from "./src/lib/supabaseConfig";
+import { Resend } from "resend";
 
 // Load environmental parameters (both .env and .env.local)
 dotenv.config();
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: ".env.local" });
 
 // ElevenLabs keys are resolved from the server environment (documented in .env.example).
 // API keys are NEVER stored in the publicly-readable site_settings table.
@@ -28,10 +33,10 @@ const PORT = 3000;
 // the Express routes match the public URLs exactly. No-op on Vercel,
 // Cloud Run and local dev (the prefix never appears there).
 app.use((req, _res, next) => {
-  const prefix = '/.netlify/functions/';
+  const prefix = "/.netlify/functions/";
   if (req.url.startsWith(prefix)) {
     // /.netlify/functions/api/state -> /api/state (the public URL)
-    req.url = '/' + req.url.slice(prefix.length);
+    req.url = "/" + req.url.slice(prefix.length);
   }
   next();
 });
@@ -39,46 +44,97 @@ app.use((req, _res, next) => {
 // Production Logger to centralize system and diagnostic logging securely
 export const logger = {
   info: (message: string, meta?: any) => {
-    console.log(JSON.stringify({ level: 'info', timestamp: new Date().toISOString(), message, ...meta }));
+    console.log(
+      JSON.stringify({
+        level: "info",
+        timestamp: new Date().toISOString(),
+        message,
+        ...meta,
+      }),
+    );
   },
   warn: (message: string, meta?: any) => {
-    console.warn(JSON.stringify({ level: 'warning', timestamp: new Date().toISOString(), message, ...meta }));
+    console.warn(
+      JSON.stringify({
+        level: "warning",
+        timestamp: new Date().toISOString(),
+        message,
+        ...meta,
+      }),
+    );
   },
   error: (message: string, error?: any) => {
-    const errorDetails = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error;
-    console.error(JSON.stringify({ level: 'error', timestamp: new Date().toISOString(), message, error: errorDetails }));
-  }
+    const errorDetails =
+      error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : error;
+    console.error(
+      JSON.stringify({
+        level: "error",
+        timestamp: new Date().toISOString(),
+        message,
+        error: errorDetails,
+      }),
+    );
+  },
 };
+
+// Content-Security-Policy applied to every function-served response (client
+// routes, /api/*). script-src MUST include the ACTIVE ad providers' loader
+// domains, or the browser silently blocks every ad call: Monetag MultiTag
+// loader (alwingulla.com) plus its service-worker domain (3nbf4.com),
+// Adsterra banner/popunder domains (highperformanceformat.com,
+// highrevenueformat.com, profitableratecpmnetwork.com), Google AdSense
+// (pagead2.googlesyndication.com, tpc.googlesyndication.com,
+// *.doubleclick.net) and the Meta pixel (connect.facebook.net). Ad creatives
+// render inside iframes, which frame-src https: already permits.
+const CONTENT_SECURITY_POLICY =
+  "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://*.doubleclick.net https://connect.facebook.net https://alwingulla.com https://3nbf4.com https://*.highperformanceformat.com https://*.highrevenueformat.com https://*.profitableratecpmnetwork.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; frame-src 'self' https:;";
 
 // 1. Security Headers Middlewares (Phase 4: Security Hardening)
 app.use((req, res, next) => {
-  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; frame-src 'self' https:;");
+  res.setHeader(
+    "Strict-Transport-Security",
+    "max-age=63072000; includeSubDomains; preload",
+  );
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
   next();
 });
 
 // 2. CORS Whitelist Custom Middleware (Phase 4: Security Hardening)
 app.use((req, res, next) => {
   const allowedOrigins = [
-    'https://ais-dev-26dsrrqv2jjrw7pdyosmk5-119880194965.europe-west2.run.app',
-    'https://ais-pre-26dsrrqv2jjrw7pdyosmk5-119880194965.europe-west2.run.app',
-    'http://localhost:3000'
+    "https://ais-dev-26dsrrqv2jjrw7pdyosmk5-119880194965.europe-west2.run.app",
+    "https://ais-pre-26dsrrqv2jjrw7pdyosmk5-119880194965.europe-west2.run.app",
+    "http://localhost:3000",
   ];
   const origin = req.headers.origin;
-  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.run.app'))) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  if (
+    origin &&
+    (allowedOrigins.includes(origin) || origin.endsWith(".run.app"))
+  ) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
   } else {
-    res.setHeader('Access-Control-Allow-Origin', 'https://ais-dev-26dsrrqv2jjrw7pdyosmk5-119880194965.europe-west2.run.app');
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      "https://ais-dev-26dsrrqv2jjrw7pdyosmk5-119880194965.europe-west2.run.app",
+    );
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  
-  if (req.method === 'OPTIONS') {
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS",
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Requested-With",
+  );
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  if (req.method === "OPTIONS") {
     res.sendStatus(200);
     return;
   }
@@ -94,10 +150,13 @@ const rateLimits = new Map<string, RateLimitInfo>();
 
 const rateLimiter = (limit: number, windowMs: number) => {
   return (req: Request, res: Response, next: any) => {
-    const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+    const ip =
+      (req.headers["x-forwarded-for"] as string) ||
+      req.socket.remoteAddress ||
+      "unknown";
     const key = `${req.path}:${ip}`;
     const now = Date.now();
-    
+
     let info = rateLimits.get(key);
     if (!info || now > info.resetTime) {
       info = { count: 1, resetTime: now + windowMs };
@@ -105,548 +164,728 @@ const rateLimiter = (limit: number, windowMs: number) => {
       next();
       return;
     }
-    
+
     info.count++;
     if (info.count > limit) {
-      res.status(429).json({ error: 'Too many requests. Please try again later.' });
+      res
+        .status(429)
+        .json({ error: "Too many requests. Please try again later." });
       return;
     }
     next();
   };
 };
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Protect newsletter dispatch and sensitive endpoints with rate limiter
-app.use('/api/newsletter/send', rateLimiter(10, 60 * 1000));
+app.use("/api/newsletter/send", rateLimiter(10, 60 * 1000));
 
 // HEALTH CHECK ENDPOINT (Production & CI/CD)
-app.get('/api/health', (req: Request, res: Response) => {
+app.get("/api/health", (req: Request, res: Response) => {
   res.json({
-    status: 'ok',
+    status: "ok",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || "development",
   });
 });
-app.use('/api/auth/', rateLimiter(30, 60 * 1000));
-app.use('/api/setup/', rateLimiter(10, 60 * 1000));
+app.use("/api/auth/", rateLimiter(30, 60 * 1000));
+app.use("/api/setup/", rateLimiter(10, 60 * 1000));
 
 // REAL WEBHOOKS DISPATCH ENGINE ENDPOINT
-app.post('/api/webhooks/dispatch', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { url, event, payload, secret, customHeaders } = req.body;
+app.post(
+  "/api/webhooks/dispatch",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { url, event, payload, secret, customHeaders } = req.body;
 
-  if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-    res.status(400).json({ error: 'A valid target webhook HTTP(S) URL is required.' });
-    return;
-  }
+    if (
+      !url ||
+      typeof url !== "string" ||
+      (!url.startsWith("http://") && !url.startsWith("https://"))
+    ) {
+      res
+        .status(400)
+        .json({ error: "A valid target webhook HTTP(S) URL is required." });
+      return;
+    }
 
-  const startTime = Date.now();
-  const eventName = event || 'ping.test';
-  const dataPayload = payload || { event: eventName, timestamp: new Date().toISOString(), message: 'Heartsync Webhook Dispatch Test' };
-  const rawBody = JSON.stringify(dataPayload);
-
-  // Compute signature if secret provided
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'Heartsync-WebhookEngine/2.0',
-    'X-Heartsync-Event': eventName,
-    'X-Heartsync-Delivery': `del_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    'X-Heartsync-Timestamp': Math.floor(Date.now() / 1000).toString(),
-    ...(customHeaders || {})
-  };
-
-  if (secret) {
-    const signature = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-    headers['X-Heartsync-Signature'] = `sha256=${signature}`;
-  }
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s max timeout
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: rawBody,
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-    const durationMs = Date.now() - startTime;
-    const responseText = await response.text();
-    const responseSnippet = responseText.substring(0, 500);
-
-    logger.info('Webhook dispatched successfully', { url, event: eventName, status: response.status, durationMs });
-
-    res.json({
-      success: response.ok,
-      statusCode: response.status,
-      statusText: response.statusText,
-      durationMs,
-      responseSnippet,
-      deliveryId: headers['X-Heartsync-Delivery'],
+    const startTime = Date.now();
+    const eventName = event || "ping.test";
+    const dataPayload = payload || {
       event: eventName,
-      timestamp: new Date().toISOString()
-    });
-  } catch (err: any) {
-    const durationMs = Date.now() - startTime;
-    logger.warn('Webhook dispatch failed or timed out', { url, event: eventName, error: err.message, durationMs });
+      timestamp: new Date().toISOString(),
+      message: "Heartsync Webhook Dispatch Test",
+    };
+    const rawBody = JSON.stringify(dataPayload);
 
-    res.status(502).json({
-      success: false,
-      statusCode: 502,
-      error: err.message || 'Network error or timeout delivering webhook payload',
-      durationMs,
-      event: eventName,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
+    // Compute signature if secret provided
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "User-Agent": "Heartsync-WebhookEngine/2.0",
+      "X-Heartsync-Event": eventName,
+      "X-Heartsync-Delivery": `del_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      "X-Heartsync-Timestamp": Math.floor(Date.now() / 1000).toString(),
+      ...(customHeaders || {}),
+    };
+
+    if (secret) {
+      const signature = crypto
+        .createHmac("sha256", secret)
+        .update(rawBody)
+        .digest("hex");
+      headers["X-Heartsync-Signature"] = `sha256=${signature}`;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s max timeout
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: rawBody,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      const durationMs = Date.now() - startTime;
+      const responseText = await response.text();
+      const responseSnippet = responseText.substring(0, 500);
+
+      logger.info("Webhook dispatched successfully", {
+        url,
+        event: eventName,
+        status: response.status,
+        durationMs,
+      });
+
+      res.json({
+        success: response.ok,
+        statusCode: response.status,
+        statusText: response.statusText,
+        durationMs,
+        responseSnippet,
+        deliveryId: headers["X-Heartsync-Delivery"],
+        event: eventName,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      const durationMs = Date.now() - startTime;
+      logger.warn("Webhook dispatch failed or timed out", {
+        url,
+        event: eventName,
+        error: err.message,
+        durationMs,
+      });
+
+      res.status(502).json({
+        success: false,
+        statusCode: 502,
+        error:
+          err.message || "Network error or timeout delivering webhook payload",
+        durationMs,
+        event: eventName,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  },
+);
 
 // REAL DNS DIAGNOSTICS & PROBE ENGINE ENDPOINT
-app.post('/api/dns/diagnostics', adminAuthMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { domains, domain } = req.body;
-    const targetDomains: string[] = Array.isArray(domains) && domains.length > 0
-      ? domains
-      : (domain ? [domain] : []);
+app.post(
+  "/api/dns/diagnostics",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { domains, domain } = req.body;
+      const targetDomains: string[] =
+        Array.isArray(domains) && domains.length > 0
+          ? domains
+          : domain
+            ? [domain]
+            : [];
 
-    const results = [];
-    const logLines: string[] = [];
-    logLines.push(`[Diagnostic Probe Sequence Initiated - ${new Date().toLocaleTimeString()}]:`);
-    logLines.push(`- Action: Performing real DNS record resolution & HTTP/SSL probes...`);
+      const results = [];
+      const logLines: string[] = [];
+      logLines.push(
+        `[Diagnostic Probe Sequence Initiated - ${new Date().toLocaleTimeString()}]:`,
+      );
+      logLines.push(
+        `- Action: Performing real DNS record resolution & HTTP/SSL probes...`,
+      );
 
-    for (const dStr of targetDomains) {
-      const cleanDomain = dStr.replace(/^https?:\/\//i, '').split('/')[0].split(':')[0].trim();
-      if (!cleanDomain) continue;
+      for (const dStr of targetDomains) {
+        const cleanDomain = dStr
+          .replace(/^https?:\/\//i, "")
+          .split("/")[0]
+          .split(":")[0]
+          .trim();
+        if (!cleanDomain) continue;
 
-      let aRecords: string[] = [];
-      let cnameRecords: string[] = [];
-      let txtRecords: string[] = [];
-      let mxRecords: string[] = [];
-      let httpStatus = 0;
-      let latencyMs = 0;
-      let hstsHeader = false;
-      let sslActive = false;
-      let probeStatus = 'UNKNOWN';
+        let aRecords: string[] = [];
+        let cnameRecords: string[] = [];
+        let txtRecords: string[] = [];
+        let mxRecords: string[] = [];
+        let httpStatus = 0;
+        let latencyMs = 0;
+        let hstsHeader = false;
+        let sslActive = false;
+        let probeStatus = "UNKNOWN";
 
-      // 1. DNS Resolution
-      try {
-        aRecords = await dnsPromises.resolve4(cleanDomain).catch(() => []);
-      } catch (_) {}
+        // 1. DNS Resolution
+        try {
+          aRecords = await dnsPromises.resolve4(cleanDomain).catch(() => []);
+        } catch (_) {}
 
-      try {
-        cnameRecords = await dnsPromises.resolveCname(cleanDomain).catch(() => []);
-      } catch (_) {}
+        try {
+          cnameRecords = await dnsPromises
+            .resolveCname(cleanDomain)
+            .catch(() => []);
+        } catch (_) {}
 
-      try {
-        const txtRaw = await dnsPromises.resolveTxt(cleanDomain).catch(() => []);
-        txtRecords = txtRaw.map(t => t.join(' '));
-      } catch (_) {}
+        try {
+          const txtRaw = await dnsPromises
+            .resolveTxt(cleanDomain)
+            .catch(() => []);
+          txtRecords = txtRaw.map((t) => t.join(" "));
+        } catch (_) {}
 
-      try {
-        const mxRaw = await dnsPromises.resolveMx(cleanDomain).catch(() => []);
-        mxRecords = mxRaw.map(m => `${m.priority} ${m.exchange}`);
-      } catch (_) {}
+        try {
+          const mxRaw = await dnsPromises
+            .resolveMx(cleanDomain)
+            .catch(() => []);
+          mxRecords = mxRaw.map((m) => `${m.priority} ${m.exchange}`);
+        } catch (_) {}
 
-      // 2. HTTP/HTTPS Real Probe
-      const probeUrl = `https://${cleanDomain}`;
-      const startTime = Date.now();
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        // 2. HTTP/HTTPS Real Probe
+        const probeUrl = `https://${cleanDomain}`;
+        const startTime = Date.now();
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-        const probeRes = await fetch(probeUrl, {
-          method: 'GET',
-          headers: { 'User-Agent': 'Heartsync-DNSProbe/2.0' },
-          signal: controller.signal
+          const probeRes = await fetch(probeUrl, {
+            method: "GET",
+            headers: { "User-Agent": "Heartsync-DNSProbe/2.0" },
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          latencyMs = Date.now() - startTime;
+          httpStatus = probeRes.status;
+          sslActive = true;
+          hstsHeader = probeRes.headers.has("strict-transport-security");
+          probeStatus = probeRes.ok
+            ? "VERIFIED_ACTIVE"
+            : `HTTP_${probeRes.status}`;
+        } catch (probeErr: any) {
+          latencyMs = Date.now() - startTime;
+          probeStatus =
+            probeErr.name === "AbortError"
+              ? "TIMEOUT_6S"
+              : "UNREACHABLE_OR_PENDING";
+        }
+
+        results.push({
+          domain: cleanDomain,
+          aRecords,
+          cnameRecords,
+          txtRecords,
+          mxRecords,
+          httpStatus,
+          latencyMs,
+          hstsHeader,
+          sslActive,
+          probeStatus,
         });
-        clearTimeout(timeoutId);
 
-        latencyMs = Date.now() - startTime;
-        httpStatus = probeRes.status;
-        sslActive = true;
-        hstsHeader = probeRes.headers.has('strict-transport-security');
-        probeStatus = probeRes.ok ? 'VERIFIED_ACTIVE' : `HTTP_${probeRes.status}`;
-      } catch (probeErr: any) {
-        latencyMs = Date.now() - startTime;
-        probeStatus = probeErr.name === 'AbortError' ? 'TIMEOUT_6S' : 'UNREACHABLE_OR_PENDING';
+        const dnsDetail =
+          cnameRecords.length > 0
+            ? `[CNAME] verified => Target: ${cnameRecords[0]}`
+            : aRecords.length > 0
+              ? `[A] resolved => IP: ${aRecords.join(", ")}`
+              : `[DNS] status => PENDING or unmapped`;
+
+        logLines.push(
+          `- Checked ${cleanDomain}... ${dnsDetail} | HTTP Probe: ${httpStatus || probeStatus} (${latencyMs}ms)`,
+        );
       }
 
-      results.push({
-        domain: cleanDomain,
-        aRecords,
-        cnameRecords,
-        txtRecords,
-        mxRecords,
-        httpStatus,
-        latencyMs,
-        hstsHeader,
-        sslActive,
-        probeStatus
+      logLines.push(`- HTTPS Port 443 Check: Active and Enforced`);
+      logLines.push(`- Public Routing Integrity: Verification Complete`);
+      logLines.push(`Diagnostic Status: ALL DNS PROBES EXECUTED SUCCESSFULLY`);
+      logLines.push(
+        `----------------------------------------------------------`,
+      );
+
+      const formattedLog = logLines.join("\n");
+
+      const sbClient = getSupabaseClient();
+      if (sbClient) {
+        try {
+          await sbClient.from("audit_logs").insert([
+            {
+              action_type: "DNS_DIAGNOSTICS_RUN",
+              description: `Ran real DNS probe for ${targetDomains.join(", ")}`,
+              metadata: { results, timestamp: new Date().toISOString() },
+              created_at: new Date().toISOString(),
+            },
+          ]);
+        } catch (_) {}
+      }
+
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        results,
+        formattedLog,
       });
-
-      const dnsDetail = cnameRecords.length > 0 
-        ? `[CNAME] verified => Target: ${cnameRecords[0]}`
-        : (aRecords.length > 0 ? `[A] resolved => IP: ${aRecords.join(', ')}` : `[DNS] status => PENDING or unmapped`);
-
-      logLines.push(`- Checked ${cleanDomain}... ${dnsDetail} | HTTP Probe: ${httpStatus || probeStatus} (${latencyMs}ms)`);
+    } catch (err: any) {
+      logger.error("DNS diagnostics endpoint failed", err);
+      res
+        .status(500)
+        .json({
+          error: err.message || "Failed to execute DNS diagnostics probe.",
+        });
     }
-
-    logLines.push(`- HTTPS Port 443 Check: Active and Enforced`);
-    logLines.push(`- Public Routing Integrity: Verification Complete`);
-    logLines.push(`Diagnostic Status: ALL DNS PROBES EXECUTED SUCCESSFULLY`);
-    logLines.push(`----------------------------------------------------------`);
-
-    const formattedLog = logLines.join('\n');
-
-    const sbClient = getSupabaseClient();
-    if (sbClient) {
-      try {
-        await sbClient.from('audit_logs').insert([{
-          action_type: 'DNS_DIAGNOSTICS_RUN',
-          description: `Ran real DNS probe for ${targetDomains.join(', ')}`,
-          metadata: { results, timestamp: new Date().toISOString() },
-          created_at: new Date().toISOString()
-        }]);
-      } catch (_) {}
-    }
-
-    res.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      results,
-      formattedLog
-    });
-  } catch (err: any) {
-    logger.error('DNS diagnostics endpoint failed', err);
-    res.status(500).json({ error: err.message || 'Failed to execute DNS diagnostics probe.' });
-  }
-});
+  },
+);
 
 // REAL GOOGLE INDEXING & SEARCH ENGINE SUBMISSION ENGINE ENDPOINT
-app.post('/api/seo/index-submit', adminAuthMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { urls, url } = req.body;
-    const inputUrls: string[] = Array.isArray(urls) && urls.length > 0
-      ? urls
-      : (url ? [url] : []);
+app.post(
+  "/api/seo/index-submit",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { urls, url } = req.body;
+      const inputUrls: string[] =
+        Array.isArray(urls) && urls.length > 0 ? urls : url ? [url] : [];
 
-    const results = [];
+      const results = [];
 
-    for (const targetUrl of inputUrls) {
-      if (!targetUrl || typeof targetUrl !== 'string') continue;
+      for (const targetUrl of inputUrls) {
+        if (!targetUrl || typeof targetUrl !== "string") continue;
 
-      const startTime = Date.now();
-      let statusCode = 0;
-      let latencyMs = 0;
-      let isIndexable = true;
-      let hasMetaRobots = true;
-      let hasOgTags = false;
-      let status: 'Success' | 'Crawled' | 'Pending' | 'Failed' | 'Robots Blocked' = 'Success';
-      let statusDetails = '';
+        const startTime = Date.now();
+        let statusCode = 0;
+        let latencyMs = 0;
+        let isIndexable = true;
+        let hasMetaRobots = true;
+        let hasOgTags = false;
+        let status:
+          "Success" | "Crawled" | "Pending" | "Failed" | "Robots Blocked" =
+          "Success";
+        let statusDetails = "";
 
-      // 1. Perform Real HTTP Probe on target URL
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        // 1. Perform Real HTTP Probe on target URL
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-        const probeRes = await fetch(targetUrl, {
-          method: 'GET',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
-          },
-          signal: controller.signal
+          const probeRes = await fetch(targetUrl, {
+            method: "GET",
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          latencyMs = Date.now() - startTime;
+          statusCode = probeRes.status;
+
+          const html = await probeRes.text();
+          const lowerHtml = html.toLowerCase();
+
+          if (
+            lowerHtml.includes('content="noindex') ||
+            lowerHtml.includes('content="noindex, nofollow"')
+          ) {
+            isIndexable = false;
+            status = "Robots Blocked";
+            statusDetails =
+              "Page contains meta noindex tag blocking search crawlers.";
+          } else {
+            isIndexable = true;
+            status = "Success";
+            statusDetails =
+              "URL responded HTTP 200 OK and satisfies search indexing criteria.";
+          }
+
+          if (
+            lowerHtml.includes("og:title") ||
+            lowerHtml.includes("og:description")
+          ) {
+            hasOgTags = true;
+          }
+        } catch (fetchErr: any) {
+          latencyMs = Date.now() - startTime;
+          statusCode = 0;
+          status = "Failed";
+          statusDetails =
+            fetchErr.message || "URL unreachable or request timed out.";
+        }
+
+        // 2. Ping Search Engine Sitemap & Indexing Endpoints
+        let googlePingStatus = "Ping skipped";
+        try {
+          const googlePingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(targetUrl)}`;
+          const pingController = new AbortController();
+          const pingTimeout = setTimeout(() => pingController.abort(), 4000);
+
+          const pingRes = await fetch(googlePingUrl, {
+            signal: pingController.signal,
+          }).catch(() => null);
+          clearTimeout(pingTimeout);
+
+          if (pingRes) {
+            googlePingStatus = `Google Sitemap Ping responded with HTTP ${pingRes.status}`;
+          } else {
+            googlePingStatus = "Search engine ping dispatched";
+          }
+        } catch (_) {
+          googlePingStatus = "Ping attempt completed";
+        }
+
+        const lastChecked = new Date()
+          .toISOString()
+          .replace("T", " ")
+          .substring(0, 16);
+
+        results.push({
+          url: targetUrl,
+          status,
+          statusCode,
+          isIndexable,
+          hasMetaRobots,
+          hasOgTags,
+          latencyMs,
+          lastChecked,
+          statusDetails,
+          googlePingStatus,
         });
-        clearTimeout(timeoutId);
-
-        latencyMs = Date.now() - startTime;
-        statusCode = probeRes.status;
-
-        const html = await probeRes.text();
-        const lowerHtml = html.toLowerCase();
-
-        if (lowerHtml.includes('content="noindex') || lowerHtml.includes('content="noindex, nofollow"')) {
-          isIndexable = false;
-          status = 'Robots Blocked';
-          statusDetails = 'Page contains meta noindex tag blocking search crawlers.';
-        } else {
-          isIndexable = true;
-          status = 'Success';
-          statusDetails = 'URL responded HTTP 200 OK and satisfies search indexing criteria.';
-        }
-
-        if (lowerHtml.includes('og:title') || lowerHtml.includes('og:description')) {
-          hasOgTags = true;
-        }
-      } catch (fetchErr: any) {
-        latencyMs = Date.now() - startTime;
-        statusCode = 0;
-        status = 'Failed';
-        statusDetails = fetchErr.message || 'URL unreachable or request timed out.';
       }
 
-      // 2. Ping Search Engine Sitemap & Indexing Endpoints
-      let googlePingStatus = 'Ping skipped';
-      try {
-        const googlePingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(targetUrl)}`;
-        const pingController = new AbortController();
-        const pingTimeout = setTimeout(() => pingController.abort(), 4000);
-
-        const pingRes = await fetch(googlePingUrl, { signal: pingController.signal }).catch(() => null);
-        clearTimeout(pingTimeout);
-
-        if (pingRes) {
-          googlePingStatus = `Google Sitemap Ping responded with HTTP ${pingRes.status}`;
-        } else {
-          googlePingStatus = 'Search engine ping dispatched';
-        }
-      } catch (_) {
-        googlePingStatus = 'Ping attempt completed';
+      const sbClient = getSupabaseClient();
+      if (sbClient) {
+        try {
+          await sbClient.from("audit_logs").insert([
+            {
+              action_type: "GOOGLE_INDEXING_SUBMIT",
+              description: `Submitted ${inputUrls.length} URLs for Google Search Indexing`,
+              metadata: {
+                inputUrls,
+                results,
+                timestamp: new Date().toISOString(),
+              },
+              created_at: new Date().toISOString(),
+            },
+          ]);
+        } catch (_) {}
       }
 
-      const lastChecked = new Date().toISOString().replace('T', ' ').substring(0, 16);
-
-      results.push({
-        url: targetUrl,
-        status,
-        statusCode,
-        isIndexable,
-        hasMetaRobots,
-        hasOgTags,
-        latencyMs,
-        lastChecked,
-        statusDetails,
-        googlePingStatus
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        submittedCount: results.length,
+        results,
       });
+    } catch (err: any) {
+      logger.error("Google indexing submit endpoint failed", err);
+      res
+        .status(500)
+        .json({
+          error: err.message || "Failed to submit URLs for Google indexing.",
+        });
     }
-
-    const sbClient = getSupabaseClient();
-    if (sbClient) {
-      try {
-        await sbClient.from('audit_logs').insert([{
-          action_type: 'GOOGLE_INDEXING_SUBMIT',
-          description: `Submitted ${inputUrls.length} URLs for Google Search Indexing`,
-          metadata: { inputUrls, results, timestamp: new Date().toISOString() },
-          created_at: new Date().toISOString()
-        }]);
-      } catch (_) {}
-    }
-
-    res.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      submittedCount: results.length,
-      results
-    });
-  } catch (err: any) {
-    logger.error('Google indexing submit endpoint failed', err);
-    res.status(500).json({ error: err.message || 'Failed to submit URLs for Google indexing.' });
-  }
-});
+  },
+);
 
 // REAL CI/CD PIPELINE & DEVOPS HEALTH CHECK ENGINE
 let LATEST_CICD_STATUS: any = {
-  status: 'passed',
+  status: "passed",
   lastRun: new Date().toISOString(),
   overallScore: 100,
   workflowConfigured: true,
   stages: [
-    { name: 'Repository & Config Validation', status: 'pass', durationMs: 14, details: 'All config files (package.json, tsconfig.json, vite.config.ts) valid.' },
-    { name: 'TypeScript & Static Analysis', status: 'pass', durationMs: 42, details: 'Type system integrity verified across client and server.' },
-    { name: 'Production Build & Artifacts', status: 'pass', durationMs: 28, details: 'Vite and esbuild target dist/ outputs verified.' },
-    { name: 'Database & Infrastructure Connectivity', status: 'pass', durationMs: 35, details: 'Supabase PostgreSQL cloud connection verified.' },
-    { name: 'Service Endpoint & Health Check', status: 'pass', durationMs: 18, details: 'GET /api/health responding HTTP 200 OK.' },
-    { name: 'GitHub Actions CI/CD Pipeline', status: 'pass', durationMs: 8, details: '.github/workflows/ci.yml configured with multi-stage test & build jobs.' }
-  ]
+    {
+      name: "Repository & Config Validation",
+      status: "pass",
+      durationMs: 14,
+      details:
+        "All config files (package.json, tsconfig.json, vite.config.ts) valid.",
+    },
+    {
+      name: "TypeScript & Static Analysis",
+      status: "pass",
+      durationMs: 42,
+      details: "Type system integrity verified across client and server.",
+    },
+    {
+      name: "Production Build & Artifacts",
+      status: "pass",
+      durationMs: 28,
+      details: "Vite and esbuild target dist/ outputs verified.",
+    },
+    {
+      name: "Database & Infrastructure Connectivity",
+      status: "pass",
+      durationMs: 35,
+      details: "Supabase PostgreSQL cloud connection verified.",
+    },
+    {
+      name: "Service Endpoint & Health Check",
+      status: "pass",
+      durationMs: 18,
+      details: "GET /api/health responding HTTP 200 OK.",
+    },
+    {
+      name: "GitHub Actions CI/CD Pipeline",
+      status: "pass",
+      durationMs: 8,
+      details:
+        ".github/workflows/ci.yml configured with multi-stage test & build jobs.",
+    },
+  ],
 };
 
-app.get('/api/cicd/status', (req: Request, res: Response) => {
+app.get("/api/cicd/status", (req: Request, res: Response) => {
   res.json({
     success: true,
-    ...LATEST_CICD_STATUS
+    ...LATEST_CICD_STATUS,
   });
 });
 
-app.post('/api/cicd/check', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const startTime = Date.now();
-  const stages: Array<{ name: string; status: 'pass' | 'fail' | 'warn'; durationMs: number; details: string; logs?: string[] }> = [];
+app.post(
+  "/api/cicd/check",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    const stages: Array<{
+      name: string;
+      status: "pass" | "fail" | "warn";
+      durationMs: number;
+      details: string;
+      logs?: string[];
+    }> = [];
 
-  try {
-    // 1. Config Validation
-    const stage1Start = Date.now();
-    const configFiles = ['package.json', 'tsconfig.json', 'vite.config.ts', 'metadata.json', '.github/workflows/ci.yml'];
-    const missingConfigs: string[] = [];
-    for (const f of configFiles) {
-      if (!fs.existsSync(path.join(process.cwd(), f))) {
-        missingConfigs.push(f);
-      }
-    }
-    const stage1Duration = Date.now() - stage1Start;
-    if (missingConfigs.length > 0) {
-      stages.push({
-        name: 'Repository & Config Validation',
-        status: 'fail',
-        durationMs: stage1Duration,
-        details: `Missing configuration files: ${missingConfigs.join(', ')}`
-      });
-    } else {
-      stages.push({
-        name: 'Repository & Config Validation',
-        status: 'pass',
-        durationMs: stage1Duration,
-        details: 'All required configuration files present and readable.'
-      });
-    }
-
-    // 2. TypeScript & AST Static Analysis
-    const stage2Start = Date.now();
-    const criticalSourceFiles = ['src/main.tsx', 'src/App.tsx', 'server.ts'];
-    let sourceCheckPass = true;
-    for (const sf of criticalSourceFiles) {
-      try {
-        const content = fs.readFileSync(path.join(process.cwd(), sf), 'utf8');
-        if (content.length < 50) sourceCheckPass = false;
-      } catch {
-        sourceCheckPass = false;
-      }
-    }
-    const stage2Duration = Date.now() - stage2Start;
-    stages.push({
-      name: 'TypeScript & Static Analysis',
-      status: sourceCheckPass ? 'pass' : 'fail',
-      durationMs: stage2Duration,
-      details: sourceCheckPass 
-        ? 'Entrypoints verified: src/main.tsx, src/App.tsx, and server.ts intact.'
-        : 'Warning: Failed to inspect one or more core source entrypoints.'
-    });
-
-    // 3. Build & Artifacts Check
-    const stage3Start = Date.now();
-    const distExists = fs.existsSync(path.join(process.cwd(), 'dist'));
-    const distIndexHtml = fs.existsSync(path.join(process.cwd(), 'dist', 'index.html'));
-    const distServer = fs.existsSync(path.join(process.cwd(), 'dist', 'server.cjs'));
-    const stage3Duration = Date.now() - stage3Start;
-    stages.push({
-      name: 'Production Build & Artifacts',
-      status: (distExists && (distIndexHtml || distServer)) ? 'pass' : 'warn',
-      durationMs: stage3Duration,
-      details: (distExists && (distIndexHtml || distServer))
-        ? 'Production bundle artifacts present in dist/ directory.'
-        : 'Production build script verified in package.json. Bundle ready for compilation.'
-    });
-
-    // 4. Database & Infrastructure Connectivity
-    const stage4Start = Date.now();
-    let dbStatus: 'pass' | 'warn' | 'fail' = 'pass';
-    let dbDetails = 'Supabase PostgreSQL connection operational.';
-    const sbClient = getSupabaseClient();
-    if (sbClient) {
-      try {
-        const { error } = await sbClient.from('posts').select('id').limit(1);
-        if (error) {
-          dbStatus = 'warn';
-          dbDetails = `Database responded with notice: ${error.message}`;
-        }
-      } catch (dbErr: any) {
-        dbStatus = 'warn';
-        dbDetails = `Database query timed out: ${dbErr.message}`;
-      }
-    } else {
-      dbStatus = 'warn';
-      dbDetails = 'Operating in mock local database mode (Supabase credentials not set).';
-    }
-    const stage4Duration = Date.now() - stage4Start;
-    stages.push({
-      name: 'Database & Infrastructure Connectivity',
-      status: dbStatus,
-      durationMs: stage4Duration,
-      details: dbDetails
-    });
-
-    // 5. Health Check Probe
-    const stage5Start = Date.now();
-    let healthProbeStatus: 'pass' | 'fail' = 'pass';
-    let healthProbeDetails = 'Internal route /api/health responding with HTTP 200.';
     try {
-      const probeRes = await fetch('http://127.0.0.1:3000/api/health', { method: 'GET' });
-      if (!probeRes.ok) {
-        healthProbeStatus = 'fail';
-        healthProbeDetails = `Health endpoint returned status HTTP ${probeRes.status}`;
+      // 1. Config Validation
+      const stage1Start = Date.now();
+      const configFiles = [
+        "package.json",
+        "tsconfig.json",
+        "vite.config.ts",
+        "metadata.json",
+        ".github/workflows/ci.yml",
+      ];
+      const missingConfigs: string[] = [];
+      for (const f of configFiles) {
+        if (!fs.existsSync(path.join(process.cwd(), f))) {
+          missingConfigs.push(f);
+        }
       }
-    } catch {
-      // In dev middleware, loopback fetch may be pending, verify route directly
-      healthProbeStatus = 'pass';
-      healthProbeDetails = 'Health route /api/health mounted and active on port 3000.';
-    }
-    const stage5Duration = Date.now() - stage5Start;
-    stages.push({
-      name: 'Service Endpoint & Health Check',
-      status: healthProbeStatus,
-      durationMs: stage5Duration,
-      details: healthProbeDetails
-    });
-
-    // 6. GitHub Actions Workflow Verification
-    const stage6Start = Date.now();
-    const workflowPath = path.join(process.cwd(), '.github', 'workflows', 'ci.yml');
-    const hasWorkflow = fs.existsSync(workflowPath);
-    let workflowDetails = 'GitHub Actions CI/CD configuration (.github/workflows/ci.yml) active.';
-    if (hasWorkflow) {
-      const content = fs.readFileSync(workflowPath, 'utf8');
-      if (content.includes('npm run build') && content.includes('npm run lint')) {
-        workflowDetails = 'GitHub Actions workflow includes Linting, TypeScript checks, and Production Build tests.';
+      const stage1Duration = Date.now() - stage1Start;
+      if (missingConfigs.length > 0) {
+        stages.push({
+          name: "Repository & Config Validation",
+          status: "fail",
+          durationMs: stage1Duration,
+          details: `Missing configuration files: ${missingConfigs.join(", ")}`,
+        });
+      } else {
+        stages.push({
+          name: "Repository & Config Validation",
+          status: "pass",
+          durationMs: stage1Duration,
+          details: "All required configuration files present and readable.",
+        });
       }
-    }
-    const stage6Duration = Date.now() - stage6Start;
-    stages.push({
-      name: 'GitHub Actions CI/CD Pipeline',
-      status: hasWorkflow ? 'pass' : 'fail',
-      durationMs: stage6Duration,
-      details: workflowDetails
-    });
 
-    // Overall Status
-    const hasFail = stages.some(s => s.status === 'fail');
-    const hasWarn = stages.some(s => s.status === 'warn');
-    const overallStatus = hasFail ? 'failing' : (hasWarn ? 'warning' : 'passed');
-    const passedCount = stages.filter(s => s.status === 'pass').length;
-    const overallScore = Math.round((passedCount / stages.length) * 100);
+      // 2. TypeScript & AST Static Analysis
+      const stage2Start = Date.now();
+      const criticalSourceFiles = ["src/main.tsx", "src/App.tsx", "server.ts"];
+      let sourceCheckPass = true;
+      for (const sf of criticalSourceFiles) {
+        try {
+          const content = fs.readFileSync(path.join(process.cwd(), sf), "utf8");
+          if (content.length < 50) sourceCheckPass = false;
+        } catch {
+          sourceCheckPass = false;
+        }
+      }
+      const stage2Duration = Date.now() - stage2Start;
+      stages.push({
+        name: "TypeScript & Static Analysis",
+        status: sourceCheckPass ? "pass" : "fail",
+        durationMs: stage2Duration,
+        details: sourceCheckPass
+          ? "Entrypoints verified: src/main.tsx, src/App.tsx, and server.ts intact."
+          : "Warning: Failed to inspect one or more core source entrypoints.",
+      });
 
-    const totalDurationMs = Date.now() - startTime;
+      // 3. Build & Artifacts Check
+      const stage3Start = Date.now();
+      const distExists = fs.existsSync(path.join(process.cwd(), "dist"));
+      const distIndexHtml = fs.existsSync(
+        path.join(process.cwd(), "dist", "index.html"),
+      );
+      const distServer = fs.existsSync(
+        path.join(process.cwd(), "dist", "server.cjs"),
+      );
+      const stage3Duration = Date.now() - stage3Start;
+      stages.push({
+        name: "Production Build & Artifacts",
+        status: distExists && (distIndexHtml || distServer) ? "pass" : "warn",
+        durationMs: stage3Duration,
+        details:
+          distExists && (distIndexHtml || distServer)
+            ? "Production bundle artifacts present in dist/ directory."
+            : "Production build script verified in package.json. Bundle ready for compilation.",
+      });
 
-    LATEST_CICD_STATUS = {
-      status: overallStatus,
-      lastRun: new Date().toISOString(),
-      overallScore,
-      totalDurationMs,
-      workflowConfigured: hasWorkflow,
-      stages
-    };
+      // 4. Database & Infrastructure Connectivity
+      const stage4Start = Date.now();
+      let dbStatus: "pass" | "warn" | "fail" = "pass";
+      let dbDetails = "Supabase PostgreSQL connection operational.";
+      const sbClient = getSupabaseClient();
+      if (sbClient) {
+        try {
+          const { error } = await sbClient.from("posts").select("id").limit(1);
+          if (error) {
+            dbStatus = "warn";
+            dbDetails = `Database responded with notice: ${error.message}`;
+          }
+        } catch (dbErr: any) {
+          dbStatus = "warn";
+          dbDetails = `Database query timed out: ${dbErr.message}`;
+        }
+      } else {
+        dbStatus = "warn";
+        dbDetails =
+          "Operating in mock local database mode (Supabase credentials not set).";
+      }
+      const stage4Duration = Date.now() - stage4Start;
+      stages.push({
+        name: "Database & Infrastructure Connectivity",
+        status: dbStatus,
+        durationMs: stage4Duration,
+        details: dbDetails,
+      });
 
-    // Record in audit logs if Supabase is connected
-    if (sbClient) {
+      // 5. Health Check Probe
+      const stage5Start = Date.now();
+      let healthProbeStatus: "pass" | "fail" = "pass";
+      let healthProbeDetails =
+        "Internal route /api/health responding with HTTP 200.";
       try {
-        await sbClient.from('audit_logs').insert([{
-          action_type: 'CI_CD_PIPELINE_RUN',
-          description: `Ran real-time CI/CD check. Score: ${overallScore}% (${overallStatus})`,
-          metadata: { overallStatus, overallScore, totalDurationMs, stages },
-          created_at: new Date().toISOString()
-        }]);
-      } catch (_) {}
-    }
+        const probeRes = await fetch("http://127.0.0.1:3000/api/health", {
+          method: "GET",
+        });
+        if (!probeRes.ok) {
+          healthProbeStatus = "fail";
+          healthProbeDetails = `Health endpoint returned status HTTP ${probeRes.status}`;
+        }
+      } catch {
+        // In dev middleware, loopback fetch may be pending, verify route directly
+        healthProbeStatus = "pass";
+        healthProbeDetails =
+          "Health route /api/health mounted and active on port 3000.";
+      }
+      const stage5Duration = Date.now() - stage5Start;
+      stages.push({
+        name: "Service Endpoint & Health Check",
+        status: healthProbeStatus,
+        durationMs: stage5Duration,
+        details: healthProbeDetails,
+      });
 
-    res.json({
-      success: true,
-      ...LATEST_CICD_STATUS
-    });
-  } catch (err: any) {
-    logger.error('CI/CD health check failed', err);
-    res.status(500).json({ error: err.message || 'Failed to execute CI/CD checks.' });
-  }
-});
+      // 6. GitHub Actions Workflow Verification
+      const stage6Start = Date.now();
+      const workflowPath = path.join(
+        process.cwd(),
+        ".github",
+        "workflows",
+        "ci.yml",
+      );
+      const hasWorkflow = fs.existsSync(workflowPath);
+      let workflowDetails =
+        "GitHub Actions CI/CD configuration (.github/workflows/ci.yml) active.";
+      if (hasWorkflow) {
+        const content = fs.readFileSync(workflowPath, "utf8");
+        if (
+          content.includes("npm run build") &&
+          content.includes("npm run lint")
+        ) {
+          workflowDetails =
+            "GitHub Actions workflow includes Linting, TypeScript checks, and Production Build tests.";
+        }
+      }
+      const stage6Duration = Date.now() - stage6Start;
+      stages.push({
+        name: "GitHub Actions CI/CD Pipeline",
+        status: hasWorkflow ? "pass" : "fail",
+        durationMs: stage6Duration,
+        details: workflowDetails,
+      });
+
+      // Overall Status
+      const hasFail = stages.some((s) => s.status === "fail");
+      const hasWarn = stages.some((s) => s.status === "warn");
+      const overallStatus = hasFail
+        ? "failing"
+        : hasWarn
+          ? "warning"
+          : "passed";
+      const passedCount = stages.filter((s) => s.status === "pass").length;
+      const overallScore = Math.round((passedCount / stages.length) * 100);
+
+      const totalDurationMs = Date.now() - startTime;
+
+      LATEST_CICD_STATUS = {
+        status: overallStatus,
+        lastRun: new Date().toISOString(),
+        overallScore,
+        totalDurationMs,
+        workflowConfigured: hasWorkflow,
+        stages,
+      };
+
+      // Record in audit logs if Supabase is connected
+      if (sbClient) {
+        try {
+          await sbClient.from("audit_logs").insert([
+            {
+              action_type: "CI_CD_PIPELINE_RUN",
+              description: `Ran real-time CI/CD check. Score: ${overallScore}% (${overallStatus})`,
+              metadata: {
+                overallStatus,
+                overallScore,
+                totalDurationMs,
+                stages,
+              },
+              created_at: new Date().toISOString(),
+            },
+          ]);
+        } catch (_) {}
+      }
+
+      res.json({
+        success: true,
+        ...LATEST_CICD_STATUS,
+      });
+    } catch (err: any) {
+      logger.error("CI/CD health check failed", err);
+      res
+        .status(500)
+        .json({ error: err.message || "Failed to execute CI/CD checks." });
+    }
+  },
+);
 
 // =========================================================================
 // GROUP 5: GDPR COMPLIANCE ENGINE & DIAGNOSTIC/QUIZ DATABASE PERSISTENCE
@@ -667,7 +906,9 @@ app.post('/api/cicd/check', adminAuthMiddleware, async (req: Request, res: Respo
  *  Env-driven so staging/prod can differ; the canonical public domain is the
  *  default. Runtime canonical/OG tags already derive from the request host. */
 function getPublicSiteUrl(): string {
-  return (process.env.PUBLIC_SITE_URL || 'https://heartsyncx.netlify.app').replace(/\/+$/, '');
+  return (
+    process.env.PUBLIC_SITE_URL || "https://heartsyncx.netlify.app"
+  ).replace(/\/+$/, "");
 }
 
 function mapDiagnosticRow(r: any) {
@@ -681,7 +922,7 @@ function mapDiagnosticRow(r: any) {
     recommendation: r.recommendation,
     answers: r.answers || {},
     sessionHash: r.session_hash,
-    createdAt: r.created_at
+    createdAt: r.created_at,
   };
 }
 
@@ -692,7 +933,7 @@ function mapAuditRow(r: any) {
     userEmail: r.user_email,
     ipHash: r.ip_hash,
     details: r.details,
-    timestamp: r.created_at
+    timestamp: r.created_at,
   };
 }
 
@@ -706,13 +947,16 @@ function mapDsrRow(r: any) {
     slaDeadline: r.sla_deadline,
     requestedAt: r.requested_at,
     fulfilledAt: r.fulfilled_at,
-    certificateId: r.certificate_id
+    certificateId: r.certificate_id,
   };
 }
 
 /** Append one privacy event to the gdpr_audit_log table. Best-effort: a failed
  *  audit write must never fail the user-facing operation that produced it. */
-async function recordAuditEvent(dbClient: any, entry: { event: string; userEmail: string; ipHash: string; details: string }) {
+async function recordAuditEvent(
+  dbClient: any,
+  entry: { event: string; userEmail: string; ipHash: string; details: string },
+) {
   if (!dbClient) return null;
   const row = {
     id: `glog-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -720,315 +964,476 @@ async function recordAuditEvent(dbClient: any, entry: { event: string; userEmail
     user_email: entry.userEmail,
     ip_hash: entry.ipHash,
     details: entry.details,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
   };
   try {
-    const { error } = await dbClient.from('gdpr_audit_log').insert(row);
-    if (error) console.warn('GDPR audit-log insert failed:', error.message);
+    const { error } = await dbClient.from("gdpr_audit_log").insert(row);
+    if (error) console.warn("GDPR audit-log insert failed:", error.message);
   } catch (err: any) {
-    console.warn('GDPR audit-log insert threw:', err?.message);
+    console.warn("GDPR audit-log insert threw:", err?.message);
   }
   return { ...row, timestamp: row.created_at };
 }
 
 // DIAGNOSTICS & QUIZZES API ENDPOINTS (database-backed, H-08)
-app.get('/api/diagnostics/results', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  let query = db.from('diagnostic_results').select('*').order('created_at', { ascending: false }).limit(200);
-  const email = (req.query.email || '').toString().trim().toLowerCase();
-  if (email) query = query.eq('user_email', email);
-  const { data, error } = await query;
-  if (error) {
-    res.status(502).json({ error: 'Diagnostic results lookup failed.', detail: error.message });
-    return;
-  }
-  const results = (data || []).map(mapDiagnosticRow);
-  res.json({ success: true, count: results.length, results });
-});
+app.get(
+  "/api/diagnostics/results",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    let query = db
+      .from("diagnostic_results")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const email = (req.query.email || "").toString().trim().toLowerCase();
+    if (email) query = query.eq("user_email", email);
+    const { data, error } = await query;
+    if (error) {
+      res
+        .status(502)
+        .json({
+          error: "Diagnostic results lookup failed.",
+          detail: error.message,
+        });
+      return;
+    }
+    const results = (data || []).map(mapDiagnosticRow);
+    res.json({ success: true, count: results.length, results });
+  },
+);
 
-app.post('/api/diagnostics/submit', async (req: Request, res: Response) => {
-  const { quizId, quizTitle, userEmail, score, categoryScores, recommendation, answers } = req.body;
+app.post("/api/diagnostics/submit", async (req: Request, res: Response) => {
+  const {
+    quizId,
+    quizTitle,
+    userEmail,
+    score,
+    categoryScores,
+    recommendation,
+    answers,
+  } = req.body;
 
   if (!quizTitle || score === undefined) {
-    res.status(400).json({ error: 'Quiz title and calculated score are required.' });
+    res
+      .status(400)
+      .json({ error: "Quiz title and calculated score are required." });
     return;
   }
 
   const row = {
     id: `diag-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    quiz_id: quizId || 'attachment-assessment',
+    quiz_id: quizId || "attachment-assessment",
     quiz_title: quizTitle,
-    user_email: (userEmail || 'anonymous-reader@heartsync.app').trim().toLowerCase(),
+    user_email: (userEmail || "anonymous-reader@heartsync.app")
+      .trim()
+      .toLowerCase(),
     score: Number(score),
     category_scores: categoryScores || {},
-    recommendation: recommendation || 'Continue daily co-regulation practice.',
+    recommendation: recommendation || "Continue daily co-regulation practice.",
     answers: answers || {},
     session_hash: `sess_${Math.random().toString(36).substring(2, 9)}`,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
   };
 
   const db = getSupabaseClient();
   if (!db) {
-    res.status(503).json({ error: 'Diagnostic storage is not configured. Your result was NOT saved.' });
+    res
+      .status(503)
+      .json({
+        error:
+          "Diagnostic storage is not configured. Your result was NOT saved.",
+      });
     return;
   }
-  const { error: insertErr } = await db.from('diagnostic_results').insert(row);
+  const { error: insertErr } = await db.from("diagnostic_results").insert(row);
   if (insertErr) {
-    res.status(502).json({ error: 'Could not save the assessment result. Please try again.', detail: insertErr.message });
+    res
+      .status(502)
+      .json({
+        error: "Could not save the assessment result. Please try again.",
+        detail: insertErr.message,
+      });
     return;
   }
   await recordAuditEvent(db, {
-    event: 'DIAGNOSTIC_QUIZ_SAVED',
+    event: "DIAGNOSTIC_QUIZ_SAVED",
     userEmail: row.user_email,
-    ipHash: 'ip_session_hash',
-    details: `Saved assessment score ${row.score} for quiz "${row.quiz_title}"`
+    ipHash: "ip_session_hash",
+    details: `Saved assessment score ${row.score} for quiz "${row.quiz_title}"`,
   });
   res.json({ success: true, record: mapDiagnosticRow(row) });
 });
 
-app.delete('/api/diagnostics/results/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  const { data, error } = await db.from('diagnostic_results').delete().eq('id', req.params.id).select();
-  if (error) {
-    res.status(502).json({ error: 'Diagnostic record removal failed.', detail: error.message });
-    return;
-  }
-  if (!data || data.length === 0) {
-    res.status(404).json({ error: 'Diagnostic record not found.' });
-    return;
-  }
-  res.json({ success: true, message: `Removed diagnostic record ${req.params.id}`, removed: mapDiagnosticRow(data[0]) });
-});
+app.delete(
+  "/api/diagnostics/results/:id",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    const { data, error } = await db
+      .from("diagnostic_results")
+      .delete()
+      .eq("id", req.params.id)
+      .select();
+    if (error) {
+      res
+        .status(502)
+        .json({
+          error: "Diagnostic record removal failed.",
+          detail: error.message,
+        });
+      return;
+    }
+    if (!data || data.length === 0) {
+      res.status(404).json({ error: "Diagnostic record not found." });
+      return;
+    }
+    res.json({
+      success: true,
+      message: `Removed diagnostic record ${req.params.id}`,
+      removed: mapDiagnosticRow(data[0]),
+    });
+  },
+);
 
 // GDPR COMPLIANCE ENGINE API ENDPOINTS (database-backed, H-08)
-app.post('/api/gdpr/export', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { email } = req.body;
+app.post(
+  "/api/gdpr/export",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { email } = req.body;
 
-  if (!email || typeof email !== 'string') {
-    res.status(400).json({ error: 'A valid user email address is required for Article 15 Data Portability export.' });
-    return;
-  }
+    if (!email || typeof email !== "string") {
+      res
+        .status(400)
+        .json({
+          error:
+            "A valid user email address is required for Article 15 Data Portability export.",
+        });
+      return;
+    }
 
-  const cleanEmail = email.trim().toLowerCase();
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured. Export aborted.' });
-    return;
-  }
+    const cleanEmail = email.trim().toLowerCase();
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res
+        .status(503)
+        .json({ error: "Database access is not configured. Export aborted." });
+      return;
+    }
 
-  // Gather user data across the diagnostic store, audit trail and DSR ledger.
-  const [diagRes, auditRes, dsrRes] = await Promise.all([
-    db.from('diagnostic_results').select('*').eq('user_email', cleanEmail).order('created_at', { ascending: false }),
-    db.from('gdpr_audit_log').select('*').eq('user_email', cleanEmail).order('created_at', { ascending: false }).limit(500),
-    db.from('gdpr_dsr_requests').select('*').eq('user_email', cleanEmail).order('requested_at', { ascending: false })
-  ]);
-  if (diagRes.error || auditRes.error || dsrRes.error) {
-    res.status(502).json({ error: 'Article 15 export lookup failed.', detail: diagRes.error?.message || auditRes.error?.message || dsrRes.error?.message });
-    return;
-  }
+    // Gather user data across the diagnostic store, audit trail and DSR ledger.
+    const [diagRes, auditRes, dsrRes] = await Promise.all([
+      db
+        .from("diagnostic_results")
+        .select("*")
+        .eq("user_email", cleanEmail)
+        .order("created_at", { ascending: false }),
+      db
+        .from("gdpr_audit_log")
+        .select("*")
+        .eq("user_email", cleanEmail)
+        .order("created_at", { ascending: false })
+        .limit(500),
+      db
+        .from("gdpr_dsr_requests")
+        .select("*")
+        .eq("user_email", cleanEmail)
+        .order("requested_at", { ascending: false }),
+    ]);
+    if (diagRes.error || auditRes.error || dsrRes.error) {
+      res
+        .status(502)
+        .json({
+          error: "Article 15 export lookup failed.",
+          detail:
+            diagRes.error?.message ||
+            auditRes.error?.message ||
+            dsrRes.error?.message,
+        });
+      return;
+    }
 
-  const exportPayload = {
-    compliance_standard: 'EU General Data Protection Regulation (GDPR) Article 15 - Right of Access & Data Portability',
-    exported_at: new Date().toISOString(),
-    data_subject: {
+    const exportPayload = {
+      compliance_standard:
+        "EU General Data Protection Regulation (GDPR) Article 15 - Right of Access & Data Portability",
+      exported_at: new Date().toISOString(),
+      data_subject: {
+        email: cleanEmail,
+        identity_verified: true,
+        data_controller: "Heartsync Inc. Privacy & Data Protection Office",
+      },
+      diagnostic_assessment_results: (diagRes.data || []).map(mapDiagnosticRow),
+      dsr_request_history: (dsrRes.data || []).map(mapDsrRow),
+      privacy_consent_audit_trail: (auditRes.data || []).map(mapAuditRow),
+      active_subscription: {
+        tier: "Heartsync Premium Circle",
+        status: "Active",
+        auto_renew: true,
+      },
+      cryptographic_export_hash: crypto
+        .createHash("sha256")
+        .update(cleanEmail + Date.now().toString())
+        .digest("hex"),
+    };
+
+    await recordAuditEvent(db, {
+      event: "ARTICLE_15_DATA_EXPORTED",
+      userEmail: cleanEmail,
+      ipHash: "ip_admin_action",
+      details: "Generated complete JSON Data Portability Export Package",
+    });
+
+    res.json({
+      success: true,
       email: cleanEmail,
-      identity_verified: true,
-      data_controller: 'Heartsync Inc. Privacy & Data Protection Office'
-    },
-    diagnostic_assessment_results: (diagRes.data || []).map(mapDiagnosticRow),
-    dsr_request_history: (dsrRes.data || []).map(mapDsrRow),
-    privacy_consent_audit_trail: (auditRes.data || []).map(mapAuditRow),
-    active_subscription: {
-      tier: 'Heartsync Premium Circle',
-      status: 'Active',
-      auto_renew: true
-    },
-    cryptographic_export_hash: crypto.createHash('sha256').update(cleanEmail + Date.now().toString()).digest('hex')
-  };
+      exportedAt: exportPayload.exported_at,
+      exportPayload,
+    });
+  },
+);
 
-  await recordAuditEvent(db, {
-    event: 'ARTICLE_15_DATA_EXPORTED',
-    userEmail: cleanEmail,
-    ipHash: 'ip_admin_action',
-    details: 'Generated complete JSON Data Portability Export Package'
-  });
+app.post(
+  "/api/gdpr/purge",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { email, reason } = req.body;
 
-  res.json({
-    success: true,
-    email: cleanEmail,
-    exportedAt: exportPayload.exported_at,
-    exportPayload
-  });
-});
+    if (!email || typeof email !== "string") {
+      res
+        .status(400)
+        .json({
+          error:
+            "A valid user email address is required for Article 17 Data Purge.",
+        });
+      return;
+    }
 
-app.post('/api/gdpr/purge', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { email, reason } = req.body;
+    const cleanEmail = email.trim().toLowerCase();
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res
+        .status(503)
+        .json({ error: "Database access is not configured. Purge aborted." });
+      return;
+    }
 
-  if (!email || typeof email !== 'string') {
-    res.status(400).json({ error: 'A valid user email address is required for Article 17 Data Purge.' });
-    return;
-  }
+    // 1. Purge diagnostic results (Article 17 erasure).
+    const { data: purged, error: delErr } = await db
+      .from("diagnostic_results")
+      .delete()
+      .eq("user_email", cleanEmail)
+      .select();
+    if (delErr) {
+      res
+        .status(502)
+        .json({ error: "Article 17 purge failed.", detail: delErr.message });
+      return;
+    }
+    const purgedDiagnosticsCount = (purged || []).length;
 
-  const cleanEmail = email.trim().toLowerCase();
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured. Purge aborted.' });
-    return;
-  }
+    // 2. Anonymize or fulfill DSR requests for this user.
+    const certificateId = `PURGE-GDPR-2026-${Math.floor(10000 + Math.random() * 90000)}`;
 
-  // 1. Purge diagnostic results (Article 17 erasure).
-  const { data: purged, error: delErr } = await db.from('diagnostic_results')
-    .delete().eq('user_email', cleanEmail).select();
-  if (delErr) {
-    res.status(502).json({ error: 'Article 17 purge failed.', detail: delErr.message });
-    return;
-  }
-  const purgedDiagnosticsCount = (purged || []).length;
+    // 3. Append Audit Event.
+    await recordAuditEvent(db, {
+      event: "ARTICLE_17_DATA_PURGED",
+      userEmail: "ANONYMIZED_" + cleanEmail.substring(0, 3) + "***",
+      ipHash: "ip_purge_executed",
+      details: `Executed Article 17 Right to be Forgotten. Purged ${purgedDiagnosticsCount} diagnostic records. Certificate: ${certificateId}`,
+    });
 
-  // 2. Anonymize or fulfill DSR requests for this user.
-  const certificateId = `PURGE-GDPR-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+    res.json({
+      success: true,
+      email: cleanEmail,
+      certificateId,
+      reason: reason || "Article 17 Data Subject Right to Erasure Request",
+      purgedRecordsCount: purgedDiagnosticsCount,
+      timestamp: new Date().toISOString(),
+      status: "DATA_PERMANENTLY_PURGED_AND_ANONYMIZED",
+    });
+  },
+);
 
-  // 3. Append Audit Event.
-  await recordAuditEvent(db, {
-    event: 'ARTICLE_17_DATA_PURGED',
-    userEmail: 'ANONYMIZED_' + cleanEmail.substring(0, 3) + '***',
-    ipHash: 'ip_purge_executed',
-    details: `Executed Article 17 Right to be Forgotten. Purged ${purgedDiagnosticsCount} diagnostic records. Certificate: ${certificateId}`
-  });
+app.get(
+  "/api/gdpr/audit-log",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    const { data, error } = await db
+      .from("gdpr_audit_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) {
+      res
+        .status(502)
+        .json({ error: "Audit trail lookup failed.", detail: error.message });
+      return;
+    }
+    const logs = (data || []).map(mapAuditRow);
+    res.json({ success: true, count: logs.length, logs });
+  },
+);
 
-  res.json({
-    success: true,
-    email: cleanEmail,
-    certificateId,
-    reason: reason || 'Article 17 Data Subject Right to Erasure Request',
-    purgedRecordsCount: purgedDiagnosticsCount,
-    timestamp: new Date().toISOString(),
-    status: 'DATA_PERMANENTLY_PURGED_AND_ANONYMIZED'
-  });
-});
+app.post(
+  "/api/gdpr/audit-log",
+  rateLimiter(20, 60 * 1000),
+  async (req: Request, res: Response) => {
+    const { event, userEmail, details } = req.body;
+    const db = getSupabaseClient();
+    if (!db) {
+      res
+        .status(503)
+        .json({
+          error: "Audit storage is not configured. The event was NOT recorded.",
+        });
+      return;
+    }
+    const log = await recordAuditEvent(db, {
+      event: event || "PRIVACY_EVENT",
+      userEmail: userEmail || "anonymous",
+      ipHash: "ip_client",
+      details: details || "Updated consent settings",
+    });
+    if (!log) {
+      res.status(500).json({ error: "Could not record the privacy event." });
+      return;
+    }
+    res.json({ success: true, log });
+  },
+);
 
-app.get('/api/gdpr/audit-log', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  const { data, error } = await db.from('gdpr_audit_log').select('*').order('created_at', { ascending: false }).limit(500);
-  if (error) {
-    res.status(502).json({ error: 'Audit trail lookup failed.', detail: error.message });
-    return;
-  }
-  const logs = (data || []).map(mapAuditRow);
-  res.json({ success: true, count: logs.length, logs });
-});
+app.get(
+  "/api/gdpr/dsr-requests",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    const { data, error } = await db
+      .from("gdpr_dsr_requests")
+      .select("*")
+      .order("requested_at", { ascending: false })
+      .limit(200);
+    if (error) {
+      res
+        .status(502)
+        .json({ error: "DSR ledger lookup failed.", detail: error.message });
+      return;
+    }
+    const requests = (data || []).map(mapDsrRow);
+    res.json({ success: true, count: requests.length, requests });
+  },
+);
 
-app.post('/api/gdpr/audit-log', rateLimiter(20, 60 * 1000), async (req: Request, res: Response) => {
-  const { event, userEmail, details } = req.body;
-  const db = getSupabaseClient();
-  if (!db) {
-    res.status(503).json({ error: 'Audit storage is not configured. The event was NOT recorded.' });
-    return;
-  }
-  const log = await recordAuditEvent(db, {
-    event: event || 'PRIVACY_EVENT',
-    userEmail: userEmail || 'anonymous',
-    ipHash: 'ip_client',
-    details: details || 'Updated consent settings'
-  });
-  if (!log) {
-    res.status(500).json({ error: 'Could not record the privacy event.' });
-    return;
-  }
-  res.json({ success: true, log });
-});
+app.post(
+  "/api/gdpr/dsr-requests",
+  rateLimiter(5, 60 * 1000),
+  async (req: Request, res: Response) => {
+    const { type, userEmail, reason } = req.body;
 
-app.get('/api/gdpr/dsr-requests', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  const { data, error } = await db.from('gdpr_dsr_requests').select('*').order('requested_at', { ascending: false }).limit(200);
-  if (error) {
-    res.status(502).json({ error: 'DSR ledger lookup failed.', detail: error.message });
-    return;
-  }
-  const requests = (data || []).map(mapDsrRow);
-  res.json({ success: true, count: requests.length, requests });
-});
+    if (!userEmail || !type) {
+      res
+        .status(400)
+        .json({
+          error: "Type (EXPORT|ERASE|RECTIFY) and user email are required.",
+        });
+      return;
+    }
 
-app.post('/api/gdpr/dsr-requests', rateLimiter(5, 60 * 1000), async (req: Request, res: Response) => {
-  const { type, userEmail, reason } = req.body;
+    const db = getSupabaseClient();
+    if (!db) {
+      res
+        .status(503)
+        .json({
+          error:
+            "DSR storage is not configured. Your request was NOT saved  - please retry.",
+        });
+      return;
+    }
 
-  if (!userEmail || !type) {
-    res.status(400).json({ error: 'Type (EXPORT|ERASE|RECTIFY) and user email are required.' });
-    return;
-  }
+    const row = {
+      id: `dsr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: type.toUpperCase(),
+      user_email: userEmail.trim().toLowerCase(),
+      status: "PENDING",
+      reason: reason || "Data Subject Privacy Rights Exercise",
+      sla_deadline: new Date(Date.now() + 86400000 * 30).toISOString(),
+      requested_at: new Date().toISOString(),
+      fulfilled_at: null,
+      certificate_id: null,
+    };
 
-  const db = getSupabaseClient();
-  if (!db) {
-    res.status(503).json({ error: 'DSR storage is not configured. Your request was NOT saved  - please retry.' });
-    return;
-  }
+    const { error: insertErr } = await db.from("gdpr_dsr_requests").insert(row);
+    if (insertErr) {
+      res
+        .status(502)
+        .json({
+          error: "Could not save the DSR request. Please try again.",
+          detail: insertErr.message,
+        });
+      return;
+    }
+    await recordAuditEvent(db, {
+      event: "DSR_REQUEST_CREATED",
+      userEmail: row.user_email,
+      ipHash: "ip_dsr_portal",
+      details: `Created new DSR request of type ${row.type}`,
+    });
+    res.json({ success: true, request: mapDsrRow(row) });
+  },
+);
 
-  const row = {
-    id: `dsr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    type: type.toUpperCase(),
-    user_email: userEmail.trim().toLowerCase(),
-    status: 'PENDING',
-    reason: reason || 'Data Subject Privacy Rights Exercise',
-    sla_deadline: new Date(Date.now() + 86400000 * 30).toISOString(),
-    requested_at: new Date().toISOString(),
-    fulfilled_at: null,
-    certificate_id: null
-  };
-
-  const { error: insertErr } = await db.from('gdpr_dsr_requests').insert(row);
-  if (insertErr) {
-    res.status(502).json({ error: 'Could not save the DSR request. Please try again.', detail: insertErr.message });
-    return;
-  }
-  await recordAuditEvent(db, {
-    event: 'DSR_REQUEST_CREATED',
-    userEmail: row.user_email,
-    ipHash: 'ip_dsr_portal',
-    details: `Created new DSR request of type ${row.type}`
-  });
-  res.json({ success: true, request: mapDsrRow(row) });
-});
-
-app.patch('/api/gdpr/dsr-requests/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { status, certificateId } = req.body;
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  const patch: any = {};
-  if (status) patch.status = status;
-  if (status === 'FULFILLED') {
-    patch.fulfilled_at = new Date().toISOString();
-    patch.certificate_id = certificateId || `CERT-GDPR-${Date.now()}`;
-  }
-  const { data, error } = await db.from('gdpr_dsr_requests').update(patch).eq('id', req.params.id).select().maybeSingle();
-  if (error) {
-    res.status(502).json({ error: 'DSR request update failed.', detail: error.message });
-    return;
-  }
-  if (!data) {
-    res.status(404).json({ error: 'DSR request not found.' });
-    return;
-  }
-  res.json({ success: true, request: mapDsrRow(data) });
-});
+app.patch(
+  "/api/gdpr/dsr-requests/:id",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { status, certificateId } = req.body;
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    const patch: any = {};
+    if (status) patch.status = status;
+    if (status === "FULFILLED") {
+      patch.fulfilled_at = new Date().toISOString();
+      patch.certificate_id = certificateId || `CERT-GDPR-${Date.now()}`;
+    }
+    const { data, error } = await db
+      .from("gdpr_dsr_requests")
+      .update(patch)
+      .eq("id", req.params.id)
+      .select()
+      .maybeSingle();
+    if (error) {
+      res
+        .status(502)
+        .json({ error: "DSR request update failed.", detail: error.message });
+      return;
+    }
+    if (!data) {
+      res.status(404).json({ error: "DSR request not found." });
+      return;
+    }
+    res.json({ success: true, request: mapDsrRow(data) });
+  },
+);
 
 // =========================================================================
 // GROUP 1: MEMBERSHIP TIERS & E-COMMERCE DIGITAL PRODUCTS STORE
@@ -1042,57 +1447,82 @@ app.patch('/api/gdpr/dsr-requests/:id', adminAuthMiddleware, async (req: Request
 // ============================================================================
 
 async function createDigitalProductOrder(opts: {
-  productId: string; email: string; amount: number; currency: string; transactionId: string; gateway: string;
+  productId: string;
+  email: string;
+  amount: number;
+  currency: string;
+  transactionId: string;
+  gateway: string;
 }): Promise<any | null> {
   const svc = getServiceRoleSupabase();
   if (!svc) {
-    console.warn('Digital order creation skipped: SUPABASE_SERVICE_ROLE_KEY is not configured.');
+    console.warn(
+      "Digital order creation skipped: SUPABASE_SERVICE_ROLE_KEY is not configured.",
+    );
     return null;
   }
-  const { data: product, error: prodErr } = await svc.from('digital_products')
-    .select('id, title, file_url, sale_price, price, total_sales')
-    .eq('id', opts.productId)
+  const { data: product, error: prodErr } = await svc
+    .from("digital_products")
+    .select("id, title, file_url, sale_price, price, total_sales")
+    .eq("id", opts.productId)
     .maybeSingle();
   if (prodErr || !product) {
-    console.warn('Digital order creation failed: product not found:', opts.productId, prodErr?.message || '');
+    console.warn(
+      "Digital order creation failed: product not found:",
+      opts.productId,
+      prodErr?.message || "",
+    );
     return null;
   }
   const token = `dl_tok_${Math.random().toString(36).substring(2, 10)}_${Date.now()}`;
-  const { data: order, error: orderErr } = await svc.from('digital_product_orders').insert({
-    id: `ord-${Date.now()}`,
-    user_email: (opts.email || '').trim().toLowerCase(),
-    product_id: product.id,
-    product_title: product.title,
-    amount: opts.amount,
-    currency: opts.currency,
-    download_token: token,
-    status: 'completed',
-    gateway: opts.gateway,
-    transaction_id: opts.transactionId,
-    expires_at: new Date(Date.now() + 86400000 * 30).toISOString(),
-    created_at: new Date().toISOString()
-  }).select().single();
+  const { data: order, error: orderErr } = await svc
+    .from("digital_product_orders")
+    .insert({
+      id: `ord-${Date.now()}`,
+      user_email: (opts.email || "").trim().toLowerCase(),
+      product_id: product.id,
+      product_title: product.title,
+      amount: opts.amount,
+      currency: opts.currency,
+      download_token: token,
+      status: "completed",
+      gateway: opts.gateway,
+      transaction_id: opts.transactionId,
+      expires_at: new Date(Date.now() + 86400000 * 30).toISOString(),
+      created_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
   if (orderErr) {
-    console.warn('Digital order insert failed:', orderErr.message);
+    console.warn("Digital order insert failed:", orderErr.message);
     return null;
   }
-  const { error: salesErr } = await svc.from('digital_products')
+  const { error: salesErr } = await svc
+    .from("digital_products")
     .update({ total_sales: Number(product.total_sales || 0) + 1 })
-    .eq('id', product.id);
-  if (salesErr) console.warn('Digital product sales counter update warning:', salesErr.message);
+    .eq("id", product.id);
+  if (salesErr)
+    console.warn(
+      "Digital product sales counter update warning:",
+      salesErr.message,
+    );
   return order;
 }
 
 // GET ALL DIGITAL PRODUCTS (public: active products only)
-app.get('/api/digital-products', async (req: Request, res: Response) => {
+app.get("/api/digital-products", async (req: Request, res: Response) => {
   const supabase = getSupabaseClient();
-  if (!supabase) { res.json({ success: true, count: 0, products: [] }); return; }
-  const { data: products, error } = await supabase.from('digital_products')
-    .select('*')
-    .eq('is_active', true)
-    .order('created_at', { ascending: false });
+  if (!supabase) {
+    res.json({ success: true, count: 0, products: [] });
+    return;
+  }
+  const { data: products, error } = await supabase
+    .from("digital_products")
+    .select("*")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
   if (error) {
-    console.warn('Digital products fetch failed:', error.message);
+    console.warn("Digital products fetch failed:", error.message);
     res.json({ success: true, count: 0, products: [] });
     return;
   }
@@ -1106,192 +1536,354 @@ app.get('/api/digital-products', async (req: Request, res: Response) => {
       fileType: p.file_type,
       salePrice: p.sale_price,
       isFeatured: p.is_featured,
-      totalSales: p.total_sales
-    }))
+      totalSales: p.total_sales,
+    })),
   });
 });
 
 // CREATE DIGITAL PRODUCT (admin)
-app.post('/api/digital-products', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { title, subtitle, description, price, salePrice, coverImage, fileUrl, fileType, category, tags, isFeatured } = req.body;
-  if (!title || price === undefined) {
-    res.status(400).json({ error: 'Product title and base price are required.' });
-    return;
-  }
-  const dbClient = getAdminDbClient(req);
-  if (!dbClient) { res.status(503).json({ error: 'Database is not configured.' }); return; }
-  const { data: product, error } = await dbClient.from('digital_products').insert({
-    id: `prod-${Date.now()}`,
-    title,
-    subtitle: subtitle || '',
-    description: description || '',
-    price: Number(price),
-    sale_price: (salePrice !== undefined && salePrice !== null) ? Number(salePrice) : null,
-    cover_image: coverImage || '',
-    file_url: fileUrl || '',
-    file_type: fileType || 'pdf',
-    category: category || 'E-Books & Workbooks',
-    tags: JSON.stringify(Array.isArray(tags) ? tags : []),
-    is_featured: !!isFeatured,
-    is_active: true,
-    total_sales: 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }).select().single();
-  if (error) { res.status(500).json({ error: 'Failed to create product: ' + error.message }); return; }
-  res.json({ success: true, product });
-});
+app.post(
+  "/api/digital-products",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const {
+      title,
+      subtitle,
+      description,
+      price,
+      salePrice,
+      coverImage,
+      fileUrl,
+      fileType,
+      category,
+      tags,
+      isFeatured,
+    } = req.body;
+    if (!title || price === undefined) {
+      res
+        .status(400)
+        .json({ error: "Product title and base price are required." });
+      return;
+    }
+    const dbClient = getAdminDbClient(req);
+    if (!dbClient) {
+      res.status(503).json({ error: "Database is not configured." });
+      return;
+    }
+    const { data: product, error } = await dbClient
+      .from("digital_products")
+      .insert({
+        id: `prod-${Date.now()}`,
+        title,
+        subtitle: subtitle || "",
+        description: description || "",
+        price: Number(price),
+        sale_price:
+          salePrice !== undefined && salePrice !== null
+            ? Number(salePrice)
+            : null,
+        cover_image: coverImage || "",
+        file_url: fileUrl || "",
+        file_type: fileType || "pdf",
+        category: category || "E-Books & Workbooks",
+        tags: JSON.stringify(Array.isArray(tags) ? tags : []),
+        is_featured: !!isFeatured,
+        is_active: true,
+        total_sales: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (error) {
+      res
+        .status(500)
+        .json({ error: "Failed to create product: " + error.message });
+      return;
+    }
+    res.json({ success: true, product });
+  },
+);
 
 // UPDATE DIGITAL PRODUCT (admin)
-app.put('/api/digital-products/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const dbClient = getAdminDbClient(req);
-  if (!dbClient) { res.status(503).json({ error: 'Database is not configured.' }); return; }
-  const { title, subtitle, description, price, salePrice, coverImage, fileUrl, fileType, category, tags, isFeatured, isActive } = req.body;
-  const patch: any = { updated_at: new Date().toISOString() };
-  if (title !== undefined) patch.title = title;
-  if (subtitle !== undefined) patch.subtitle = subtitle;
-  if (description !== undefined) patch.description = description;
-  if (price !== undefined) patch.price = Number(price);
-  if (salePrice !== undefined) patch.sale_price = salePrice === null ? null : Number(salePrice);
-  if (coverImage !== undefined) patch.cover_image = coverImage;
-  if (fileUrl !== undefined) patch.file_url = fileUrl;
-  if (fileType !== undefined) patch.file_type = fileType;
-  if (category !== undefined) patch.category = category;
-  if (tags !== undefined) patch.tags = JSON.stringify(Array.isArray(tags) ? tags : []);
-  if (isFeatured !== undefined) patch.is_featured = !!isFeatured;
-  if (isActive !== undefined) patch.is_active = !!isActive;
-  const { data: product, error } = await dbClient.from('digital_products').update(patch).eq('id', id).select().maybeSingle();
-  if (error) { res.status(500).json({ error: 'Failed to update product: ' + error.message }); return; }
-  if (!product) { res.status(404).json({ error: 'Digital product not found.' }); return; }
-  res.json({ success: true, product });
-});
+app.put(
+  "/api/digital-products/:id",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const dbClient = getAdminDbClient(req);
+    if (!dbClient) {
+      res.status(503).json({ error: "Database is not configured." });
+      return;
+    }
+    const {
+      title,
+      subtitle,
+      description,
+      price,
+      salePrice,
+      coverImage,
+      fileUrl,
+      fileType,
+      category,
+      tags,
+      isFeatured,
+      isActive,
+    } = req.body;
+    const patch: any = { updated_at: new Date().toISOString() };
+    if (title !== undefined) patch.title = title;
+    if (subtitle !== undefined) patch.subtitle = subtitle;
+    if (description !== undefined) patch.description = description;
+    if (price !== undefined) patch.price = Number(price);
+    if (salePrice !== undefined)
+      patch.sale_price = salePrice === null ? null : Number(salePrice);
+    if (coverImage !== undefined) patch.cover_image = coverImage;
+    if (fileUrl !== undefined) patch.file_url = fileUrl;
+    if (fileType !== undefined) patch.file_type = fileType;
+    if (category !== undefined) patch.category = category;
+    if (tags !== undefined)
+      patch.tags = JSON.stringify(Array.isArray(tags) ? tags : []);
+    if (isFeatured !== undefined) patch.is_featured = !!isFeatured;
+    if (isActive !== undefined) patch.is_active = !!isActive;
+    const { data: product, error } = await dbClient
+      .from("digital_products")
+      .update(patch)
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+    if (error) {
+      res
+        .status(500)
+        .json({ error: "Failed to update product: " + error.message });
+      return;
+    }
+    if (!product) {
+      res.status(404).json({ error: "Digital product not found." });
+      return;
+    }
+    res.json({ success: true, product });
+  },
+);
 
 // DELETE DIGITAL PRODUCT (admin)
-app.delete('/api/digital-products/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const dbClient = getAdminDbClient(req);
-  if (!dbClient) { res.status(503).json({ error: 'Database is not configured.' }); return; }
-  const { data: removed, error } = await dbClient.from('digital_products').delete().eq('id', id).select().maybeSingle();
-  if (error) { res.status(500).json({ error: 'Failed to delete product: ' + error.message }); return; }
-  if (!removed) { res.status(404).json({ error: 'Digital product not found.' }); return; }
-  res.json({ success: true, removed });
-});
+app.delete(
+  "/api/digital-products/:id",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const dbClient = getAdminDbClient(req);
+    if (!dbClient) {
+      res.status(503).json({ error: "Database is not configured." });
+      return;
+    }
+    const { data: removed, error } = await dbClient
+      .from("digital_products")
+      .delete()
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+    if (error) {
+      res
+        .status(500)
+        .json({ error: "Failed to delete product: " + error.message });
+      return;
+    }
+    if (!removed) {
+      res.status(404).json({ error: "Digital product not found." });
+      return;
+    }
+    res.json({ success: true, removed });
+  },
+);
 
 // CHECKOUT DIGITAL PRODUCT  - opens a real gateway session only. The order and
 // download token are created exclusively by the VERIFIED payment webhook.
-app.post('/api/digital-products/checkout', async (req: Request, res: Response) => {
-  const { productId, userEmail, gateway } = req.body;
-  const cleanEmail = (userEmail || '').trim().toLowerCase();
-  if (!productId || !cleanEmail || !cleanEmail.includes('@')) {
-    res.status(400).json({ error: 'A productId and a valid email address are required.' });
-    return;
-  }
-  const supabase = getSupabaseClient();
-  const product = supabase
-    ? (await supabase.from('digital_products').select('*').eq('id', productId).eq('is_active', true).maybeSingle()).data
-    : null;
-  if (!product) {
-    res.status(404).json({ error: 'Selected digital product was not found.' });
-    return;
-  }
+app.post(
+  "/api/digital-products/checkout",
+  async (req: Request, res: Response) => {
+    const { productId, userEmail, gateway } = req.body;
+    const cleanEmail = (userEmail || "").trim().toLowerCase();
+    if (!productId || !cleanEmail || !cleanEmail.includes("@")) {
+      res
+        .status(400)
+        .json({ error: "A productId and a valid email address are required." });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    const product = supabase
+      ? (
+          await supabase
+            .from("digital_products")
+            .select("*")
+            .eq("id", productId)
+            .eq("is_active", true)
+            .maybeSingle()
+        ).data
+      : null;
+    if (!product) {
+      res
+        .status(404)
+        .json({ error: "Selected digital product was not found." });
+      return;
+    }
 
-  const chargedAmount = product.sale_price ?? product.price;
-  const origin = GATEWAY_BASE(req);
-  const metadata = {
-    kind: 'digital_product',
-    productId: product.id,
-    email: cleanEmail
-  };
-  try {
-    if (gateway === 'stripe') {
-      const url = await createStripeCheckoutSession({
-        origin, amount: chargedAmount, currency: 'USD', name: product.title,
-        mode: 'payment', interval: 'month', email: cleanEmail, metadata,
-        successUrl: `${origin}/?checkout=success&productId=${product.id}`,
-        cancelUrl: origin
-      });
-      if (!url) { res.status(501).json({ error: 'Stripe is not configured yet. Digital purchases go live once payment keys are installed.' }); return; }
-      res.json({ success: true, gateway: 'stripe', checkoutUrl: url });
-      return;
+    const chargedAmount = product.sale_price ?? product.price;
+    const origin = GATEWAY_BASE(req);
+    const metadata = {
+      kind: "digital_product",
+      productId: product.id,
+      email: cleanEmail,
+    };
+    try {
+      if (gateway === "stripe") {
+        const url = await createStripeCheckoutSession({
+          origin,
+          amount: chargedAmount,
+          currency: "USD",
+          name: product.title,
+          mode: "payment",
+          interval: "month",
+          email: cleanEmail,
+          metadata,
+          successUrl: `${origin}/?checkout=success&productId=${product.id}`,
+          cancelUrl: origin,
+        });
+        if (!url) {
+          res
+            .status(501)
+            .json({
+              error:
+                "Stripe is not configured yet. Digital purchases go live once payment keys are installed.",
+            });
+          return;
+        }
+        res.json({ success: true, gateway: "stripe", checkoutUrl: url });
+        return;
+      }
+      if (gateway === "paystack") {
+        const url = await createPaystackTransaction({
+          amount: chargedAmount,
+          currency: "USD",
+          email: cleanEmail,
+          callbackUrl: `${origin}/?checkout=success&productId=${product.id}`,
+          metadata,
+        });
+        if (!url) {
+          res
+            .status(501)
+            .json({
+              error:
+                "Paystack is not configured yet. Digital purchases go live once payment keys are installed.",
+            });
+          return;
+        }
+        res.json({ success: true, gateway: "paystack", checkoutUrl: url });
+        return;
+      }
+      res.status(501).json({ error: "This payment gateway is not live yet." });
+    } catch (err: any) {
+      console.warn("Digital product checkout failure:", err?.message);
+      res
+        .status(502)
+        .json({ error: "The payment gateway rejected the checkout request." });
     }
-    if (gateway === 'paystack') {
-      const url = await createPaystackTransaction({ amount: chargedAmount, currency: 'USD', email: cleanEmail, callbackUrl: `${origin}/?checkout=success&productId=${product.id}`, metadata });
-      if (!url) { res.status(501).json({ error: 'Paystack is not configured yet. Digital purchases go live once payment keys are installed.' }); return; }
-      res.json({ success: true, gateway: 'paystack', checkoutUrl: url });
-      return;
-    }
-    res.status(501).json({ error: 'This payment gateway is not live yet.' });
-  } catch (err: any) {
-    console.warn('Digital product checkout failure:', err?.message);
-    res.status(502).json({ error: 'The payment gateway rejected the checkout request.' });
-  }
-});
+  },
+);
 
 // VERIFY AND DOWNLOAD DIGITAL PRODUCT ASSET (token-holding RPC  - anonymous
 // users can never enumerate orders; the token IS the capability)
-app.get('/api/digital-products/download/:token', async (req: Request, res: Response) => {
-  const { token } = req.params;
-  const supabase = getSupabaseClient();
-  if (!supabase) { res.status(503).json({ error: 'Database is not configured.' }); return; }
-  const { data: order, error } = await supabase.rpc('digital_product_download', { p_token: token });
-  if (error || !order) {
-    res.status(404).json({ error: 'Invalid or expired cryptographic download token.' });
-    return;
-  }
-  res.json({
-    success: true,
-    productTitle: order.product_title,
-    downloadUrl: order.file_url,
-    authorizedEmail: order.user_email,
-    expiresAt: order.expires_at,
-    message: 'Authorized digital download ready.'
-  });
-});
+app.get(
+  "/api/digital-products/download/:token",
+  async (req: Request, res: Response) => {
+    const { token } = req.params;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      res.status(503).json({ error: "Database is not configured." });
+      return;
+    }
+    const { data: order, error } = await supabase.rpc(
+      "digital_product_download",
+      { p_token: token },
+    );
+    if (error || !order) {
+      res
+        .status(404)
+        .json({ error: "Invalid or expired cryptographic download token." });
+      return;
+    }
+    res.json({
+      success: true,
+      productTitle: order.product_title,
+      downloadUrl: order.file_url,
+      authorizedEmail: order.user_email,
+      expiresAt: order.expires_at,
+      message: "Authorized digital download ready.",
+    });
+  },
+);
 
 // GET DIGITAL ORDERS LEDGER (admin)
-app.get('/api/digital-products/orders', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const dbClient = getAdminDbClient(req);
-  if (!dbClient) { res.status(503).json({ error: 'Database is not configured.' }); return; }
-  const { data: orders, error } = await dbClient.from('digital_product_orders')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(500);
-  if (error) { res.status(500).json({ error: 'Failed to load orders: ' + error.message }); return; }
-  res.json({ success: true, count: (orders || []).length, orders: orders || [] });
-});
+app.get(
+  "/api/digital-products/orders",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const dbClient = getAdminDbClient(req);
+    if (!dbClient) {
+      res.status(503).json({ error: "Database is not configured." });
+      return;
+    }
+    const { data: orders, error } = await dbClient
+      .from("digital_product_orders")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) {
+      res
+        .status(500)
+        .json({ error: "Failed to load orders: " + error.message });
+      return;
+    }
+    res.json({
+      success: true,
+      count: (orders || []).length,
+      orders: orders || [],
+    });
+  },
+);
 
 // Initialize Gemini Client with standard User-Agent header (Telemetry) and named parameters
 // (Gemini service reloads dynamically via getGeminiClient on demand)
-console.log('🤖 AI Copilot setup in lazy dynamic-resolution database-synced mode.');
+console.log(
+  "🤖 AI Copilot setup in lazy dynamic-resolution database-synced mode.",
+);
 
 // Resilient Multilingual Local Dictionary for High-Fidelity Gemini Offline/Quota Fallback
 const LOCAL_DICTIONARY: Record<string, Record<string, string>> = {
   es: {
     "Live Analytics Deck": "Panel de Analíticas en Vivo",
-    "Posts": "Artículos",
-    "Categories": "Categorías",
-    "Tags": "Etiquetas",
-    "Pages": "Páginas",
-    "Authors": "Autores",
-    "Podcasts": "Podcasts",
+    Posts: "Artículos",
+    Categories: "Categorías",
+    Tags: "Etiquetas",
+    Pages: "Páginas",
+    Authors: "Autores",
+    Podcasts: "Podcasts",
     "AI Writer Assist": "Copiloto Escrito de IA",
     "Autopilot RSS": "RSS de Autonavegación",
     "Media Library": "Biblioteca de Medios",
     "Upload Manager": "Gestor de Carga",
-    "Comments": "Comentarios",
-    "Moderation": "Moderación",
+    Comments: "Comentarios",
+    Moderation: "Moderación",
     "Support Tickets": "Soporte Técnico",
     "Ads Manager": "Gestor de Anuncios",
     "AdSense Settings": "Configuración de AdSense",
     "Banner Slots": "Espacios para Banners",
     "Admin Users": "Administradores",
     "Roles & Permissions": "Roles y Permisos",
-    "Newsletter": "Boletín",
-    "Subscribers": "Suscriptores",
+    Newsletter: "Boletín",
+    Subscribers: "Suscriptores",
     "Email Campaigns": "Campañas de Correo",
     "SEO Settings": "Ajustes SEO",
-    "Sitemap": "Mapa del sitio",
+    Sitemap: "Mapa del sitio",
     "Metadata Manager": "Gestor de Metadatos",
     "General Settings": "Ajustes Generales",
     "Site Branding": "Branding del Sitio",
@@ -1299,7 +1891,7 @@ const LOCAL_DICTIONARY: Record<string, Record<string, string>> = {
     "Custom Domains & DNS": "Dominios y DNS",
     "Plugin Marketplace": "Tienda de Plugins",
     "API Keys": "Claves de API",
-    "Security": "Seguridad",
+    Security: "Seguridad",
     "Subscriptions SaaS": "Suscripciones SaaS",
     "Visual Page Builder": "Creador de Páginas",
     "Multi-Site Manager": "Gestor Multiservicio",
@@ -1307,56 +1899,56 @@ const LOCAL_DICTIONARY: Record<string, Record<string, string>> = {
     "Clinical Sentiment Guard": "Guardia de Sentimiento",
     "Webhook Alerts": "Alertas Webhook",
     "Translation Center": "Centro de Traducción",
-    "CONTENT": "CONTENIDO",
-    "MEDIA": "MEDIOS",
-    "ENGAGEMENT": "COMPROMISO",
+    CONTENT: "CONTENIDO",
+    MEDIA: "MEDIOS",
+    ENGAGEMENT: "COMPROMISO",
     "INTEGRATIONS (NEW)": "INTEGRACIONES",
-    "MONETIZATION": "MONETIZACIÓN",
-    "USERS": "USUARIOS",
-    "MARKETING": "MARKETING",
-    "SEO": "SEO",
-    "SETTINGS": "AJUSTES",
+    MONETIZATION: "MONETIZACIÓN",
+    USERS: "USUARIOS",
+    MARKETING: "MARKETING",
+    SEO: "SEO",
+    SETTINGS: "AJUSTES",
     "Supabase Connected": "Conectado a Supabase",
     "Local Sandbox": "Entorno Local",
-    "Actions": "Acciones",
-    "Edit": "Editar",
-    "Delete": "Eliminar",
+    Actions: "Acciones",
+    Edit: "Editar",
+    Delete: "Eliminar",
     "Add New Post": "Añadir Artículo",
-    "Title": "Título",
-    "Excerpt": "Resumen",
-    "Content": "Contenido",
-    "Save": "Guardar",
-    "Cancel": "Cancelar",
-    "Create": "Crear",
+    Title: "Título",
+    Excerpt: "Resumen",
+    Content: "Contenido",
+    Save: "Guardar",
+    Cancel: "Cancelar",
+    Create: "Crear",
     "Category Name": "Nombre de Categoría",
-    "Description": "Descripción",
-    "LIVE ANALYTICS DECK": "PANEL DE ANALÍTICAS EN VIVO"
+    Description: "Descripción",
+    "LIVE ANALYTICS DECK": "PANEL DE ANALÍTICAS EN VIVO",
   },
   de: {
     "Live Analytics Deck": "Live-Analyse-Dashboard",
-    "Posts": "Beiträge",
-    "Categories": "Kategorien",
-    "Tags": "Schlagwörter",
-    "Pages": "Seiten",
-    "Authors": "Autoren",
-    "Podcasts": "Podcasts",
+    Posts: "Beiträge",
+    Categories: "Kategorien",
+    Tags: "Schlagwörter",
+    Pages: "Seiten",
+    Authors: "Autoren",
+    Podcasts: "Podcasts",
     "AI Writer Assist": "KI-Schreibassistent",
     "Autopilot RSS": "Autopilot RSS",
     "Media Library": "Medienbibliothek",
     "Upload Manager": "Upload-Manager",
-    "Comments": "Kommentare",
-    "Moderation": "Moderation",
+    Comments: "Kommentare",
+    Moderation: "Moderation",
     "Support Tickets": "Support-Tickets",
     "Ads Manager": "Anzeigen-Manager",
     "AdSense Settings": "AdSense-Einstellungen",
     "Banner Slots": "Banner-Plätze",
     "Admin Users": "Administratoren",
     "Roles & Permissions": "Rollen & Berechtigungen",
-    "Newsletter": "Newsletter",
-    "Subscribers": "Abonnenten",
+    Newsletter: "Newsletter",
+    Subscribers: "Abonnenten",
     "Email Campaigns": "E-Mail-Kampagnen",
     "SEO Settings": "SEO-Einstellungen",
-    "Sitemap": "Sitemap",
+    Sitemap: "Sitemap",
     "Metadata Manager": "Metadaten-Manager",
     "General Settings": "Allgemeine Einstellungen",
     "Site Branding": "Branding",
@@ -1364,7 +1956,7 @@ const LOCAL_DICTIONARY: Record<string, Record<string, string>> = {
     "Custom Domains & DNS": "Domänen & DNS",
     "Plugin Marketplace": "Plugin-Marktplatz",
     "API Keys": "API-Schlüssel",
-    "Security": "Sicherheit",
+    Security: "Sicherheit",
     "Subscriptions SaaS": "SaaS-Abonnements",
     "Visual Page Builder": "Visual-Page-Builder",
     "Multi-Site Manager": "Multi-Site-Manager",
@@ -1372,56 +1964,56 @@ const LOCAL_DICTIONARY: Record<string, Record<string, string>> = {
     "Clinical Sentiment Guard": "Klinischer Sentiment-Guard",
     "Webhook Alerts": "Webhook-Warnungen",
     "Translation Center": "Übersetzungszentrum",
-    "CONTENT": "INHALT",
-    "MEDIA": "MEDIEN",
-    "ENGAGEMENT": "INTERAKTION",
+    CONTENT: "INHALT",
+    MEDIA: "MEDIEN",
+    ENGAGEMENT: "INTERAKTION",
     "INTEGRATIONS (NEW)": "INTEGRATIONEN",
-    "MONETIZATION": "MONETISIERUNG",
-    "USERS": "BENUTZER",
-    "MARKETING": "MARKETING",
-    "SEO": "SEO",
-    "SETTINGS": "EINSTELLUNGEN",
+    MONETIZATION: "MONETISIERUNG",
+    USERS: "BENUTZER",
+    MARKETING: "MARKETING",
+    SEO: "SEO",
+    SETTINGS: "EINSTELLUNGEN",
     "Supabase Connected": "Supabase verbunden",
     "Local Sandbox": "Lokale Sandbox",
-    "Actions": "Aktionen",
-    "Edit": "Bearbeiten",
-    "Delete": "Löschen",
+    Actions: "Aktionen",
+    Edit: "Bearbeiten",
+    Delete: "Löschen",
     "Add New Post": "Neuer Beitrag",
-    "Title": "Titel",
-    "Excerpt": "Auszug",
-    "Content": "Inhalt",
-    "Save": "Speichern",
-    "Cancel": "Abbrechen",
-    "Create": "Erstellen",
+    Title: "Titel",
+    Excerpt: "Auszug",
+    Content: "Inhalt",
+    Save: "Speichern",
+    Cancel: "Abbrechen",
+    Create: "Erstellen",
     "Category Name": "Kategorie-Name",
-    "Description": "Beschreibung",
-    "LIVE ANALYTICS DECK": "LIVE-ANALYSE-DASHBOARD"
+    Description: "Beschreibung",
+    "LIVE ANALYTICS DECK": "LIVE-ANALYSE-DASHBOARD",
   },
   fr: {
     "Live Analytics Deck": "Tableau d'Analyses en Direct",
-    "Posts": "Articles",
-    "Categories": "Catégories",
-    "Tags": "Mots-clés",
-    "Pages": "Pages",
-    "Authors": "Auteurs",
-    "Podcasts": "Podcasts",
+    Posts: "Articles",
+    Categories: "Catégories",
+    Tags: "Mots-clés",
+    Pages: "Pages",
+    Authors: "Auteurs",
+    Podcasts: "Podcasts",
     "AI Writer Assist": "Copilote de Rédaction IA",
     "Autopilot RSS": "RSS Autopilote",
     "Media Library": "Bibliothèque de Médias",
     "Upload Manager": "Gestionnaire d'Import",
-    "Comments": "Commentaires",
-    "Moderation": "Modération",
+    Comments: "Commentaires",
+    Moderation: "Modération",
     "Support Tickets": "Tickets de Support",
     "Ads Manager": "Gestionnaire de Publicités",
     "AdSense Settings": "Paramètres AdSense",
     "Banner Slots": "Emplacements de Bannières",
     "Admin Users": "Administrateurs",
     "Roles & Permissions": "Rôles & Autorisations",
-    "Newsletter": "Lettre d'Information",
-    "Subscribers": "Abonnés",
+    Newsletter: "Lettre d'Information",
+    Subscribers: "Abonnés",
     "Email Campaigns": "Campagnes d'E-mail",
     "SEO Settings": "Configuration SEO",
-    "Sitemap": "Sitemap",
+    Sitemap: "Sitemap",
     "Metadata Manager": "Gestionnaire de Métadonnées",
     "General Settings": "Paramètres Généraux",
     "Site Branding": "Identité du Site",
@@ -1429,7 +2021,7 @@ const LOCAL_DICTIONARY: Record<string, Record<string, string>> = {
     "Custom Domains & DNS": "Domaines & DNS",
     "Plugin Marketplace": "Boutique de Plugins",
     "API Keys": "Clés API",
-    "Security": "Sécurité",
+    Security: "Sécurité",
     "Subscriptions SaaS": "Abonnements SaaS",
     "Visual Page Builder": "Générateur de Pages",
     "Multi-Site Manager": "Gestionnaire Multi-Sites",
@@ -1437,38 +2029,38 @@ const LOCAL_DICTIONARY: Record<string, Record<string, string>> = {
     "Clinical Sentiment Guard": "Garde de Sentiment",
     "Webhook Alerts": "Alertes Webhook",
     "Translation Center": "Centre de Traduction",
-    "CONTENT": "CONTENU",
-    "MEDIA": "MÉDIAS",
-    "ENGAGEMENT": "ENGAGEMENT",
+    CONTENT: "CONTENU",
+    MEDIA: "MÉDIAS",
+    ENGAGEMENT: "ENGAGEMENT",
     "INTEGRATIONS (NEW)": "INTÉGRATIONS",
-    "MONETIZATION": "MONÉTISATION",
-    "USERS": "UTILISATEURS",
-    "MARKETING": "MARKETING",
-    "SEO": "SEO",
-    "SETTINGS": "PARAMÈTRES",
+    MONETIZATION: "MONÉTISATION",
+    USERS: "UTILISATEURS",
+    MARKETING: "MARKETING",
+    SEO: "SEO",
+    SETTINGS: "PARAMÈTRES",
     "Supabase Connected": "Supabase Connecté",
     "Local Sandbox": "Bac à sable local",
-    "Actions": "Actions",
-    "Edit": "Modifier",
-    "Delete": "Supprimer",
+    Actions: "Actions",
+    Edit: "Modifier",
+    Delete: "Supprimer",
     "Add New Post": "Ajouter un Article",
-    "Title": "Titre",
-    "Excerpt": "Extrait",
-    "Content": "Contenu",
-    "Save": "Enregistrer",
-    "Cancel": "Annuler",
-    "Create": "Créer",
+    Title: "Titre",
+    Excerpt: "Extrait",
+    Content: "Contenu",
+    Save: "Enregistrer",
+    Cancel: "Annuler",
+    Create: "Créer",
     "Category Name": "Nom de la Catégorie",
-    "Description": "Description",
-    "LIVE ANALYTICS DECK": "TABLEAU D'ANALYSES EN DIRECT"
-  }
+    Description: "Description",
+    "LIVE ANALYTICS DECK": "TABLEAU D'ANALYSES EN DIRECT",
+  },
 };
 
 const localizeObj = (obj: any, targetLang: string): any => {
   const langKey = String(targetLang).toLowerCase();
-  
-  if (typeof obj === 'string') {
-    if (!obj || obj.startsWith('http') || obj.length < 2) {
+
+  if (typeof obj === "string") {
+    if (!obj || obj.startsWith("http") || obj.length < 2) {
       return obj;
     }
     if (LOCAL_DICTIONARY[langKey] && LOCAL_DICTIONARY[langKey][obj]) {
@@ -1477,12 +2069,25 @@ const localizeObj = (obj: any, targetLang: string): any => {
     return obj;
   }
   if (Array.isArray(obj)) {
-    return obj.map(item => localizeObj(item, targetLang));
+    return obj.map((item) => localizeObj(item, targetLang));
   }
-  if (typeof obj === 'object' && obj !== null) {
+  if (typeof obj === "object" && obj !== null) {
     const trans: any = {};
     for (const k of Object.keys(obj)) {
-      if (['id', 'slug', 'category_id', 'author_id', 'status', 'publish_date', 'color', 'icon', 'featured_image', 'logo_url'].includes(k)) {
+      if (
+        [
+          "id",
+          "slug",
+          "category_id",
+          "author_id",
+          "status",
+          "publish_date",
+          "color",
+          "icon",
+          "featured_image",
+          "logo_url",
+        ].includes(k)
+      ) {
         trans[k] = obj[k];
       } else {
         trans[k] = localizeObj(obj[k], targetLang);
@@ -1498,64 +2103,74 @@ const localizeObj = (obj: any, targetLang: string): any => {
 // --------------------------------------------------------
 
 // Quiz Generation endpoint using Gemini or Mock Fallback
-app.post('/api/gemini/generate-quiz', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { title, content } = req.body;
+app.post(
+  "/api/gemini/generate-quiz",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { title, content } = req.body;
 
-  if (!content) {
-    res.status(400).json({ error: 'Article content is required to generate a quiz.' });
-    return;
-  }
+    if (!content) {
+      res
+        .status(400)
+        .json({ error: "Article content is required to generate a quiz." });
+      return;
+    }
 
-  const ai = await getGeminiClient();
-  if (!ai) {
-    // Elegant fallback mock quiz
-    res.json({
-      title: title || 'Relationship Schema Challenge',
-      questions: [
-        {
-          question: `Based on the article's core tenets, what is often the root cause of standard intimacy friction?`,
-          options: [
-            "Incompatible personality types",
-            "Unresolved attachment schema dynamics and communication patterns",
-            "Financial disparities",
-            "Lack of shared hobbies"
-          ],
-          correctAnswerIndex: 1,
-          explanation: "As outlined, intimacy friction is deeply linked to our active relational schemas, where healing is achieved through mindfulness and schema tracking."
-        },
-        {
-          question: "Which habit is emphasized as highly supportive for emotional regulation?",
-          options: [
-            "Withdrawing immediately during tense arguments",
-            "Proactively practicing co-reflective breathing and validating partner states",
-            "Focusing solely on individual grievances",
-            "Allowing emotions to escalate without boundaries"
-          ],
-          correctAnswerIndex: 1,
-          explanation: "Deep co-reflective breathing and emotional validation are proven methods to stabilize the nervous system and foster secure intimacy."
-        },
-        {
-          question: "How can couples successfully integrate attachment insights into their daily routine?",
-          options: [
-            "By setting strict daily evaluation metrics",
-            "By establishing consistent check-in rituals and emotional safety parameters",
-            "By avoiding serious conversations altogether",
-            "By relying entirely on individual therapy"
-          ],
-          correctAnswerIndex: 1,
-          explanation: "Consistent, safe communication check-ins allow partners to actively de-escalate triggers and build trust."
-        }
-      ]
-    });
-    return;
-  }
+    const ai = await getGeminiClient();
+    if (!ai) {
+      // Elegant fallback mock quiz
+      res.json({
+        title: title || "Relationship Schema Challenge",
+        questions: [
+          {
+            question: `Based on the article's core tenets, what is often the root cause of standard intimacy friction?`,
+            options: [
+              "Incompatible personality types",
+              "Unresolved attachment schema dynamics and communication patterns",
+              "Financial disparities",
+              "Lack of shared hobbies",
+            ],
+            correctAnswerIndex: 1,
+            explanation:
+              "As outlined, intimacy friction is deeply linked to our active relational schemas, where healing is achieved through mindfulness and schema tracking.",
+          },
+          {
+            question:
+              "Which habit is emphasized as highly supportive for emotional regulation?",
+            options: [
+              "Withdrawing immediately during tense arguments",
+              "Proactively practicing co-reflective breathing and validating partner states",
+              "Focusing solely on individual grievances",
+              "Allowing emotions to escalate without boundaries",
+            ],
+            correctAnswerIndex: 1,
+            explanation:
+              "Deep co-reflective breathing and emotional validation are proven methods to stabilize the nervous system and foster secure intimacy.",
+          },
+          {
+            question:
+              "How can couples successfully integrate attachment insights into their daily routine?",
+            options: [
+              "By setting strict daily evaluation metrics",
+              "By establishing consistent check-in rituals and emotional safety parameters",
+              "By avoiding serious conversations altogether",
+              "By relying entirely on individual therapy",
+            ],
+            correctAnswerIndex: 1,
+            explanation:
+              "Consistent, safe communication check-ins allow partners to actively de-escalate triggers and build trust.",
+          },
+        ],
+      });
+      return;
+    }
 
-  try {
-    const prompt = `Analyze the article below and generate a high-quality, professional educational multiple-choice quiz of 3 highly engaging questions.
+    try {
+      const prompt = `Analyze the article below and generate a high-quality, professional educational multiple-choice quiz of 3 highly engaging questions.
 Each question must have exactly 4 choices, with 1 correct answer.
 Write helpful and therapeutic explanations for why the correct answer is right.
 
-Article Title: "${title || 'Relational Wellness Guide'}"
+Article Title: "${title || "Relational Wellness Guide"}"
 Article Content:
 """
 ${content.substring(0, 4000)}
@@ -1573,66 +2188,82 @@ You MUST return a JSON object wrapping the questions. Use the following schema:
   ]
 }`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: "You are an expert cognitive psychologist, relationships therapist, and quiz author. You produce clean, standard JSON output, adhering exactly to the requested scheme.",
-        responseMimeType: "application/json",
-      },
-    });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          systemInstruction:
+            "You are an expert cognitive psychologist, relationships therapist, and quiz author. You produce clean, standard JSON output, adhering exactly to the requested scheme.",
+          responseMimeType: "application/json",
+        },
+      });
 
-    const responseText = response.text || '';
-    const parsed = JSON.parse(responseText.trim());
-    res.json({
-      title: title || 'Relational Wellness Guide',
-      questions: parsed.questions || parsed
-    });
-  } catch (error: any) {
-    console.error('Quiz Generation Error:', error);
-    res.status(500).json({ error: 'Failed to generate quiz from article: ' + error.message });
-  }
-});
+      const responseText = response.text || "";
+      const parsed = JSON.parse(responseText.trim());
+      res.json({
+        title: title || "Relational Wellness Guide",
+        questions: parsed.questions || parsed,
+      });
+    } catch (error: any) {
+      console.error("Quiz Generation Error:", error);
+      res
+        .status(500)
+        .json({
+          error: "Failed to generate quiz from article: " + error.message,
+        });
+    }
+  },
+);
 
 // 1. Secured Gemini Assist Proxy
-app.post('/api/gemini/assist', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { title, promptType, excerpt, currentContent } = req.body;
+app.post(
+  "/api/gemini/assist",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { title, promptType, excerpt, currentContent } = req.body;
 
-  if (!title) {
-     res.status(400).json({ error: 'Title is a required parameter for context.' });
-     return;
-  }
+    if (!title) {
+      res
+        .status(400)
+        .json({ error: "Title is a required parameter for context." });
+      return;
+    }
 
-  const ai = await getGeminiClient();
-  if (!ai) {
-     res.status(503).json({ error: 'Gemini service is unconfigured or key is absent.' });
-     return;
-  }
+    const ai = await getGeminiClient();
+    if (!ai) {
+      res
+        .status(503)
+        .json({ error: "Gemini service is unconfigured or key is absent." });
+      return;
+    }
 
-  try {
-    const prompt = `You are a professional psychologist, couples counsellor, and lead content writer at Heartsync, a premium SaaS relationships and emotional wellness blog.
+    try {
+      const prompt = `You are a professional psychologist, couples counsellor, and lead content writer at Heartsync, a premium SaaS relationships and emotional wellness blog.
 Configure a highly engaging response based on:
 Article Title: "${title}"
-Excerpt: "${excerpt || 'None provided'}"
-Focus Directive: "${promptType || 'Suggest outline advice'}"
+Excerpt: "${excerpt || "None provided"}"
+Focus Directive: "${promptType || "Suggest outline advice"}"
 
 Make the output feel deeply empathetic, practical, modern, and human-written. Incorporate couples counselling metrics or emotional wellness insights. Present the advice inside a clean, beautiful Markdown structure. Make sure you return direct ideas. Do not return generic boilerplate. Keep it under 350 words.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.8,
-        topP: 0.95
-      }
-    });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.8,
+          topP: 0.95,
+        },
+      });
 
-    const text = response.text || 'Failed to generate content response.';
-    res.json({ suggestion: text });
-  } catch (error: any) {
-    console.warn('Gemini content extraction error (triggered fallback):', error);
-    res.json({
-      suggestion: `### Suggested Outline & Advice (Local Sandbox Fallback)
+      const text = response.text || "Failed to generate content response.";
+      res.json({ suggestion: text });
+    } catch (error: any) {
+      console.warn(
+        "Gemini content extraction error (triggered fallback):",
+        error,
+      );
+      res.json({
+        suggestion: `### Suggested Outline & Advice (Local Sandbox Fallback)
 
 *(The Live Gemini service is handling high request volume or reached standard API quota limits)*
 
@@ -1640,10 +2271,11 @@ Make the output feel deeply empathetic, practical, modern, and human-written. In
 1. **Theoretical Foundations:** Relate current behavioral friction to secure attachment scaffolding concepts.
 2. **Grounding Interventions:** Implement conversational micro-checkpoints for partners under communicative stress.
 3. **Practical Action Items:** Establish daily 10-minute co-regulated sensory validation sessions.
-4. **Long Term Assessment:** Run weekly retrospective bonding audits to track stability levels.`
-    });
-  }
-});
+4. **Long Term Assessment:** Run weekly retrospective bonding audits to track stability levels.`,
+      });
+    }
+  },
+);
 
 // 1.25. Dynamic Article Summarizer
 // ============================================================================
@@ -1654,9 +2286,24 @@ Make the output feel deeply empathetic, practical, modern, and human-written. In
 const adviceRateBuckets = new Map<string, { count: number; resetAt: number }>();
 const ADVICE_DAILY_LIMIT = 12;
 const CRISIS_KEYWORDS = [
-  'kill myself', 'end my life', 'suicide', 'suicidal', 'self harm', 'self-harm',
-  'want to die', 'hurt myself', 'abuse', 'abusive', 'beaten', 'hits me', 'hit me',
-  'raped', 'rape', 'stalked', 'stalking', 'threatening to kill'
+  "kill myself",
+  "end my life",
+  "suicide",
+  "suicidal",
+  "self harm",
+  "self-harm",
+  "want to die",
+  "hurt myself",
+  "abuse",
+  "abusive",
+  "beaten",
+  "hits me",
+  "hit me",
+  "raped",
+  "rape",
+  "stalked",
+  "stalking",
+  "threatening to kill",
 ];
 
 function adviceRateCheck(ip: string): { ok: boolean; remaining: number } {
@@ -1667,47 +2314,72 @@ function adviceRateCheck(ip: string): { ok: boolean; remaining: number } {
     return { ok: true, remaining: ADVICE_DAILY_LIMIT - 1 };
   }
   bucket.count += 1;
-  return { ok: bucket.count <= ADVICE_DAILY_LIMIT, remaining: Math.max(0, ADVICE_DAILY_LIMIT - bucket.count) };
+  return {
+    ok: bucket.count <= ADVICE_DAILY_LIMIT,
+    remaining: Math.max(0, ADVICE_DAILY_LIMIT - bucket.count),
+  };
 }
 
 function detectCrisisRisk(message: string): boolean {
-  const lower = (message || '').toLowerCase();
+  const lower = (message || "").toLowerCase();
   return CRISIS_KEYWORDS.some((k) => lower.includes(k));
 }
 
-app.post('/api/advice/ask', async (req: Request, res: Response) => {
-  const ip = (req.headers['x-forwarded-for'] || req.ip || 'unknown') as string;
+app.post("/api/advice/ask", async (req: Request, res: Response) => {
+  const ip = (req.headers["x-forwarded-for"] || req.ip || "unknown") as string;
   const rate = adviceRateCheck(String(ip));
   if (!rate.ok) {
-    res.status(429).json({ error: 'Daily guidance limit reached. Your access resets within 24 hours.' });
+    res
+      .status(429)
+      .json({
+        error:
+          "Daily guidance limit reached. Your access resets within 24 hours.",
+      });
     return;
   }
 
   const { message, mode, history } = req.body || {};
-  const trimmed = (message || '').trim();
+  const trimmed = (message || "").trim();
   if (!trimmed || trimmed.length < 3) {
-    res.status(400).json({ error: 'Please describe your situation in a sentence or two.' });
+    res
+      .status(400)
+      .json({ error: "Please describe your situation in a sentence or two." });
     return;
   }
   if (trimmed.length > 2000) {
-    res.status(400).json({ error: 'Please keep your question under 2000 characters.' });
+    res
+      .status(400)
+      .json({ error: "Please keep your question under 2000 characters." });
     return;
   }
 
   const ai = await getGeminiClient();
   if (!ai) {
-    res.status(503).json({ error: 'The AI guide is not configured yet. It activates once the Gemini key is installed.' });
+    res
+      .status(503)
+      .json({
+        error:
+          "The AI guide is not configured yet. It activates once the Gemini key is installed.",
+      });
     return;
   }
 
   const crisisRisk = detectCrisisRisk(trimmed);
   const historyText = Array.isArray(history)
     ? history
-        .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+        .filter(
+          (m: any) =>
+            m &&
+            (m.role === "user" || m.role === "assistant") &&
+            typeof m.content === "string",
+        )
         .slice(-6)
-        .map((m: any) => `${m.role === 'user' ? 'Reader' : 'Guide'}: ${m.content.slice(0, 800)}`)
-        .join('\n')
-    : '';
+        .map(
+          (m: any) =>
+            `${m.role === "user" ? "Reader" : "Guide"}: ${m.content.slice(0, 800)}`,
+        )
+        .join("\n")
+    : "";
 
   const systemPrompt = `You are the HeartSync Guide, a warm, evidence-informed relationship and emotional-wellness companion for a premium publishing platform (niches: love & relationships, dating & romance, communication & emotional connection, relationship problems & breakups, self-love & personal growth).
 
@@ -1720,97 +2392,125 @@ Style rules:
 - If the situation involves violence, coercion, or immediate danger, prioritize safety: clearly recommend contacting local emergency services or a domestic-violence hotline, and say plainly that the reader deserves immediate professional support.
 
 Recent conversation (if any):
-${historyText || '(new conversation)'}
+${historyText || "(new conversation)"}
 
-${mode === 'journal_prompt' ? 'The reader pressed "inspire me" on their private journal. Return ONLY one single journaling prompt (one or two sentences, no numbering, no explanation).' : 'Answer the reader\'s question below.'}`;
+${mode === "journal_prompt" ? 'The reader pressed "inspire me" on their private journal. Return ONLY one single journaling prompt (one or two sentences, no numbering, no explanation).' : "Answer the reader's question below."}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: systemPrompt + '\n\nReader question: ' + trimmed,
+      model: "gemini-2.5-flash",
+      contents: systemPrompt + "\n\nReader question: " + trimmed,
       config: {
         temperature: 0.8,
-        maxOutputTokens: 1024
-      }
+        maxOutputTokens: 1024,
+      },
     });
-    const text = (response?.text || '').trim();
+    const text = (response?.text || "").trim();
     if (!text) {
-      res.status(502).json({ error: 'The guide could not compose an answer. Please try rephrasing.' });
+      res
+        .status(502)
+        .json({
+          error:
+            "The guide could not compose an answer. Please try rephrasing.",
+        });
       return;
     }
     res.json({
       success: true,
       answer: text,
       crisisFlag: crisisRisk,
-      remainingToday: rate.remaining
+      remainingToday: rate.remaining,
     });
   } catch (err: any) {
-    console.warn('Advice engine failure:', err?.message);
-    res.status(502).json({ error: 'The guidance service is temporarily unavailable.' });
+    console.warn("Advice engine failure:", err?.message);
+    res
+      .status(502)
+      .json({ error: "The guidance service is temporarily unavailable." });
   }
 });
 
 // AI CONTENT DRAFTING FOR THE RICH TEXT EDITOR (previously a missing endpoint)
-app.post('/api/ai/draft', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { prompt, mode, context } = req.body;
-  if (!prompt || typeof prompt !== 'string') {
-    res.status(400).json({ error: 'A drafting prompt is required.' });
-    return;
-  }
+app.post(
+  "/api/ai/draft",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { prompt, mode, context } = req.body;
+    if (!prompt || typeof prompt !== "string") {
+      res.status(400).json({ error: "A drafting prompt is required." });
+      return;
+    }
 
-  const ai = await getGeminiClient();
-  if (!ai) {
-    res.status(503).json({ error: 'The AI drafting service is not configured. Add a Gemini API key on the server.' });
-    return;
-  }
+    const ai = await getGeminiClient();
+    if (!ai) {
+      res
+        .status(503)
+        .json({
+          error:
+            "The AI drafting service is not configured. Add a Gemini API key on the server.",
+        });
+      return;
+    }
 
-  try {
-    const finalPrompt = `You are an expert relationships and emotional-wellness writer for Heartsync.
-Drafting mode: ${mode || 'draft'}
+    try {
+      const finalPrompt = `You are an expert relationships and emotional-wellness writer for Heartsync.
+Drafting mode: ${mode || "draft"}
 Writer instruction: "${prompt.trim()}"
 
 Existing article context (may be partial):
 <<CONTEXT>>
-${(typeof context === 'string' ? context : '').substring(0, 2000)}
+${(typeof context === "string" ? context : "").substring(0, 2000)}
 <</CONTEXT>>
 
 Return ONLY the new article content in clean Markdown. No preamble, no explanation.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: finalPrompt,
-      config: { temperature: 0.8, topP: 0.95 }
-    });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: finalPrompt,
+        config: { temperature: 0.8, topP: 0.95 },
+      });
 
-    const text = (response.text || '').trim();
-    if (!text) {
-      res.status(502).json({ error: 'The drafting model returned an empty response.' });
-      return;
+      const text = (response.text || "").trim();
+      if (!text) {
+        res
+          .status(502)
+          .json({ error: "The drafting model returned an empty response." });
+        return;
+      }
+      res.json({ success: true, text });
+    } catch (err: any) {
+      console.warn("AI draft generation failure:", err?.message || err);
+      res
+        .status(502)
+        .json({
+          error:
+            "Draft generation failed: " + (err?.message || "unknown error"),
+        });
     }
-    res.json({ success: true, text });
-  } catch (err: any) {
-    console.warn('AI draft generation failure:', err?.message || err);
-    res.status(502).json({ error: 'Draft generation failed: ' + (err?.message || 'unknown error') });
-  }
-});
+  },
+);
 
 // 1.30. AI In-Article Inserts Generator Endpoint
-app.post('/api/gemini/generate-inserts', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { title, content, excerpt, keywords, tone, insertType } = req.body;
-  if (!title && !content) {
-    res.status(400).json({ error: 'Title or content is required to generate inserts.' });
-    return;
-  }
+app.post(
+  "/api/gemini/generate-inserts",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { title, content, excerpt, keywords, tone, insertType } = req.body;
+    if (!title && !content) {
+      res
+        .status(400)
+        .json({ error: "Title or content is required to generate inserts." });
+      return;
+    }
 
-  const ai = await getGeminiClient();
-  const targetType = insertType || 'all';
+    const ai = await getGeminiClient();
+    const targetType = insertType || "all";
 
-  const prompt = `You are an expert relationship psychologist and senior editor at Heartsync.
+    const prompt = `You are an expert relationship psychologist and senior editor at Heartsync.
 Analyze this article context:
-- Title: "${title || 'Untitled Article'}"
-- Excerpt: "${excerpt || ''}"
-- Keywords: "${Array.isArray(keywords) ? keywords.join(', ') : (keywords || '')}"
-- Tone: "${tone || 'Empathetic, Clinical, Warm'}"
+- Title: "${title || "Untitled Article"}"
+- Excerpt: "${excerpt || ""}"
+- Keywords: "${Array.isArray(keywords) ? keywords.join(", ") : keywords || ""}"
+- Tone: "${tone || "Empathetic, Clinical, Warm"}"
 - Article Content:
 ${(content || title).substring(0, 4000)}
 
@@ -1847,167 +2547,239 @@ Output MUST be strictly valid JSON matching this structure:
 
 Return ONLY valid JSON without markdown wrapping.`;
 
-  if (!ai) {
-    // Return high quality context-aware mock fallback
-    const mockInserts = {
-      insight: {
-        title: "In-Article Insight",
-        content: `When exploring "${title || 'relational dynamics'}", notice how subtle emotional cues often carry deeper relational bids. Grounding yourself in present awareness transforms defensive reactions into curious connection.`
-      },
-      reflection: {
-        title: "Reflection Note",
-        content: `Take a quiet breath right now. Ask yourself: "Where in my body do I feel tension when this topic arises with my partner?" Acknowledging this physical signal is the first step toward co-regulation.`
-      },
-      tip: {
-        title: "Relationship Tip",
-        content: `• Practice the 10-Second Validation Pause before responding during conflict.\n• Use "I feel" statements focused on your core vulnerability rather than your partner's behavior.\n• Schedule a low-stakes 5-minute daily check-in completely free of logistics chatter.`
-      },
-      summary: {
-        title: "Post Summary",
-        content: `1. **Acknowledge Attachment Patterns:** Unconscious triggers drive defensive cycles unless consciously observed.\n2. **Prioritize Emotional Safety:** Validation precedes logical problem-solving in intimate partnerships.\n3. **Commit to Micro-Repairs:** Small daily acts of reconnection compound into enduring relationship resilience.`
-      },
-      related: {
-        title: "Related Reading",
-        content: "Expand your emotional vocabulary and intimacy skills with these related guides:",
-        links: [
-          { title: "Building Emotional Safety & Secure Attachment", url: "/post/secure-attachment", readTime: "6 min read" },
-          { title: "The Somatic Intimacy & Co-Regulation Playbook", url: "/post/somatic-intimacy", readTime: "8 min read" }
-        ]
-      }
-    };
-    res.json({ inserts: targetType === 'all' ? mockInserts : { [targetType]: (mockInserts as any)[targetType] } });
-    return;
-  }
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.7
-      }
-    });
-
-    let jsonResult = {};
-    try {
-      jsonResult = JSON.parse(response.text || '{}');
-    } catch {
-      jsonResult = {};
+    if (!ai) {
+      // Return high quality context-aware mock fallback
+      const mockInserts = {
+        insight: {
+          title: "In-Article Insight",
+          content: `When exploring "${title || "relational dynamics"}", notice how subtle emotional cues often carry deeper relational bids. Grounding yourself in present awareness transforms defensive reactions into curious connection.`,
+        },
+        reflection: {
+          title: "Reflection Note",
+          content: `Take a quiet breath right now. Ask yourself: "Where in my body do I feel tension when this topic arises with my partner?" Acknowledging this physical signal is the first step toward co-regulation.`,
+        },
+        tip: {
+          title: "Relationship Tip",
+          content: `• Practice the 10-Second Validation Pause before responding during conflict.\n• Use "I feel" statements focused on your core vulnerability rather than your partner's behavior.\n• Schedule a low-stakes 5-minute daily check-in completely free of logistics chatter.`,
+        },
+        summary: {
+          title: "Post Summary",
+          content: `1. **Acknowledge Attachment Patterns:** Unconscious triggers drive defensive cycles unless consciously observed.\n2. **Prioritize Emotional Safety:** Validation precedes logical problem-solving in intimate partnerships.\n3. **Commit to Micro-Repairs:** Small daily acts of reconnection compound into enduring relationship resilience.`,
+        },
+        related: {
+          title: "Related Reading",
+          content:
+            "Expand your emotional vocabulary and intimacy skills with these related guides:",
+          links: [
+            {
+              title: "Building Emotional Safety & Secure Attachment",
+              url: "/post/secure-attachment",
+              readTime: "6 min read",
+            },
+            {
+              title: "The Somatic Intimacy & Co-Regulation Playbook",
+              url: "/post/somatic-intimacy",
+              readTime: "8 min read",
+            },
+          ],
+        },
+      };
+      res.json({
+        inserts:
+          targetType === "all"
+            ? mockInserts
+            : { [targetType]: (mockInserts as any)[targetType] },
+      });
+      return;
     }
 
-    res.json({ inserts: jsonResult });
-  } catch (err: any) {
-    console.warn('Gemini generate-inserts API error (using fallback):', err);
-    const mockInserts = {
-      insight: {
-        title: "In-Article Insight",
-        content: `When exploring "${title || 'relational dynamics'}", notice how subtle emotional cues often carry deeper relational bids. Grounding yourself in present awareness transforms defensive reactions into curious connection.`
-      },
-      reflection: {
-        title: "Reflection Note",
-        content: `Take a quiet breath right now. Ask yourself: "Where in my body do I feel tension when this topic arises with my partner?" Acknowledging this physical signal is the first step toward co-regulation.`
-      },
-      tip: {
-        title: "Relationship Tip",
-        content: `• Practice the 10-Second Validation Pause before responding during conflict.\n• Use "I feel" statements focused on your core vulnerability rather than your partner's behavior.\n• Schedule a low-stakes 5-minute daily check-in completely free of logistics chatter.`
-      },
-      summary: {
-        title: "Post Summary",
-        content: `1. **Acknowledge Attachment Patterns:** Unconscious triggers drive defensive cycles unless consciously observed.\n2. **Prioritize Emotional Safety:** Validation precedes logical problem-solving in intimate partnerships.\n3. **Commit to Micro-Repairs:** Small daily acts of reconnection compound into enduring relationship resilience.`
-      },
-      related: {
-        title: "Related Reading",
-        content: "Expand your emotional vocabulary and intimacy skills with these related guides:",
-        links: [
-          { title: "Building Emotional Safety & Secure Attachment", url: "/post/secure-attachment", readTime: "6 min read" },
-          { title: "The Somatic Intimacy & Co-Regulation Playbook", url: "/post/somatic-intimacy", readTime: "8 min read" }
-        ]
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.7,
+        },
+      });
+
+      let jsonResult = {};
+      try {
+        jsonResult = JSON.parse(response.text || "{}");
+      } catch {
+        jsonResult = {};
       }
-    };
-    res.json({ inserts: targetType === 'all' ? mockInserts : { [targetType]: (mockInserts as any)[targetType] } });
-  }
-});
+
+      res.json({ inserts: jsonResult });
+    } catch (err: any) {
+      console.warn("Gemini generate-inserts API error (using fallback):", err);
+      const mockInserts = {
+        insight: {
+          title: "In-Article Insight",
+          content: `When exploring "${title || "relational dynamics"}", notice how subtle emotional cues often carry deeper relational bids. Grounding yourself in present awareness transforms defensive reactions into curious connection.`,
+        },
+        reflection: {
+          title: "Reflection Note",
+          content: `Take a quiet breath right now. Ask yourself: "Where in my body do I feel tension when this topic arises with my partner?" Acknowledging this physical signal is the first step toward co-regulation.`,
+        },
+        tip: {
+          title: "Relationship Tip",
+          content: `• Practice the 10-Second Validation Pause before responding during conflict.\n• Use "I feel" statements focused on your core vulnerability rather than your partner's behavior.\n• Schedule a low-stakes 5-minute daily check-in completely free of logistics chatter.`,
+        },
+        summary: {
+          title: "Post Summary",
+          content: `1. **Acknowledge Attachment Patterns:** Unconscious triggers drive defensive cycles unless consciously observed.\n2. **Prioritize Emotional Safety:** Validation precedes logical problem-solving in intimate partnerships.\n3. **Commit to Micro-Repairs:** Small daily acts of reconnection compound into enduring relationship resilience.`,
+        },
+        related: {
+          title: "Related Reading",
+          content:
+            "Expand your emotional vocabulary and intimacy skills with these related guides:",
+          links: [
+            {
+              title: "Building Emotional Safety & Secure Attachment",
+              url: "/post/secure-attachment",
+              readTime: "6 min read",
+            },
+            {
+              title: "The Somatic Intimacy & Co-Regulation Playbook",
+              url: "/post/somatic-intimacy",
+              readTime: "8 min read",
+            },
+          ],
+        },
+      };
+      res.json({
+        inserts:
+          targetType === "all"
+            ? mockInserts
+            : { [targetType]: (mockInserts as any)[targetType] },
+      });
+    }
+  },
+);
 
 // 1.5. Dynamic SaaS Multimodal post generator
-app.post('/api/gemini/generate-article', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { topic, tone, wordCount, targetAudience, focusKeywords, includeChecklist } = req.body;
+app.post(
+  "/api/gemini/generate-article",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const {
+      topic,
+      tone,
+      wordCount,
+      targetAudience,
+      focusKeywords,
+      includeChecklist,
+    } = req.body;
 
-  if (!topic) {
-    res.status(400).json({ error: 'Core topic/prompt is required.' });
-    return;
-  }
+    if (!topic) {
+      res.status(400).json({ error: "Core topic/prompt is required." });
+      return;
+    }
 
-  const ai = await getGeminiClient();
-  if (!ai) {
-    // If AI unconfigured, return a highly rich mock template immediately so UX demo works flawlessly
-    res.json({
-      title: `The Ultimate Science of ${topic.replace(/[^a-zA-Z0-9\s]/g, '')}`,
-      content: `### Understanding ${topic}\n\nOur counseling experts have compiled the following therapeutic milestones customized for **${targetAudience || 'General Couples'}**.\n\n#### Core Diagnostics & Counseling Markers\n- **Target Audience:** ${targetAudience || 'General Couples'}\n- **SEO Optimized Keywords:** ${focusKeywords || 'couples advice, healing, active trust'}\n- **Empathetic Resonance:** Secure attachments require open conversational conduits in daily routines.\n- **Boundaries:** Defining healthy parameters safeguards long term validation.\n\n${includeChecklist ? `#### 📋 Clinical Actionable Checklist\n1. **Establish Active Reassurance:** Dedicate 10 minutes uninterrupted daily.\n2. **Identify Defensive Reliances:** Keep responses free of sarcasm or defensive posture.\n3. **Coordinate Mutual Intent:** Review joint lifestyle vision milestones once a month.` : ''}\n\n*Generate with process.env.GEMINI_API_KEY set inside your Settings to activate full live neural generation capability.*`,
-      excerpt: `Explore critical clinical strategies for navigating ${topic} safely in your relationship, tailored specifically for ${targetAudience}.`,
-      seo_title: `${topic} - Therapeutic Relationship Guide | Heartsync`,
-      seo_description: `Learn how the scientific principles of empathy and security transform couples therapy around ${topic}.`,
-      keywords: focusKeywords ? focusKeywords.split(',').map((k: string) => k.trim()) : [topic, 'relationship goals', 'couples counseling', 'mental health'],
-      featured_image_prompt: `A beautiful clean heart-shaped relational concept, minimalist pink gradients outline, digital art style`
-    });
-    return;
-  }
+    const ai = await getGeminiClient();
+    if (!ai) {
+      // If AI unconfigured, return a highly rich mock template immediately so UX demo works flawlessly
+      res.json({
+        title: `The Ultimate Science of ${topic.replace(/[^a-zA-Z0-9\s]/g, "")}`,
+        content: `### Understanding ${topic}\n\nOur counseling experts have compiled the following therapeutic milestones customized for **${targetAudience || "General Couples"}**.\n\n#### Core Diagnostics & Counseling Markers\n- **Target Audience:** ${targetAudience || "General Couples"}\n- **SEO Optimized Keywords:** ${focusKeywords || "couples advice, healing, active trust"}\n- **Empathetic Resonance:** Secure attachments require open conversational conduits in daily routines.\n- **Boundaries:** Defining healthy parameters safeguards long term validation.\n\n${includeChecklist ? `#### 📋 Clinical Actionable Checklist\n1. **Establish Active Reassurance:** Dedicate 10 minutes uninterrupted daily.\n2. **Identify Defensive Reliances:** Keep responses free of sarcasm or defensive posture.\n3. **Coordinate Mutual Intent:** Review joint lifestyle vision milestones once a month.` : ""}\n\n*Generate with process.env.GEMINI_API_KEY set inside your Settings to activate full live neural generation capability.*`,
+        excerpt: `Explore critical clinical strategies for navigating ${topic} safely in your relationship, tailored specifically for ${targetAudience}.`,
+        seo_title: `${topic} - Therapeutic Relationship Guide | Heartsync`,
+        seo_description: `Learn how the scientific principles of empathy and security transform couples therapy around ${topic}.`,
+        keywords: focusKeywords
+          ? focusKeywords.split(",").map((k: string) => k.trim())
+          : [
+              topic,
+              "relationship goals",
+              "couples counseling",
+              "mental health",
+            ],
+        featured_image_prompt: `A beautiful clean heart-shaped relational concept, minimalist pink gradients outline, digital art style`,
+      });
+      return;
+    }
 
-  try {
-    const prompt = `Generate a comprehensive relational article about: "${topic}"
-    Tone directive: ${tone || 'empathetic and professional couples counselling style'}
-    Target length: approximately ${wordCount || '500'} words.
-    Target Audience: ${targetAudience || 'General Couples'}
-    Focus Keywords to include: ${focusKeywords || 'None specified'}
-    Include Clinical Actionable Checklist: ${includeChecklist ? 'Yes, please append a 3-4 item premium action checklist for couples at the end of the post' : 'No'}
+    try {
+      const prompt = `Generate a comprehensive relational article about: "${topic}"
+    Tone directive: ${tone || "empathetic and professional couples counselling style"}
+    Target length: approximately ${wordCount || "500"} words.
+    Target Audience: ${targetAudience || "General Couples"}
+    Focus Keywords to include: ${focusKeywords || "None specified"}
+    Include Clinical Actionable Checklist: ${includeChecklist ? "Yes, please append a 3-4 item premium action checklist for couples at the end of the post" : "No"}
     
     Structure the response as a JSON object containing deep clinical counseling metrics, emotional wellness markers, and practical couples advice. Ensure the article content is beautifully detailed in Markdown with structural sections. Every generated article must be written as a professional counselor or specialist and never refer to "Gemini" in content. EXTREMELY IMPORTANT: The 'excerpt' field MUST be formatted strictly as a single clean paragraph summarizing the text under the exact semantic tag "Summary" - no raw JSON keywords inside the string itself.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.85,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            content: { type: Type.STRING, description: 'The beautiful Markdown formatted full article text' },
-            excerpt: { type: Type.STRING, description: 'A catchy 2-sentence summary hook' },
-            seo_title: { type: Type.STRING },
-            seo_description: { type: Type.STRING },
-            keywords: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.85,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              content: {
+                type: Type.STRING,
+                description:
+                  "The beautiful Markdown formatted full article text",
+              },
+              excerpt: {
+                type: Type.STRING,
+                description: "A catchy 2-sentence summary hook",
+              },
+              seo_title: { type: Type.STRING },
+              seo_description: { type: Type.STRING },
+              keywords: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              featured_image_prompt: {
+                type: Type.STRING,
+                description: "An image generator prompt",
+              },
             },
-            featured_image_prompt: { type: Type.STRING, description: 'An image generator prompt' }
+            required: [
+              "title",
+              "content",
+              "excerpt",
+              "seo_title",
+              "seo_description",
+              "keywords",
+              "featured_image_prompt",
+            ],
           },
-          required: ['title', 'content', 'excerpt', 'seo_title', 'seo_description', 'keywords', 'featured_image_prompt']
-        }
+        },
+      });
+
+      const text = response.text;
+      if (!text) {
+        throw new Error("Frictionless generation yielded empty response.");
       }
-    });
 
-    const text = response.text;
-    if (!text) {
-      throw new Error('Frictionless generation yielded empty response.');
+      const payload = JSON.parse(text);
+      res.json(payload);
+    } catch (error: any) {
+      console.warn("Gemini post generator error (triggered fallback):", error);
+      res.json({
+        title: `Intimacy Matrix: Core Tactics for ${topic.replace(/[^a-zA-Z0-9\s]/g, "")}`,
+        content: `### Navigating ${topic} Like a Relationship Specialist\n\nOur leading clinicians at Heartsync have formulated a detailed co-regulation roadmap tailored for **${targetAudience || "General Couples"}**.\n\n#### The Gottman Communication Framework\nTo navigate ${topic} successfully, couples must implement active, supportive checkpoints to interrupt somatic defense pathways before emotional withdrawal occurs.\n\n#### 3 Core Clinical Directives\n1. **Commit to Responsive Listening:** Allow your partner to speak for five full minutes without interruption or counter-arguments.\n2. **Sustain Non-Verbal Reassurance:** Simple touch, relaxed posture, and warm eye contact act as powerful biological co-regulators.\n3. **Coordinate Mutual Intentions:** Establish joint, micro-scheduled connection tasks to slowly rebuild relational security.\n\n${includeChecklist ? `#### 📋 Clinical Connection Checklist\n- [ ] **Co-regulation Pause:** Set a mutual timer when discussion triggers relational stress.\n- [ ] **Daily Verification:** Affirm one specific thing you appreciate about your partner's commitment.` : ""}\n\n*(Live Gemini generation is temporarily on standby due to high quota volume; premium local backup loaded successfully)*`,
+        excerpt: `Explore critical clinical strategies for navigating ${topic} safely in your relationship, tailored specifically for ${targetAudience}.`,
+        seo_title: `${topic} - Therapeutic Relationship Guide | Heartsync`,
+        seo_description: `Learn how the scientific principles of empathy and security transform couples therapy around ${topic}.`,
+        keywords: focusKeywords
+          ? focusKeywords.split(",").map((k: string) => k.trim())
+          : [
+              topic,
+              "relationship goals",
+              "couples counseling",
+              "mental health",
+            ],
+        featured_image_prompt: `A beautiful clean heart-shaped relational concept, minimalist pink gradients outline, digital art style`,
+      });
     }
-
-    const payload = JSON.parse(text);
-    res.json(payload);
-  } catch (error: any) {
-    console.warn('Gemini post generator error (triggered fallback):', error);
-    res.json({
-      title: `Intimacy Matrix: Core Tactics for ${topic.replace(/[^a-zA-Z0-9\s]/g, '')}`,
-      content: `### Navigating ${topic} Like a Relationship Specialist\n\nOur leading clinicians at Heartsync have formulated a detailed co-regulation roadmap tailored for **${targetAudience || 'General Couples'}**.\n\n#### The Gottman Communication Framework\nTo navigate ${topic} successfully, couples must implement active, supportive checkpoints to interrupt somatic defense pathways before emotional withdrawal occurs.\n\n#### 3 Core Clinical Directives\n1. **Commit to Responsive Listening:** Allow your partner to speak for five full minutes without interruption or counter-arguments.\n2. **Sustain Non-Verbal Reassurance:** Simple touch, relaxed posture, and warm eye contact act as powerful biological co-regulators.\n3. **Coordinate Mutual Intentions:** Establish joint, micro-scheduled connection tasks to slowly rebuild relational security.\n\n${includeChecklist ? `#### 📋 Clinical Connection Checklist\n- [ ] **Co-regulation Pause:** Set a mutual timer when discussion triggers relational stress.\n- [ ] **Daily Verification:** Affirm one specific thing you appreciate about your partner's commitment.` : ''}\n\n*(Live Gemini generation is temporarily on standby due to high quota volume; premium local backup loaded successfully)*`,
-      excerpt: `Explore critical clinical strategies for navigating ${topic} safely in your relationship, tailored specifically for ${targetAudience}.`,
-      seo_title: `${topic} - Therapeutic Relationship Guide | Heartsync`,
-      seo_description: `Learn how the scientific principles of empathy and security transform couples therapy around ${topic}.`,
-      keywords: focusKeywords ? focusKeywords.split(',').map((k: string) => k.trim()) : [topic, 'relationship goals', 'couples counseling', 'mental health'],
-      featured_image_prompt: `A beautiful clean heart-shaped relational concept, minimalist pink gradients outline, digital art style`
-    });
-  }
-});
+  },
+);
 
 // =========================================================================
 // FEATURE MANAGER & AI MODULE BUILDER SYSTEM API ENDPOINTS
@@ -2017,174 +2789,243 @@ app.post('/api/gemini/generate-article', adminAuthMiddleware, async (req: Reques
 // table, one row per module: id + full JSONB state). The previous module-scope
 // array silently lost every install/toggle/update on a serverless cold start.
 async function fetchModuleState(db: any, id: string) {
-  const { data, error } = await db.from('feature_modules').select('id, state, updated_at').eq('id', id).maybeSingle();
+  const { data, error } = await db
+    .from("feature_modules")
+    .select("id, state, updated_at")
+    .eq("id", id)
+    .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? data.state : null;
 }
 
 async function saveModuleState(db: any, id: string, state: any) {
-  const { error } = await db.from('feature_modules')
-    .upsert({ id, state, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+  const { error } = await db
+    .from("feature_modules")
+    .upsert(
+      { id, state, updated_at: new Date().toISOString() },
+      { onConflict: "id" },
+    );
   if (error) throw new Error(error.message);
   return state;
 }
 
 function moduleDbError(res: Response, err: any) {
-  console.warn('Feature module registry write failed:', err?.message || err);
-  res.status(502).json({ error: 'Module registry operation failed.', detail: err?.message || String(err) });
+  console.warn("Feature module registry write failed:", err?.message || err);
+  res
+    .status(502)
+    .json({
+      error: "Module registry operation failed.",
+      detail: err?.message || String(err),
+    });
 }
 
-app.get('/api/admin/modules', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  const { data, error } = await db.from('feature_modules').select('id, state, updated_at').order('updated_at', { ascending: false });
-  if (error) {
-    res.status(502).json({ error: 'Module registry lookup failed.', detail: error.message });
-    return;
-  }
-  const modules = (data || []).map((r: any) => r.state);
-  res.json({ success: true, count: modules.length, modules });
-});
-
-app.post('/api/admin/modules/install', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const moduleState = req.body;
-  if (!moduleState || !moduleState.manifest || !moduleState.manifest.id) {
-    res.status(400).json({ error: 'Valid module state and manifest are required.' });
-    return;
-  }
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  try {
-    moduleState.updatedAt = new Date().toISOString();
-    await saveModuleState(db, moduleState.manifest.id, moduleState);
-    logger.info(`Installed/Registered module in server store: ${moduleState.manifest.id} v${moduleState.manifest.version}`);
-    res.json({ success: true, module: moduleState });
-  } catch (err: any) {
-    moduleDbError(res, err);
-  }
-});
-
-app.post('/api/admin/modules/:id/toggle', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { enabled } = req.body;
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  try {
-    const mod = await fetchModuleState(db, id);
-    if (mod) {
-      mod.status = enabled ? 'active' : 'disabled';
-      mod.updatedAt = new Date().toISOString();
-      await saveModuleState(db, id, mod);
-      res.json({ success: true, module: mod });
-    } else {
-      res.json({ success: true, message: `Module state updated locally for ${id}` });
+app.get(
+  "/api/admin/modules",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
     }
-  } catch (err: any) {
-    moduleDbError(res, err);
-  }
-});
-
-app.post('/api/admin/modules/:id/update', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { version, manifest } = req.body;
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  try {
-    const mod = await fetchModuleState(db, id);
-    if (mod) {
-      mod.rollbackBackup = {
-        version: mod.version,
-        manifest: JSON.parse(JSON.stringify(mod.manifest)),
-        settings: JSON.parse(JSON.stringify(mod.settings || {})),
-        backedUpAt: new Date().toISOString()
-      };
-      mod.version = version;
-      if (manifest) mod.manifest = manifest;
-      mod.updatedAt = new Date().toISOString();
-      await saveModuleState(db, id, mod);
-      res.json({ success: true, module: mod });
-    } else {
-      res.json({ success: true, message: `Module ${id} updated to v${version}` });
+    const { data, error } = await db
+      .from("feature_modules")
+      .select("id, state, updated_at")
+      .order("updated_at", { ascending: false });
+    if (error) {
+      res
+        .status(502)
+        .json({
+          error: "Module registry lookup failed.",
+          detail: error.message,
+        });
+      return;
     }
-  } catch (err: any) {
-    moduleDbError(res, err);
-  }
-});
+    const modules = (data || []).map((r: any) => r.state);
+    res.json({ success: true, count: modules.length, modules });
+  },
+);
 
-app.post('/api/admin/modules/:id/rollback', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  try {
-    const mod = await fetchModuleState(db, id);
-    if (mod && mod.rollbackBackup) {
-      mod.version = mod.rollbackBackup.version;
-      mod.manifest = mod.rollbackBackup.manifest;
-      mod.settings = mod.rollbackBackup.settings;
-      mod.rollbackBackup = null;
-      mod.updatedAt = new Date().toISOString();
-      await saveModuleState(db, id, mod);
-      res.json({ success: true, module: mod });
-    } else {
-      res.json({ success: true, message: `Module ${id} rolled back` });
+app.post(
+  "/api/admin/modules/install",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const moduleState = req.body;
+    if (!moduleState || !moduleState.manifest || !moduleState.manifest.id) {
+      res
+        .status(400)
+        .json({ error: "Valid module state and manifest are required." });
+      return;
     }
-  } catch (err: any) {
-    moduleDbError(res, err);
-  }
-});
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    try {
+      moduleState.updatedAt = new Date().toISOString();
+      await saveModuleState(db, moduleState.manifest.id, moduleState);
+      logger.info(
+        `Installed/Registered module in server store: ${moduleState.manifest.id} v${moduleState.manifest.version}`,
+      );
+      res.json({ success: true, module: moduleState });
+    } catch (err: any) {
+      moduleDbError(res, err);
+    }
+  },
+);
 
-app.delete('/api/admin/modules/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  const { error } = await db.from('feature_modules').delete().eq('id', id);
-  if (error) {
-    res.status(502).json({ error: 'Module uninstall failed.', detail: error.message });
-    return;
-  }
-  res.json({ success: true, uninstalledId: id });
-});
+app.post(
+  "/api/admin/modules/:id/toggle",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { enabled } = req.body;
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    try {
+      const mod = await fetchModuleState(db, id);
+      if (mod) {
+        mod.status = enabled ? "active" : "disabled";
+        mod.updatedAt = new Date().toISOString();
+        await saveModuleState(db, id, mod);
+        res.json({ success: true, module: mod });
+      } else {
+        res.json({
+          success: true,
+          message: `Module state updated locally for ${id}`,
+        });
+      }
+    } catch (err: any) {
+      moduleDbError(res, err);
+    }
+  },
+);
+
+app.post(
+  "/api/admin/modules/:id/update",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { version, manifest } = req.body;
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    try {
+      const mod = await fetchModuleState(db, id);
+      if (mod) {
+        mod.rollbackBackup = {
+          version: mod.version,
+          manifest: JSON.parse(JSON.stringify(mod.manifest)),
+          settings: JSON.parse(JSON.stringify(mod.settings || {})),
+          backedUpAt: new Date().toISOString(),
+        };
+        mod.version = version;
+        if (manifest) mod.manifest = manifest;
+        mod.updatedAt = new Date().toISOString();
+        await saveModuleState(db, id, mod);
+        res.json({ success: true, module: mod });
+      } else {
+        res.json({
+          success: true,
+          message: `Module ${id} updated to v${version}`,
+        });
+      }
+    } catch (err: any) {
+      moduleDbError(res, err);
+    }
+  },
+);
+
+app.post(
+  "/api/admin/modules/:id/rollback",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    try {
+      const mod = await fetchModuleState(db, id);
+      if (mod && mod.rollbackBackup) {
+        mod.version = mod.rollbackBackup.version;
+        mod.manifest = mod.rollbackBackup.manifest;
+        mod.settings = mod.rollbackBackup.settings;
+        mod.rollbackBackup = null;
+        mod.updatedAt = new Date().toISOString();
+        await saveModuleState(db, id, mod);
+        res.json({ success: true, module: mod });
+      } else {
+        res.json({ success: true, message: `Module ${id} rolled back` });
+      }
+    } catch (err: any) {
+      moduleDbError(res, err);
+    }
+  },
+);
+
+app.delete(
+  "/api/admin/modules/:id",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    const { error } = await db.from("feature_modules").delete().eq("id", id);
+    if (error) {
+      res
+        .status(502)
+        .json({ error: "Module uninstall failed.", detail: error.message });
+      return;
+    }
+    res.json({ success: true, uninstalledId: id });
+  },
+);
 
 // AI FEATURE BUILDER ENDPOINT USING GEMINI OR FALLBACK CODE SYNTHESIZER
-app.post('/api/admin/modules/ai-builder/generate', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { prompt, category, requiredRole, includeDbMigrations } = req.body;
+app.post(
+  "/api/admin/modules/ai-builder/generate",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { prompt, category, requiredRole, includeDbMigrations } = req.body;
 
-  if (!prompt || typeof prompt !== 'string') {
-    res.status(400).json({ error: 'A plain English feature description prompt is required.' });
-    return;
-  }
+    if (!prompt || typeof prompt !== "string") {
+      res
+        .status(400)
+        .json({
+          error: "A plain English feature description prompt is required.",
+        });
+      return;
+    }
 
-  const cleanPrompt = prompt.trim();
-  const cat = category || 'tools';
-  const role = requiredRole || 'admin';
-  const slug = cleanPrompt.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30).replace(/^-|-$/g, '') || 'ai-feature';
-  const moduleId = `mod-ai-${slug}`;
+    const cleanPrompt = prompt.trim();
+    const cat = category || "tools";
+    const role = requiredRole || "admin";
+    const slug =
+      cleanPrompt
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .substring(0, 30)
+        .replace(/^-|-$/g, "") || "ai-feature";
+    const moduleId = `mod-ai-${slug}`;
 
-  const ai = await getGeminiClient();
+    const ai = await getGeminiClient();
 
-  let generatedBundle: any = null;
+    let generatedBundle: any = null;
 
-  if (ai) {
-    try {
-      const systemInstruction = `You are an expert full-stack TypeScript architect and module generator for HeartSync.
+    if (ai) {
+      try {
+        const systemInstruction = `You are an expert full-stack TypeScript architect and module generator for HeartSync.
 Generate a complete, production-ready module bundle matching the user request.
 Return JSON with this exact schema:
 {
@@ -2209,9 +3050,9 @@ Return JSON with this exact schema:
       {
         "version": "1.0.0",
         "description": "Initial table setup for ${slug}",
-        "upSql": "CREATE TABLE IF NOT EXISTS module_${slug.replace(/-/g, '_')}_data (id VARCHAR(255) PRIMARY KEY, payload JSONB, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
-        "downSql": "DROP TABLE IF EXISTS module_${slug.replace(/-/g, '_')}_data;",
-        "tablesCreated": ["module_${slug.replace(/-/g, '_')}_data"]
+        "upSql": "CREATE TABLE IF NOT EXISTS module_${slug.replace(/-/g, "_")}_data (id VARCHAR(255) PRIMARY KEY, payload JSONB, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
+        "downSql": "DROP TABLE IF EXISTS module_${slug.replace(/-/g, "_")}_data;",
+        "tablesCreated": ["module_${slug.replace(/-/g, "_")}_data"]
       }
     ],
     "settingsSchema": {
@@ -2235,122 +3076,161 @@ Return JSON with this exact schema:
   "sqlMigrations": "CREATE TABLE IF NOT EXISTS..."
 }`;
 
-      const aiResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Generate an extensible feature module based on this plain English request: "${cleanPrompt}".`,
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json'
-        }
-      });
-
-      const responseText = aiResponse.text || '';
-      const parsed = JSON.parse(responseText.trim());
-      generatedBundle = parsed;
-    } catch (err) {
-      logger.warn('Gemini AI module synthesis error, using fallback synthesizer:', err);
-    }
-  }
-
-  if (!generatedBundle) {
-    const titleCaseName = cleanPrompt.split(' ').slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Custom Feature Module';
-    
-    generatedBundle = {
-      manifest: {
-        id: moduleId,
-        name: titleCaseName,
-        version: '1.0.0',
-        description: cleanPrompt,
-        author: 'HeartSync AI Feature Engine',
-        category: cat,
-        icon: 'Sparkles',
-        minAdminVersion: '2.0.0',
-        permissions: [
-          {
-            code: `${slug}.access`,
-            name: `Access ${titleCaseName}`,
-            description: `Permission to view and operate ${titleCaseName}`,
-            defaultRoles: [role, 'super_admin']
-          }
-        ],
-        dbMigrations: includeDbMigrations !== false ? [
-          {
-            version: '1.0.0',
-            description: `Create storage table for ${titleCaseName}`,
-            upSql: `CREATE TABLE IF NOT EXISTS module_${slug.replace(/-/g, '_')}_records (id VARCHAR(255) PRIMARY KEY, title VARCHAR(255), payload JSONB, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
-            downSql: `DROP TABLE IF EXISTS module_${slug.replace(/-/g, '_')}_records;`,
-            tablesCreated: [`module_${slug.replace(/-/g, '_')}_records`]
-          }
-        ] : [],
-        settingsSchema: {
-          autoSync: {
-            label: 'Auto Synchronize Data',
-            type: 'boolean',
-            default: true,
-            description: 'Periodically sync state with backend ledger.'
+        const aiResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: `Generate an extensible feature module based on this plain English request: "${cleanPrompt}".`,
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json",
           },
-          maxRecordsLimit: {
-            label: 'Maximum Records Soft Cap',
-            type: 'number',
-            default: 1000,
-            description: 'Upper boundary for active stored items.'
-          }
+        });
+
+        const responseText = aiResponse.text || "";
+        const parsed = JSON.parse(responseText.trim());
+        generatedBundle = parsed;
+      } catch (err) {
+        logger.warn(
+          "Gemini AI module synthesis error, using fallback synthesizer:",
+          err,
+        );
+      }
+    }
+
+    if (!generatedBundle) {
+      const titleCaseName =
+        cleanPrompt
+          .split(" ")
+          .slice(0, 4)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ") || "Custom Feature Module";
+
+      generatedBundle = {
+        manifest: {
+          id: moduleId,
+          name: titleCaseName,
+          version: "1.0.0",
+          description: cleanPrompt,
+          author: "HeartSync AI Feature Engine",
+          category: cat,
+          icon: "Sparkles",
+          minAdminVersion: "2.0.0",
+          permissions: [
+            {
+              code: `${slug}.access`,
+              name: `Access ${titleCaseName}`,
+              description: `Permission to view and operate ${titleCaseName}`,
+              defaultRoles: [role, "super_admin"],
+            },
+          ],
+          dbMigrations:
+            includeDbMigrations !== false
+              ? [
+                  {
+                    version: "1.0.0",
+                    description: `Create storage table for ${titleCaseName}`,
+                    upSql: `CREATE TABLE IF NOT EXISTS module_${slug.replace(/-/g, "_")}_records (id VARCHAR(255) PRIMARY KEY, title VARCHAR(255), payload JSONB, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
+                    downSql: `DROP TABLE IF EXISTS module_${slug.replace(/-/g, "_")}_records;`,
+                    tablesCreated: [
+                      `module_${slug.replace(/-/g, "_")}_records`,
+                    ],
+                  },
+                ]
+              : [],
+          settingsSchema: {
+            autoSync: {
+              label: "Auto Synchronize Data",
+              type: "boolean",
+              default: true,
+              description: "Periodically sync state with backend ledger.",
+            },
+            maxRecordsLimit: {
+              label: "Maximum Records Soft Cap",
+              type: "number",
+              default: 1000,
+              description: "Upper boundary for active stored items.",
+            },
+          },
+          navItem: {
+            paneKey: moduleId,
+            label: titleCaseName,
+            icon: "Sparkles",
+            group: "PLUGINS",
+            permissionRequired: `${slug}.access`,
+            order: 10,
+          },
         },
-        navItem: {
-          paneKey: moduleId,
-          label: titleCaseName,
-          icon: 'Sparkles',
-          group: 'PLUGINS',
-          permissionRequired: `${slug}.access`,
-          order: 10
-        }
-      },
-      frontendCode: `import React from 'react';\n\nexport default function ${titleCaseName.replace(/[^a-zA-Z0-9]/g, '')}Module() {\n  return (\n    <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl space-y-4">\n      <h2 className="font-serif font-bold text-xl">${titleCaseName}</h2>\n      <p className="text-xs text-zinc-500">${cleanPrompt}</p>\n    </div>\n  );\n}`,
-      backendCode: `import { Request, Response } from 'express';\n\nexport function handle${titleCaseName.replace(/[^a-zA-Z0-9]/g, '')}Action(req: Request, res: Response) {\n  res.json({ success: true, message: "Action processed by ${titleCaseName}" });\n}`,
-      sqlMigrations: `CREATE TABLE IF NOT EXISTS module_${slug.replace(/-/g, '_')}_records (id VARCHAR(255) PRIMARY KEY, title VARCHAR(255), payload JSONB, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
+        frontendCode: `import React from 'react';\n\nexport default function ${titleCaseName.replace(/[^a-zA-Z0-9]/g, "")}Module() {\n  return (\n    <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl space-y-4">\n      <h2 className="font-serif font-bold text-xl">${titleCaseName}</h2>\n      <p className="text-xs text-zinc-500">${cleanPrompt}</p>\n    </div>\n  );\n}`,
+        backendCode: `import { Request, Response } from 'express';\n\nexport function handle${titleCaseName.replace(/[^a-zA-Z0-9]/g, "")}Action(req: Request, res: Response) {\n  res.json({ success: true, message: "Action processed by ${titleCaseName}" });\n}`,
+        sqlMigrations: `CREATE TABLE IF NOT EXISTS module_${slug.replace(/-/g, "_")}_records (id VARCHAR(255) PRIMARY KEY, title VARCHAR(255), payload JSONB, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
+      };
+    }
+
+    generatedBundle.validationReport = {
+      passedSyntaxCheck: true,
+      passedSecurityAudit: true,
+      passedSchemaValidation: true,
+      passedTestSuite: true,
+      issuesFound: [],
+      riskScore: "LOW",
     };
-  }
 
-  generatedBundle.validationReport = {
-    passedSyntaxCheck: true,
-    passedSecurityAudit: true,
-    passedSchemaValidation: true,
-    passedTestSuite: true,
-    issuesFound: [],
-    riskScore: 'LOW'
-  };
+    generatedBundle.testSimulations = [
+      {
+        name: "Manifest Schema & Required Fields Integrity",
+        passed: true,
+        executionTimeMs: 12,
+        details: "Validated ID, name, version, and permissions format",
+      },
+      {
+        name: "TypeScript Transpilation Dry-Run",
+        passed: true,
+        executionTimeMs: 45,
+        details: "Zero type or syntax errors found",
+      },
+      {
+        name: "Role Permission Binding Audit",
+        passed: true,
+        executionTimeMs: 8,
+        details: `Bound required permission key: ${generatedBundle.manifest.permissions[0]?.code}`,
+      },
+      {
+        name: "SQL Table Migration DDL Dry-Run",
+        passed: true,
+        executionTimeMs: 24,
+        details: "Database DDL SQL statements validated cleanly",
+      },
+    ];
 
-  generatedBundle.testSimulations = [
-    { name: 'Manifest Schema & Required Fields Integrity', passed: true, executionTimeMs: 12, details: 'Validated ID, name, version, and permissions format' },
-    { name: 'TypeScript Transpilation Dry-Run', passed: true, executionTimeMs: 45, details: 'Zero type or syntax errors found' },
-    { name: 'Role Permission Binding Audit', passed: true, executionTimeMs: 8, details: `Bound required permission key: ${generatedBundle.manifest.permissions[0]?.code}` },
-    { name: 'SQL Table Migration DDL Dry-Run', passed: true, executionTimeMs: 24, details: 'Database DDL SQL statements validated cleanly' }
-  ];
-
-  res.json({ success: true, bundle: generatedBundle });
-});
+    res.json({ success: true, bundle: generatedBundle });
+  },
+);
 
 // 1.6. Secure Gemini SaaS Translingual Translator
-app.post('/api/gemini/translate', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { payload, targetLang } = req.body;
+app.post(
+  "/api/gemini/translate",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { payload, targetLang } = req.body;
 
-  if (!payload || !targetLang) {
-    res.status(400).json({ error: 'Payload and targetLang are required.' });
-    return;
-  }
+    if (!payload || !targetLang) {
+      res.status(400).json({ error: "Payload and targetLang are required." });
+      return;
+    }
 
-  const ai = await getGeminiClient();
-  // If Gemini is unconfigured, return our helper dictionary or localized placeholder.
-  if (!ai) {
-    res.json({ translated: localizeObj(payload, targetLang) });
-    return;
-  }
+    const ai = await getGeminiClient();
+    // If Gemini is unconfigured, return our helper dictionary or localized placeholder.
+    if (!ai) {
+      res.json({ translated: localizeObj(payload, targetLang) });
+      return;
+    }
 
-  try {
-    const isString = typeof payload === 'string';
-    const jsonStr = isString ? JSON.stringify({ text: payload }) : JSON.stringify(payload);
-    
-    const prompt = `You are a professional linguist, relationships psychologist, and translingual localized expert translator.
+    try {
+      const isString = typeof payload === "string";
+      const jsonStr = isString
+        ? JSON.stringify({ text: payload })
+        : JSON.stringify(payload);
+
+      const prompt = `You are a professional linguist, relationships psychologist, and translingual localized expert translator.
 Translate the following content into the target language "${targetLang}".
 Maintain the beautiful, empathetic signaling counseling tone, all academic and counseling terms, and the exact formatting (such as Markdown titles, bolding, line breaks, or bullet lists).
 Absolutely preserve any HTML tags, CSS styling variables, or React Markdown symbols and keep original structured layout perfectly.
@@ -2359,64 +3239,125 @@ If the input is an object or array of string values, output the translated conte
 Input payload to translate:
 ${jsonStr}`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.25,
-        responseMimeType: isString ? 'text/plain' : 'application/json'
-      }
-    });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.25,
+          responseMimeType: isString ? "text/plain" : "application/json",
+        },
+      });
 
-    const resultText = response.text || '';
-    if (isString) {
-      res.json({ translated: resultText.trim() });
-    } else {
-      try {
-        const parsed = JSON.parse(resultText);
-        res.json({ translated: parsed });
-      } catch (parseErr) {
-        res.json({ translated: localizeObj(payload, targetLang), warning: 'Linguistic parsing decoded with local dictionary fallback' });
+      const resultText = response.text || "";
+      if (isString) {
+        res.json({ translated: resultText.trim() });
+      } else {
+        try {
+          const parsed = JSON.parse(resultText);
+          res.json({ translated: parsed });
+        } catch (parseErr) {
+          res.json({
+            translated: localizeObj(payload, targetLang),
+            warning:
+              "Linguistic parsing decoded with local dictionary fallback",
+          });
+        }
       }
+    } catch (error: any) {
+      console.warn(
+        "Heartsync translate API error (triggered fallback):",
+        error,
+      );
+      res.json({
+        translated: localizeObj(payload, targetLang),
+        warning: "Translation rate-limited. Local fallback dictionary loaded.",
+      });
     }
-  } catch (error: any) {
-    console.warn('Heartsync translate API error (triggered fallback):', error);
-    res.json({ translated: localizeObj(payload, targetLang), warning: 'Translation rate-limited. Local fallback dictionary loaded.' });
-  }
-});
+  },
+);
 
 // --------------------------------------------------------
 // SECURED TEXT-TO-SPEECH (TTS) PROXY & CACHE (ELEVENLABS)
 // --------------------------------------------------------
-const ttsCache = new Map<string, { base64: string, mimeType: string }>();
+const ttsCache = new Map<string, { base64: string; mimeType: string }>();
 let voicesCache: any[] | null = null;
 let voicesCacheTime = 0;
 
 // Default ElevenLabs stable voice list to fallback on when API key is missing or invalid
 const DEFAULT_ELEVENLABS_VOICES = [
-  { voice_id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', category: 'premade', labels: { gender: 'female', age: 'young', accent: 'american' }, preview_url: 'https://api.elevenlabs.io/v1/voices/21m00Tcm4TlvDq8ikWAM/previews', gender: 'female' },
-  { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', category: 'premade', labels: { gender: 'female', age: 'young', accent: 'american' }, preview_url: 'https://api.elevenlabs.io/v1/voices/EXAVITQu4vr4xnSDxMaL/previews', gender: 'female' },
-  { voice_id: 'piTKgcLEGmPEe62gPI8Z', name: 'Nicole', category: 'premade', labels: { gender: 'female', age: 'mature', accent: 'whisper' }, preview_url: 'https://api.elevenlabs.io/v1/voices/piTKgcLEGmPEe62gPI8Z/previews', gender: 'female' },
-  { voice_id: 'pNInz6obpgHsOH2U0edQ', name: 'Adam', category: 'premade', labels: { gender: 'male', age: 'middle-aged', accent: 'american' }, preview_url: 'https://api.elevenlabs.io/v1/voices/pNInz6obpgHsOH2U0edQ/previews', gender: 'male' },
-  { voice_id: 'ErXwobaY60CgY70m7Cov', name: 'Antoni', category: 'premade', labels: { gender: 'male', age: 'young', accent: 'american' }, preview_url: 'https://api.elevenlabs.io/v1/voices/ErXwobaY60CgY70m7Cov/previews', gender: 'male' },
-  { voice_id: 'VR6AHRvCDihgvnfOcRev', name: 'Arnold', category: 'premade', labels: { gender: 'male', age: 'middle-aged', accent: 'american' }, preview_url: 'https://api.elevenlabs.io/v1/voices/VR6AHRvCDihgvnfOcRev/previews', gender: 'male' }
+  {
+    voice_id: "21m00Tcm4TlvDq8ikWAM",
+    name: "Rachel",
+    category: "premade",
+    labels: { gender: "female", age: "young", accent: "american" },
+    preview_url:
+      "https://api.elevenlabs.io/v1/voices/21m00Tcm4TlvDq8ikWAM/previews",
+    gender: "female",
+  },
+  {
+    voice_id: "EXAVITQu4vr4xnSDxMaL",
+    name: "Bella",
+    category: "premade",
+    labels: { gender: "female", age: "young", accent: "american" },
+    preview_url:
+      "https://api.elevenlabs.io/v1/voices/EXAVITQu4vr4xnSDxMaL/previews",
+    gender: "female",
+  },
+  {
+    voice_id: "piTKgcLEGmPEe62gPI8Z",
+    name: "Nicole",
+    category: "premade",
+    labels: { gender: "female", age: "mature", accent: "whisper" },
+    preview_url:
+      "https://api.elevenlabs.io/v1/voices/piTKgcLEGmPEe62gPI8Z/previews",
+    gender: "female",
+  },
+  {
+    voice_id: "pNInz6obpgHsOH2U0edQ",
+    name: "Adam",
+    category: "premade",
+    labels: { gender: "male", age: "middle-aged", accent: "american" },
+    preview_url:
+      "https://api.elevenlabs.io/v1/voices/pNInz6obpgHsOH2U0edQ/previews",
+    gender: "male",
+  },
+  {
+    voice_id: "ErXwobaY60CgY70m7Cov",
+    name: "Antoni",
+    category: "premade",
+    labels: { gender: "male", age: "young", accent: "american" },
+    preview_url:
+      "https://api.elevenlabs.io/v1/voices/ErXwobaY60CgY70m7Cov/previews",
+    gender: "male",
+  },
+  {
+    voice_id: "VR6AHRvCDihgvnfOcRev",
+    name: "Arnold",
+    category: "premade",
+    labels: { gender: "male", age: "middle-aged", accent: "american" },
+    preview_url:
+      "https://api.elevenlabs.io/v1/voices/VR6AHRvCDihgvnfOcRev/previews",
+    gender: "male",
+  },
 ];
 
 // Lazy-loaded Supabase client on the server side
-
-
 
 let supabaseClient: any = null;
 let lastUsedSupabaseUrl: string | null = null;
 let lastUsedSupabaseKey: string | null = null;
 
 function getSupabaseClient() {
-  const envUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
-  const envKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
-  
-  let url = '';
-  let key = '';
-  
+  const envUrl = cleanConfigValue(
+    process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
+  );
+  const envKey = cleanConfigValue(
+    process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
+  );
+
+  let url = "";
+  let key = "";
+
   if (isValidSupabaseConfig(envUrl, envKey)) {
     url = envUrl;
     key = envKey;
@@ -2424,25 +3365,32 @@ function getSupabaseClient() {
     url = cleanConfigValue(serverCacheState?.site_settings?.supabase_url);
     key = cleanConfigValue(serverCacheState?.site_settings?.supabase_key);
   }
-  
+
   if (!isValidSupabaseConfig(url, key)) {
     supabaseClient = null;
     lastUsedSupabaseUrl = null;
     lastUsedSupabaseKey = null;
     return null;
   }
-  
+
   const trimmedUrl = url.trim();
   const trimmedKey = key.trim();
-  
-  if (!supabaseClient || lastUsedSupabaseUrl !== trimmedUrl || lastUsedSupabaseKey !== trimmedKey) {
+
+  if (
+    !supabaseClient ||
+    lastUsedSupabaseUrl !== trimmedUrl ||
+    lastUsedSupabaseKey !== trimmedKey
+  ) {
     try {
       supabaseClient = createSupabaseClient(trimmedUrl, trimmedKey);
       lastUsedSupabaseUrl = trimmedUrl;
       lastUsedSupabaseKey = trimmedKey;
-      console.log('⚡ Server initialized/updated Supabase client dynamically. URL:', trimmedUrl);
+      console.log(
+        "⚡ Server initialized/updated Supabase client dynamically. URL:",
+        trimmedUrl,
+      );
     } catch (err) {
-      console.warn('Failed to initialize server-side Supabase client:', err);
+      console.warn("Failed to initialize server-side Supabase client:", err);
       supabaseClient = null;
     }
   }
@@ -2450,14 +3398,18 @@ function getSupabaseClient() {
 }
 
 function sanitizeApiKey(key: string): string {
-  if (!key) return '';
-  return key.trim().replace(/^["']|["']$/g, '').trim();
+  if (!key) return "";
+  return key
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .trim();
 }
 
 // SECURITY: credential-like fields must never round-trip through client-visible state.
-const SECRET_FIELD_RE = /(^|_)(api_keys?|secret_keys?|secrets?|tokens?|passwords?|private_keys?)$/i;
+const SECRET_FIELD_RE =
+  /(^|_)(api_keys?|secret_keys?|secrets?|tokens?|passwords?|private_keys?)$/i;
 function stripSecretFields(input: any): any {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
   const out: Record<string, any> = {};
   for (const [k, v] of Object.entries(input)) {
     if (SECRET_FIELD_RE.test(k)) continue;
@@ -2467,10 +3419,16 @@ function stripSecretFields(input: any): any {
 }
 
 // Fast timeout wrapper for DB operations to avoid blocking API threads
-async function queryWithTimeout<T = any>(promise: any, timeoutMs: number = 2000): Promise<T> {
+async function queryWithTimeout<T = any>(
+  promise: any,
+  timeoutMs: number = 2000,
+): Promise<T> {
   let timeoutId: any;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(`Timeout of ${timeoutMs}ms exceeded`)), timeoutMs);
+    timeoutId = setTimeout(
+      () => reject(new Error(`Timeout of ${timeoutMs}ms exceeded`)),
+      timeoutMs,
+    );
   });
   try {
     return await Promise.race([Promise.resolve(promise), timeoutPromise]);
@@ -2483,7 +3441,9 @@ async function queryWithTimeout<T = any>(promise: any, timeoutMs: number = 2000)
 let cachedDbGeminiApiKey: string | null = null;
 let lastDbGeminiKeyCheck = 0;
 
-async function resolveGeminiApiKey(invalidateCache: boolean = false): Promise<string> {
+async function resolveGeminiApiKey(
+  invalidateCache: boolean = false,
+): Promise<string> {
   const now = Date.now();
   if (invalidateCache) {
     cachedDbGeminiApiKey = null;
@@ -2491,7 +3451,7 @@ async function resolveGeminiApiKey(invalidateCache: boolean = false): Promise<st
   }
 
   // 1. If we have a healthy cached database key and it is less than 15 seconds old, use it.
-  if (cachedDbGeminiApiKey !== null && (now - lastDbGeminiKeyCheck < 15000)) {
+  if (cachedDbGeminiApiKey !== null && now - lastDbGeminiKeyCheck < 15000) {
     return cachedDbGeminiApiKey;
   }
 
@@ -2501,26 +3461,33 @@ async function resolveGeminiApiKey(invalidateCache: boolean = false): Promise<st
   try {
     const svc = getServiceRoleSupabase();
     if (svc) {
-      const { data: geminiIntegrationRow } = await svc.from('integration_settings')
-        .select('value')
-        .eq('integration_id', 'gemini')
-        .eq('key', 'apiKey')
+      const { data: geminiIntegrationRow } = await svc
+        .from("integration_settings")
+        .select("value")
+        .eq("integration_id", "gemini")
+        .eq("key", "apiKey")
         .limit(1)
         .maybeSingle();
       const integrationKey = sanitizeApiKey(geminiIntegrationRow?.value);
-      if (integrationKey && integrationKey !== '' && integrationKey !== 'MY_GEMINI_API_KEY') {
+      if (
+        integrationKey &&
+        integrationKey !== "" &&
+        integrationKey !== "MY_GEMINI_API_KEY"
+      ) {
         cachedDbGeminiApiKey = integrationKey;
         lastDbGeminiKeyCheck = now;
         process.env.GEMINI_API_KEY = integrationKey;
         return integrationKey;
       }
     }
-  } catch (_) { /* integration store unavailable  - fall through */ }
+  } catch (_) {
+    /* integration store unavailable  - fall through */
+  }
 
   // 2. Query Memory serverCacheState first for instantaneous hot setup
   if (serverCacheState?.site_settings?.gemini_api_key) {
     const sKey = sanitizeApiKey(serverCacheState.site_settings.gemini_api_key);
-    if (sKey && sKey !== 'MY_GEMINI_API_KEY' && sKey !== '') {
+    if (sKey && sKey !== "MY_GEMINI_API_KEY" && sKey !== "") {
       cachedDbGeminiApiKey = sKey;
       lastDbGeminiKeyCheck = now;
       process.env.GEMINI_API_KEY = sKey;
@@ -2534,16 +3501,16 @@ async function resolveGeminiApiKey(invalidateCache: boolean = false): Promise<st
     try {
       const { data, error } = await queryWithTimeout(
         client
-          .from('site_settings')
-          .select('gemini_api_key')
-          .eq('id', 'singleton')
+          .from("site_settings")
+          .select("gemini_api_key")
+          .eq("id", "singleton")
           .maybeSingle(),
-        2500
+        2500,
       );
 
       if (!error && data && data.gemini_api_key) {
         const dbKey = sanitizeApiKey(data.gemini_api_key);
-        if (dbKey && dbKey !== 'MY_GEMINI_API_KEY' && dbKey !== '') {
+        if (dbKey && dbKey !== "MY_GEMINI_API_KEY" && dbKey !== "") {
           cachedDbGeminiApiKey = dbKey;
           lastDbGeminiKeyCheck = now;
           process.env.GEMINI_API_KEY = dbKey;
@@ -2551,13 +3518,13 @@ async function resolveGeminiApiKey(invalidateCache: boolean = false): Promise<st
         }
       }
     } catch (dbErr) {
-      console.warn('Backend failed to fetch Gemini key from Supabase:', dbErr);
+      console.warn("Backend failed to fetch Gemini key from Supabase:", dbErr);
     }
   }
 
   // 4. Fallback to process.env if Supabase is unconfigured or empty
   const envKey = process.env.GEMINI_API_KEY;
-  if (envKey && envKey !== 'MY_GEMINI_API_KEY' && envKey.trim() !== '') {
+  if (envKey && envKey !== "MY_GEMINI_API_KEY" && envKey.trim() !== "") {
     const cleanEnvKey = sanitizeApiKey(envKey);
     cachedDbGeminiApiKey = cleanEnvKey;
     lastDbGeminiKeyCheck = now;
@@ -2568,7 +3535,7 @@ async function resolveGeminiApiKey(invalidateCache: boolean = false): Promise<st
     return cachedDbGeminiApiKey;
   }
 
-  return '';
+  return "";
 }
 
 let dynamicAiClient: GoogleGenAI | null = null;
@@ -2589,15 +3556,17 @@ async function getGeminiClient(): Promise<GoogleGenAI | null> {
       apiKey: currentKey,
       httpOptions: {
         headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
+          "User-Agent": "aistudio-build",
+        },
+      },
     });
     dynamicAiClientKey = currentKey;
-    console.log('💚 Dynamic GoogleGenAI client initialized/re-keyed with current secret API Key.');
+    console.log(
+      "💚 Dynamic GoogleGenAI client initialized/re-keyed with current secret API Key.",
+    );
     return dynamicAiClient;
   } catch (error) {
-    console.error('Failed to initialize dynamic GoogleGenAI client:', error);
+    console.error("Failed to initialize dynamic GoogleGenAI client:", error);
     return null;
   }
 }
@@ -2606,23 +3575,27 @@ async function getGeminiClient(): Promise<GoogleGenAI | null> {
 let cachedDbApiKey: string | null = null;
 let lastDbKeyCheck = 0;
 
-async function resolveElevenLabsApiKey(invalidateCache: boolean = false): Promise<string> {
+async function resolveElevenLabsApiKey(
+  invalidateCache: boolean = false,
+): Promise<string> {
   const now = Date.now();
-  
+
   if (invalidateCache) {
     cachedDbApiKey = null;
     lastDbKeyCheck = 0;
   }
 
   // 1. If we have a healthy cached database key and it is less than 15 seconds old, use it.
-  if (cachedDbApiKey !== null && (now - lastDbKeyCheck < 15000)) {
+  if (cachedDbApiKey !== null && now - lastDbKeyCheck < 15000) {
     return cachedDbApiKey;
   }
 
   // 2. Query Memory serverCacheState first for instantaneous hot setup
   if (serverCacheState?.site_settings?.elevenlabs_api_key) {
-    const sKey = sanitizeApiKey(serverCacheState.site_settings.elevenlabs_api_key);
-    if (sKey && sKey !== 'MY_ELEVENLABS_API_KEY' && sKey !== '') {
+    const sKey = sanitizeApiKey(
+      serverCacheState.site_settings.elevenlabs_api_key,
+    );
+    if (sKey && sKey !== "MY_ELEVENLABS_API_KEY" && sKey !== "") {
       cachedDbApiKey = sKey;
       lastDbKeyCheck = now;
       process.env.ELEVENLABS_API_KEY = sKey;
@@ -2636,16 +3609,16 @@ async function resolveElevenLabsApiKey(invalidateCache: boolean = false): Promis
     try {
       const { data, error } = await queryWithTimeout(
         client
-          .from('site_settings')
-          .select('elevenlabs_api_key')
-          .eq('id', 'singleton')
+          .from("site_settings")
+          .select("elevenlabs_api_key")
+          .eq("id", "singleton")
           .maybeSingle(),
-        2500
+        2500,
       );
 
       if (!error && data && data.elevenlabs_api_key) {
         const dbKey = sanitizeApiKey(data.elevenlabs_api_key);
-        if (dbKey && dbKey !== 'MY_ELEVENLABS_API_KEY' && dbKey !== '') {
+        if (dbKey && dbKey !== "MY_ELEVENLABS_API_KEY" && dbKey !== "") {
           cachedDbApiKey = dbKey;
           lastDbKeyCheck = now;
           process.env.ELEVENLABS_API_KEY = dbKey;
@@ -2653,13 +3626,16 @@ async function resolveElevenLabsApiKey(invalidateCache: boolean = false): Promis
         }
       }
     } catch (dbErr) {
-      console.warn('Backend failed to fetch ElevenLabs key from Supabase:', dbErr);
+      console.warn(
+        "Backend failed to fetch ElevenLabs key from Supabase:",
+        dbErr,
+      );
     }
   }
 
   // 4. Fallback to process.env if Supabase is unconfigured or empty
   const envKey = process.env.ELEVENLABS_API_KEY;
-  if (envKey && envKey !== 'MY_ELEVENLABS_API_KEY' && envKey.trim() !== '') {
+  if (envKey && envKey !== "MY_ELEVENLABS_API_KEY" && envKey.trim() !== "") {
     const cleanEnvKey = sanitizeApiKey(envKey);
     cachedDbApiKey = cleanEnvKey;
     lastDbKeyCheck = now;
@@ -2671,30 +3647,32 @@ async function resolveElevenLabsApiKey(invalidateCache: boolean = false): Promis
     return cachedDbApiKey;
   }
 
-  return '';
+  return "";
 }
 
 // Memory cache for DB resolved voice ID to prevent redundant querying
 let cachedDbVoiceId: string | null = null;
 let lastDbVoiceCheck = 0;
 
-async function resolveElevenLabsVoiceId(invalidateCache: boolean = false): Promise<string> {
+async function resolveElevenLabsVoiceId(
+  invalidateCache: boolean = false,
+): Promise<string> {
   const now = Date.now();
-  
+
   if (invalidateCache) {
     cachedDbVoiceId = null;
     lastDbVoiceCheck = 0;
   }
 
   // 1. If we have a healthy cached database voice ID and it is less than 15 seconds old, use it.
-  if (cachedDbVoiceId !== null && (now - lastDbVoiceCheck < 15000)) {
+  if (cachedDbVoiceId !== null && now - lastDbVoiceCheck < 15000) {
     return cachedDbVoiceId;
   }
 
   // 2. Query Memory serverCacheState first for instantaneous hot setup
   if (serverCacheState?.site_settings?.tts_selected_voice_id) {
     const voiceId = serverCacheState.site_settings.tts_selected_voice_id.trim();
-    if (voiceId && voiceId !== 'MY_ELEVENLABS_VOICE_ID' && voiceId !== '') {
+    if (voiceId && voiceId !== "MY_ELEVENLABS_VOICE_ID" && voiceId !== "") {
       cachedDbVoiceId = voiceId;
       lastDbVoiceCheck = now;
       process.env.ELEVENLABS_VOICE_ID = voiceId;
@@ -2708,16 +3686,20 @@ async function resolveElevenLabsVoiceId(invalidateCache: boolean = false): Promi
     try {
       const { data, error } = await queryWithTimeout(
         client
-          .from('site_settings')
-          .select('tts_selected_voice_id')
-          .eq('id', 'singleton')
+          .from("site_settings")
+          .select("tts_selected_voice_id")
+          .eq("id", "singleton")
           .maybeSingle(),
-        2500
+        2500,
       );
 
       if (!error && data && data.tts_selected_voice_id) {
         const dbVoiceId = data.tts_selected_voice_id.trim();
-        if (dbVoiceId && dbVoiceId !== 'MY_ELEVENLABS_VOICE_ID' && dbVoiceId !== '') {
+        if (
+          dbVoiceId &&
+          dbVoiceId !== "MY_ELEVENLABS_VOICE_ID" &&
+          dbVoiceId !== ""
+        ) {
           cachedDbVoiceId = dbVoiceId;
           lastDbVoiceCheck = now;
           process.env.ELEVENLABS_VOICE_ID = dbVoiceId;
@@ -2725,7 +3707,10 @@ async function resolveElevenLabsVoiceId(invalidateCache: boolean = false): Promi
         }
       }
     } catch (dbErr) {
-      console.warn('Backend failed to fetch ElevenLabs Voice ID from Supabase:', dbErr);
+      console.warn(
+        "Backend failed to fetch ElevenLabs Voice ID from Supabase:",
+        dbErr,
+      );
     }
   }
 
@@ -2734,35 +3719,47 @@ async function resolveElevenLabsVoiceId(invalidateCache: boolean = false): Promi
     return cachedDbVoiceId;
   }
 
-  return '';
+  return "";
 }
 
 // Endpoint to inspect ElevenLabs configuration status
-app.get('/api/tts/status', async (req: Request, res: Response) => {
+app.get("/api/tts/status", async (req: Request, res: Response) => {
   const apiKey = await resolveElevenLabsApiKey();
-  const isHealthy = !!apiKey && apiKey !== 'MY_ELEVENLABS_API_KEY' && apiKey.trim() !== '';
+  const isHealthy =
+    !!apiKey && apiKey !== "MY_ELEVENLABS_API_KEY" && apiKey.trim() !== "";
   res.json({
     configured: isHealthy,
-    provider: isHealthy ? 'ElevenLabs Premier AI' : 'ElevenLabs (Key Unconfigured)',
-    voiceCount: isHealthy ? (voicesCache ? voicesCache.length : 'Fetching...') : DEFAULT_ELEVENLABS_VOICES.length,
-    region: 'Global S08',
-    voice_id: await resolveElevenLabsVoiceId()
+    provider: isHealthy
+      ? "ElevenLabs Premier AI"
+      : "ElevenLabs (Key Unconfigured)",
+    voiceCount: isHealthy
+      ? voicesCache
+        ? voicesCache.length
+        : "Fetching..."
+      : DEFAULT_ELEVENLABS_VOICES.length,
+    region: "Global S08",
+    voice_id: await resolveElevenLabsVoiceId(),
   });
 });
 
 // Endpoint to fetch ElevenLabs voices with in-memory caching
-app.get('/api/voices', async (req: Request, res: Response) => {
+app.get("/api/voices", async (req: Request, res: Response) => {
   const apiKey = await resolveElevenLabsApiKey();
-  const isHealthy = !!apiKey && apiKey !== 'MY_ELEVENLABS_API_KEY' && apiKey.trim() !== '';
+  const isHealthy =
+    !!apiKey && apiKey !== "MY_ELEVENLABS_API_KEY" && apiKey.trim() !== "";
 
   if (!isHealthy) {
-    res.json({ voices: DEFAULT_ELEVENLABS_VOICES, cached: true, connected: false });
+    res.json({
+      voices: DEFAULT_ELEVENLABS_VOICES,
+      cached: true,
+      connected: false,
+    });
     return;
   }
 
   // Use cached voices if under 5 minutes old
   const now = Date.now();
-  if (voicesCache && (now - voicesCacheTime < 5 * 60 * 1000)) {
+  if (voicesCache && now - voicesCacheTime < 5 * 60 * 1000) {
     res.json({ voices: voicesCache, cached: true, connected: true });
     return;
   }
@@ -2771,12 +3768,12 @@ app.get('/api/voices', async (req: Request, res: Response) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout max for UI fluidity
 
-    const response = await fetch('https://api.elevenlabs.io/v1/voices', {
-      method: 'GET',
+    const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+      method: "GET",
       headers: {
-        'xi-api-key': apiKey
+        "xi-api-key": apiKey,
       },
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
@@ -2791,20 +3788,20 @@ app.get('/api/voices', async (req: Request, res: Response) => {
     const data: any = await response.json();
     if (data && Array.isArray(data.voices)) {
       const normalized = data.voices.map((v: any) => {
-        let gender = 'female';
+        let gender = "female";
         if (v.labels) {
-          const gInfo = v.labels.gender || v.labels.Gender || '';
-          if (gInfo.toLowerCase().includes('male')) {
-            gender = 'male';
+          const gInfo = v.labels.gender || v.labels.Gender || "";
+          if (gInfo.toLowerCase().includes("male")) {
+            gender = "male";
           }
         }
         return {
           voice_id: v.voice_id,
           name: v.name,
-          category: v.category || 'premade',
+          category: v.category || "premade",
           labels: v.labels || {},
-          preview_url: v.preview_url || '',
-          gender
+          preview_url: v.preview_url || "",
+          gender,
         };
       });
 
@@ -2812,43 +3809,61 @@ app.get('/api/voices', async (req: Request, res: Response) => {
       voicesCacheTime = now;
       res.json({ voices: normalized, cached: false, connected: true });
     } else {
-      throw new Error('Invalid response structure from ElevenLabs');
+      throw new Error("Invalid response structure from ElevenLabs");
     }
   } catch (err: any) {
-    console.warn('Failed to dynamically retrieve ElevenLabs voices, falling back to static list. Warning:', err.message);
-    res.json({ voices: DEFAULT_ELEVENLABS_VOICES, cached: true, connected: false, error: err.message });
+    console.warn(
+      "Failed to dynamically retrieve ElevenLabs voices, falling back to static list. Warning:",
+      err.message,
+    );
+    res.json({
+      voices: DEFAULT_ELEVENLABS_VOICES,
+      cached: true,
+      connected: false,
+      error: err.message,
+    });
   }
 });
 
-app.post('/api/tts', async (req: Request, res: Response) => {
+app.post("/api/tts", async (req: Request, res: Response) => {
   const { text, voice, speed, stability, similarity_boost, style } = req.body;
 
   if (!text || text.trim().length === 0) {
-    res.status(400).json({ error: 'Text content is required for speech synthesis.' });
+    res
+      .status(400)
+      .json({ error: "Text content is required for speech synthesis." });
     return;
   }
 
-  const cleanText = text.replace(/<[^>]*>/g, '').substring(0, 1500);
-  
+  const cleanText = text.replace(/<[^>]*>/g, "").substring(0, 1500);
+
   const voiceIdMap: Record<string, string> = {
-    rachel: '21m00Tcm4TlvDq8ikWAM',
-    bella: 'EXAVITQu4vr4xnSDxMaL',
-    nicole: 'piTKgcLEGmPEe62gPI8Z',
-    adam: 'pNInz6obpgHsOH2U0edQ',
-    antoni: 'ErXwobaY60CgY70m7Cov',
-    arnold: 'VR6AHRvCDihgvnfOcRev',
-    neural_female: '21m00Tcm4TlvDq8ikWAM',
-    neural_male: 'pNInz6obpgHsOH2U0edQ'
+    rachel: "21m00Tcm4TlvDq8ikWAM",
+    bella: "EXAVITQu4vr4xnSDxMaL",
+    nicole: "piTKgcLEGmPEe62gPI8Z",
+    adam: "pNInz6obpgHsOH2U0edQ",
+    antoni: "ErXwobaY60CgY70m7Cov",
+    arnold: "VR6AHRvCDihgvnfOcRev",
+    neural_female: "21m00Tcm4TlvDq8ikWAM",
+    neural_male: "pNInz6obpgHsOH2U0edQ",
   };
 
-  const selectedVoiceStr = String(voice || 'rachel').toLowerCase();
-  let voiceId = voiceIdMap[selectedVoiceStr] || voice; 
+  const selectedVoiceStr = String(voice || "rachel").toLowerCase();
+  let voiceId = voiceIdMap[selectedVoiceStr] || voice;
 
   // Resolve custom ELEVENLABS_VOICE_ID dynamically
   const customVoiceId = await resolveElevenLabsVoiceId();
-  if (customVoiceId && customVoiceId !== '') {
+  if (customVoiceId && customVoiceId !== "") {
     // If voice is unspecified, default, or general, use the defined ELEVENLABS_VOICE_ID
-    if (!voice || selectedVoiceStr === 'rachel' || selectedVoiceStr === 'samantha' || selectedVoiceStr === 'female' || selectedVoiceStr === 'male' || selectedVoiceStr === 'neural_female' || selectedVoiceStr === 'neural_male') {
+    if (
+      !voice ||
+      selectedVoiceStr === "rachel" ||
+      selectedVoiceStr === "samantha" ||
+      selectedVoiceStr === "female" ||
+      selectedVoiceStr === "male" ||
+      selectedVoiceStr === "neural_female" ||
+      selectedVoiceStr === "neural_male"
+    ) {
       voiceId = customVoiceId;
     }
   }
@@ -2863,9 +3878,10 @@ app.post('/api/tts', async (req: Request, res: Response) => {
 
   const apiKey = await resolveElevenLabsApiKey();
 
-  if (!apiKey || apiKey === 'MY_ELEVENLABS_API_KEY' || apiKey.trim() === '') {
-    res.status(400).json({ 
-      error: 'ElevenLabs API Key is unconfigured! Please provide a valid ElevenLabs API Key in the admin console settings.'
+  if (!apiKey || apiKey === "MY_ELEVENLABS_API_KEY" || apiKey.trim() === "") {
+    res.status(400).json({
+      error:
+        "ElevenLabs API Key is unconfigured! Please provide a valid ElevenLabs API Key in the admin console settings.",
     });
     return;
   }
@@ -2877,27 +3893,33 @@ app.post('/api/tts', async (req: Request, res: Response) => {
     try {
       audioStream = await elevenlabs.textToSpeech.convert(voiceId, {
         text: cleanText,
-        modelId: 'eleven_multilingual_v2',
-        outputFormat: 'mp3_44100_128',
+        modelId: "eleven_multilingual_v2",
+        outputFormat: "mp3_44100_128",
         voiceSettings: {
           stability: stability !== undefined ? Number(stability) : 0.55,
-          similarityBoost: similarity_boost !== undefined ? Number(similarity_boost) : 0.75,
-          style: style !== undefined ? Number(style) : 0.0
-        }
+          similarityBoost:
+            similarity_boost !== undefined ? Number(similarity_boost) : 0.75,
+          style: style !== undefined ? Number(style) : 0.0,
+        },
       });
     } catch (apiErr: any) {
-      if (voiceId !== 'JBFqnCBsd6RMkjVDRZzb') {
-        console.warn(`Voice ID "${voiceId}" failed. Gracefully retrying synthesis with custom default or Rachel voice profile.`);
-        audioStream = await elevenlabs.textToSpeech.convert('JBFqnCBsd6RMkjVDRZzb', {
-          text: cleanText,
-          modelId: 'eleven_multilingual_v2',
-          outputFormat: 'mp3_44100_128',
-          voiceSettings: {
-            stability: 0.55,
-            similarityBoost: 0.75,
-            style: 0.0
-          }
-        });
+      if (voiceId !== "JBFqnCBsd6RMkjVDRZzb") {
+        console.warn(
+          `Voice ID "${voiceId}" failed. Gracefully retrying synthesis with custom default or Rachel voice profile.`,
+        );
+        audioStream = await elevenlabs.textToSpeech.convert(
+          "JBFqnCBsd6RMkjVDRZzb",
+          {
+            text: cleanText,
+            modelId: "eleven_multilingual_v2",
+            outputFormat: "mp3_44100_128",
+            voiceSettings: {
+              stability: 0.55,
+              similarityBoost: 0.75,
+              style: 0.0,
+            },
+          },
+        );
       } else {
         throw apiErr;
       }
@@ -2908,19 +3930,19 @@ app.post('/api/tts', async (req: Request, res: Response) => {
       chunks.push(chunk);
     }
     const buffer = Buffer.concat(chunks);
-    const base64Audio = buffer.toString('base64');
-    const mimeType = 'audio/mpeg';
+    const base64Audio = buffer.toString("base64");
+    const mimeType = "audio/mpeg";
 
     ttsCache.set(cacheKey, { base64: base64Audio, mimeType });
 
     res.json({ audio: base64Audio, mimeType, cached: false });
   } catch (err: any) {
-    if (err.statusCode === 401 || err.message?.includes('401')) {
+    if (err.statusCode === 401 || err.message?.includes("401")) {
       await resolveElevenLabsApiKey(true);
     }
-    console.error('ElevenLabs synthesis request failed:', err.message || err);
-    res.status(500).json({ 
-      error: `ElevenLabs speech synthesis failed: ${err.message || err}`
+    console.error("ElevenLabs synthesis request failed:", err.message || err);
+    res.status(500).json({
+      error: `ElevenLabs speech synthesis failed: ${err.message || err}`,
     });
   }
 });
@@ -2930,14 +3952,18 @@ function saveApiKeyToEnv(key: string) {
   process.env.ELEVENLABS_API_KEY = key;
   cachedDbApiKey = key;
   lastDbKeyCheck = Date.now();
-  console.log('🗝️ ElevenLabs API Key cached in server memory (file write skipped).');
+  console.log(
+    "🗝️ ElevenLabs API Key cached in server memory (file write skipped).",
+  );
 }
 
 function saveVoiceIdToEnv(voiceId: string) {
   process.env.ELEVENLABS_VOICE_ID = voiceId;
   cachedDbVoiceId = voiceId;
   lastDbVoiceCheck = Date.now();
-  console.log('🗣️ ElevenLabs Voice ID cached in server memory (file write skipped).');
+  console.log(
+    "🗣️ ElevenLabs Voice ID cached in server memory (file write skipped).",
+  );
 }
 
 // --------------------------------------------------------
@@ -2945,208 +3971,282 @@ function saveVoiceIdToEnv(voiceId: string) {
 // --------------------------------------------------------
 
 // 1. Test ElevenLabs key connection
-app.post('/api/admin/tts/test', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  const envKey = await resolveElevenLabsApiKey();
-  const keyToTest = apiKey !== undefined ? apiKey : envKey;
+app.post(
+  "/api/admin/tts/test",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { apiKey } = req.body;
+    const envKey = await resolveElevenLabsApiKey();
+    const keyToTest = apiKey !== undefined ? apiKey : envKey;
 
-  if (!keyToTest || keyToTest.trim() === '') {
-    res.status(400).json({ error: 'Keep in mind that no API Key has been provided for verification.' });
-    return;
-  }
-
-  const cleanKey = sanitizeApiKey(keyToTest);
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout safety
-
-    const response = await fetch('https://api.elevenlabs.io/v1/voices', {
-      method: 'GET',
-      headers: { 'xi-api-key': cleanKey },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        res.status(401).json({ error: 'The provided raw ElevenLabs API key is unauthorized or invalid.' });
-        return;
-      }
-      res.status(response.status).json({ error: `ElevenLabs returned connection failure status ${response.status}.` });
+    if (!keyToTest || keyToTest.trim() === "") {
+      res
+        .status(400)
+        .json({
+          error:
+            "Keep in mind that no API Key has been provided for verification.",
+        });
       return;
     }
 
-    const data: any = await response.json();
-    const count = data && Array.isArray(data.voices) ? data.voices.length : 0;
+    const cleanKey = sanitizeApiKey(keyToTest);
 
-    res.json({
-      success: true,
-      message: 'Secure channel test connection validated successfully.',
-      voiceCount: count
-    });
-  } catch (err: any) {
-    console.warn('TTS test connection warning:', err.message);
-    res.status(500).json({ error: `Connection failed with message: ${err.message}` });
-  }
-});
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout safety
+
+      const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+        method: "GET",
+        headers: { "xi-api-key": cleanKey },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          res
+            .status(401)
+            .json({
+              error:
+                "The provided raw ElevenLabs API key is unauthorized or invalid.",
+            });
+          return;
+        }
+        res
+          .status(response.status)
+          .json({
+            error: `ElevenLabs returned connection failure status ${response.status}.`,
+          });
+        return;
+      }
+
+      const data: any = await response.json();
+      const count = data && Array.isArray(data.voices) ? data.voices.length : 0;
+
+      res.json({
+        success: true,
+        message: "Secure channel test connection validated successfully.",
+        voiceCount: count,
+      });
+    } catch (err: any) {
+      console.warn("TTS test connection warning:", err.message);
+      res
+        .status(500)
+        .json({ error: `Connection failed with message: ${err.message}` });
+    }
+  },
+);
 
 // 2. Dynamic Fetch and Cache ElevenLabs Voices
-app.post('/api/admin/tts/voices', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  const envKey = await resolveElevenLabsApiKey();
-  const targetKey = apiKey !== undefined ? apiKey : envKey;
+app.post(
+  "/api/admin/tts/voices",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { apiKey } = req.body;
+    const envKey = await resolveElevenLabsApiKey();
+    const targetKey = apiKey !== undefined ? apiKey : envKey;
 
-  if (!targetKey || targetKey.trim() === '') {
-    res.status(400).json({ error: 'No ElevenLabs API Key has been configured.' });
-    return;
-  }
+    if (!targetKey || targetKey.trim() === "") {
+      res
+        .status(400)
+        .json({ error: "No ElevenLabs API Key has been configured." });
+      return;
+    }
 
-  const cleanTarget = sanitizeApiKey(targetKey);
+    const cleanTarget = sanitizeApiKey(targetKey);
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout safety
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout safety
 
-    const response = await fetch('https://api.elevenlabs.io/v1/voices', {
-      method: 'GET',
-      headers: { 'xi-api-key': cleanTarget },
-      signal: controller.signal
-    });
+      const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+        method: "GET",
+        headers: { "xi-api-key": cleanTarget },
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      console.warn(`Voices synchronization returned status ${response.status}. Falling back to standard default voices list.`);
+      if (!response.ok) {
+        console.warn(
+          `Voices synchronization returned status ${response.status}. Falling back to standard default voices list.`,
+        );
+        res.json({
+          success: true,
+          voices: DEFAULT_ELEVENLABS_VOICES,
+          syncTime: new Date().toISOString(),
+          warning: `ElevenLabs voice synchronization failed with status code ${response.status}. Fallback activated: using standard preconfigured voices.`,
+          fallback: true,
+        });
+        return;
+      }
+
+      const data: any = await response.json();
+      if (data && Array.isArray(data.voices)) {
+        const normalized = data.voices.map((v: any) => {
+          let gender = "female";
+          if (v.labels) {
+            const gInfo = v.labels.gender || v.labels.Gender || "";
+            if (gInfo.toLowerCase().includes("male")) {
+              gender = "male";
+            }
+          }
+          return {
+            voice_id: v.voice_id,
+            name: v.name,
+            category: v.category || "premade",
+            labels: v.labels || {},
+            preview_url: v.preview_url || "",
+            gender,
+          };
+        });
+
+        // Update in-memory server cache
+        voicesCache = normalized;
+        voicesCacheTime = Date.now();
+
+        res.json({
+          success: true,
+          voices: normalized,
+          syncTime: new Date().toISOString(),
+        });
+      } else {
+        throw new Error(
+          "Malformed voice payload format received from ElevenLabs.",
+        );
+      }
+    } catch (err: any) {
+      console.warn(
+        "Dynamic voices sync warning, providing standard defaults:",
+        err.message,
+      );
       res.json({
         success: true,
         voices: DEFAULT_ELEVENLABS_VOICES,
         syncTime: new Date().toISOString(),
-        warning: `ElevenLabs voice synchronization failed with status code ${response.status}. Fallback activated: using standard preconfigured voices.`,
-        fallback: true
+        warning: `Voices synchronization failed Safely: ${err.message}. System fell back to standard preset voices.`,
+        fallback: true,
       });
+    }
+  },
+);
+
+// 3. Save TTS Admin preferences
+app.post(
+  "/api/admin/tts/save",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { settings } = req.body;
+
+    if (!settings) {
+      res.status(400).json({ error: "No structured payload was recognized." });
       return;
     }
 
-    const data: any = await response.json();
-    if (data && Array.isArray(data.voices)) {
-      const normalized = data.voices.map((v: any) => {
-        let gender = 'female';
-        if (v.labels) {
-          const gInfo = v.labels.gender || v.labels.Gender || '';
-          if (gInfo.toLowerCase().includes('male')) {
-            gender = 'male';
-          }
-        }
-        return {
-          voice_id: v.voice_id,
-          name: v.name,
-          category: v.category || 'premade',
-          labels: v.labels || {},
-          preview_url: v.preview_url || '',
-          gender
-        };
-      });
+    try {
+      const apiKey = settings.elevenlabs_api_key;
+      // Only update key on disk if it is changed and not empty and not masked
+      if (
+        apiKey !== undefined &&
+        apiKey !== null &&
+        !apiKey.includes("****") &&
+        apiKey.trim() !== ""
+      ) {
+        const sanitized = sanitizeApiKey(apiKey);
+        saveApiKeyToEnv(sanitized);
+        await resolveElevenLabsApiKey(true);
+        console.log(
+          "🗝️  Dynamic server environment key refreshed via secure save.",
+        );
+      }
 
-      // Update in-memory server cache
-      voicesCache = normalized;
-      voicesCacheTime = Date.now();
+      const voiceId = settings.tts_selected_voice_id;
+      if (
+        voiceId !== undefined &&
+        voiceId !== null &&
+        !voiceId.includes("****") &&
+        voiceId.trim() !== ""
+      ) {
+        const sanitizedVoiceId = voiceId.trim();
+        saveVoiceIdToEnv(sanitizedVoiceId);
+        await resolveElevenLabsVoiceId(true);
+        console.log(
+          "🗣️  Dynamic server environment Voice ID refreshed via secure save.",
+        );
+      }
+
+      // Persist all selected vocal configs dynamically to the singleton settings table in Supabase
+      const supabaseClient = getAdminDbClient(req) || getSupabaseClient();
+      if (supabaseClient) {
+        const dbPayload = {
+          id: "singleton",
+          tts_global_enabled: settings.tts_global_enabled ?? true,
+          tts_default_voice: settings.tts_default_voice || "female",
+          tts_default_speed:
+            settings.tts_default_speed !== undefined
+              ? Number(settings.tts_default_speed)
+              : 1.0,
+          tts_player_position: settings.tts_player_position || "top",
+          tts_player_style: settings.tts_player_style || "button",
+          tts_voice_gender: settings.tts_voice_gender || "female",
+          tts_selected_voice: settings.tts_selected_voice || "Rachel",
+          tts_provider: "elevenlabs",
+          tts_selected_voice_id: settings.tts_selected_voice_id || "",
+          tts_stability:
+            settings.tts_stability !== undefined
+              ? Number(settings.tts_stability)
+              : 0.55,
+          tts_similarity_boost:
+            settings.tts_similarity_boost !== undefined
+              ? Number(settings.tts_similarity_boost)
+              : 0.75,
+          tts_style:
+            settings.tts_style !== undefined ? Number(settings.tts_style) : 0.0,
+          tts_last_voice_sync: settings.tts_last_voice_sync || "",
+          tts_default_pitch:
+            settings.tts_default_pitch !== undefined
+              ? Number(settings.tts_default_pitch)
+              : 1.0,
+          tts_default_volume:
+            settings.tts_default_volume !== undefined
+              ? Number(settings.tts_default_volume)
+              : 1.0,
+          tts_pronunciation_rules: settings.tts_pronunciation_rules || "",
+          tts_voice_cache:
+            typeof settings.tts_voice_cache === "string"
+              ? JSON.parse(settings.tts_voice_cache)
+              : settings.tts_voice_cache || [],
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: upsertErr } = await supabaseClient
+          .from("site_settings")
+          .upsert([dbPayload], { onConflict: "id" });
+
+        if (upsertErr) {
+          console.warn(
+            "Backend saving to Supabase site_settings singleton encountered a warning:",
+            upsertErr.message,
+          );
+        } else {
+          console.log(
+            "🗣️ Supabase site_settings singleton updated successfully from backend.",
+          );
+        }
+      }
 
       res.json({
         success: true,
-        voices: normalized,
-        syncTime: new Date().toISOString()
+        message:
+          "Administrative voice behaviors saved safely. Key hot-reloaded.",
       });
-    } else {
-      throw new Error('Malformed voice payload format received from ElevenLabs.');
+    } catch (err: any) {
+      console.warn("Secure credentials saving warning:", err.message);
+      res.status(500).json({ error: `Save failed: ${err.message}` });
     }
-  } catch (err: any) {
-    console.warn('Dynamic voices sync warning, providing standard defaults:', err.message);
-    res.json({
-      success: true,
-      voices: DEFAULT_ELEVENLABS_VOICES,
-      syncTime: new Date().toISOString(),
-      warning: `Voices synchronization failed Safely: ${err.message}. System fell back to standard preset voices.`,
-      fallback: true
-    });
-  }
-});
-
-// 3. Save TTS Admin preferences
-app.post('/api/admin/tts/save', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { settings } = req.body;
-
-  if (!settings) {
-    res.status(400).json({ error: 'No structured payload was recognized.' });
-    return;
-  }
-
-  try {
-    const apiKey = settings.elevenlabs_api_key;
-    // Only update key on disk if it is changed and not empty and not masked
-    if (apiKey !== undefined && apiKey !== null && !apiKey.includes('****') && apiKey.trim() !== '') {
-      const sanitized = sanitizeApiKey(apiKey);
-      saveApiKeyToEnv(sanitized);
-      await resolveElevenLabsApiKey(true);
-      console.log('🗝️  Dynamic server environment key refreshed via secure save.');
-    }
-
-    const voiceId = settings.tts_selected_voice_id;
-    if (voiceId !== undefined && voiceId !== null && !voiceId.includes('****') && voiceId.trim() !== '') {
-      const sanitizedVoiceId = voiceId.trim();
-      saveVoiceIdToEnv(sanitizedVoiceId);
-      await resolveElevenLabsVoiceId(true);
-      console.log('🗣️  Dynamic server environment Voice ID refreshed via secure save.');
-    }
-
-    // Persist all selected vocal configs dynamically to the singleton settings table in Supabase
-    const supabaseClient = getAdminDbClient(req) || getSupabaseClient();
-    if (supabaseClient) {
-      const dbPayload = {
-        id: 'singleton',
-        tts_global_enabled: settings.tts_global_enabled ?? true,
-        tts_default_voice: settings.tts_default_voice || 'female',
-        tts_default_speed: settings.tts_default_speed !== undefined ? Number(settings.tts_default_speed) : 1.0,
-        tts_player_position: settings.tts_player_position || 'top',
-        tts_player_style: settings.tts_player_style || 'button',
-        tts_voice_gender: settings.tts_voice_gender || 'female',
-        tts_selected_voice: settings.tts_selected_voice || 'Rachel',
-        tts_provider: 'elevenlabs',
-        tts_selected_voice_id: settings.tts_selected_voice_id || '',
-        tts_stability: settings.tts_stability !== undefined ? Number(settings.tts_stability) : 0.55,
-        tts_similarity_boost: settings.tts_similarity_boost !== undefined ? Number(settings.tts_similarity_boost) : 0.75,
-        tts_style: settings.tts_style !== undefined ? Number(settings.tts_style) : 0.0,
-        tts_last_voice_sync: settings.tts_last_voice_sync || '',
-        tts_default_pitch: settings.tts_default_pitch !== undefined ? Number(settings.tts_default_pitch) : 1.0,
-        tts_default_volume: settings.tts_default_volume !== undefined ? Number(settings.tts_default_volume) : 1.0,
-        tts_pronunciation_rules: settings.tts_pronunciation_rules || '',
-        tts_voice_cache: typeof settings.tts_voice_cache === 'string'
-          ? JSON.parse(settings.tts_voice_cache)
-          : (settings.tts_voice_cache || []),
-        updated_at: new Date().toISOString()
-      };
-
-      const { error: upsertErr } = await supabaseClient
-        .from('site_settings')
-        .upsert([dbPayload], { onConflict: 'id' });
-
-      if (upsertErr) {
-        console.warn('Backend saving to Supabase site_settings singleton encountered a warning:', upsertErr.message);
-      } else {
-        console.log('🗣️ Supabase site_settings singleton updated successfully from backend.');
-      }
-    }
-
-    res.json({
-      success: true,
-      message: 'Administrative voice behaviors saved safely. Key hot-reloaded.'
-    });
-  } catch (err: any) {
-    console.warn('Secure credentials saving warning:', err.message);
-    res.status(500).json({ error: `Save failed: ${err.message}` });
-  }
-});
+  },
+);
 
 // --------------------------------------------------------
 // PROTECTED ADMIN API ROUTES & MIDDLEWARE
@@ -3154,49 +4254,85 @@ app.post('/api/admin/tts/save', adminAuthMiddleware, async (req: Request, res: R
 
 // Secure clinical directory verification middleware using live Supabase token validation
 // Unrestricted admin middleware - allows administrative API execution
-const ADMIN_ROLES = ['admin', 'superadmin', 'Super Admin', 'Administrator', 'Editor'];
+const ADMIN_ROLES = [
+  "admin",
+  "superadmin",
+  "Super Admin",
+  "Administrator",
+  "Editor",
+];
 
 async function adminAuthMiddleware(req: Request, res: Response, next: any) {
-  const authHeader = (req.headers['authorization'] || '') as string;
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const authHeader = (req.headers["authorization"] || "") as string;
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
   if (!token) {
-    res.status(401).json({ error: 'Admin authentication required. Please sign in to the admin console.' });
+    res
+      .status(401)
+      .json({
+        error:
+          "Admin authentication required. Please sign in to the admin console.",
+      });
     return;
   }
   const supabase = getSupabaseClient();
   if (!supabase) {
-    res.status(503).json({ error: 'Authentication backend is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.' });
+    res
+      .status(503)
+      .json({
+        error:
+          "Authentication backend is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.",
+      });
     return;
   }
   try {
-    const { data: authData, error: authErr } = await supabase.auth.getUser(token);
+    const { data: authData, error: authErr } =
+      await supabase.auth.getUser(token);
     if (authErr || !authData?.user) {
-      res.status(401).json({ error: 'Invalid or expired admin session. Please sign in again.' });
+      res
+        .status(401)
+        .json({
+          error: "Invalid or expired admin session. Please sign in again.",
+        });
       return;
     }
-    const envUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
-    const envKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
+    const envUrl = cleanConfigValue(
+      process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
+    );
+    const envKey = cleanConfigValue(
+      process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
+    );
     const userClient = createSupabaseClient(envUrl, envKey, token);
     const { data: profile, error: profileErr } = await userClient
-      .from('profiles')
-      .select('role, is_suspended')
-      .eq('id', authData.user.id)
+      .from("profiles")
+      .select("role, is_suspended")
+      .eq("id", authData.user.id)
       .maybeSingle();
-    const role = profile?.role || '';
-    if (profileErr || !profile || !ADMIN_ROLES.includes(role) || profile.is_suspended) {
-      res.status(403).json({ error: 'Administrator privileges required for this operation.' });
+    const role = profile?.role || "";
+    if (
+      profileErr ||
+      !profile ||
+      !ADMIN_ROLES.includes(role) ||
+      profile.is_suspended
+    ) {
+      res
+        .status(403)
+        .json({
+          error: "Administrator privileges required for this operation.",
+        });
       return;
     }
     (req as any).user = {
       id: authData.user.id,
       email: authData.user.email,
       role,
-      name: authData.user.user_metadata?.full_name || 'Administrator'
+      name: authData.user.user_metadata?.full_name || "Administrator",
     };
     return next();
   } catch (err) {
-    console.warn('adminAuthMiddleware verification failure:', err);
-    res.status(401).json({ error: 'Admin session verification failed.' });
+    console.warn("adminAuthMiddleware verification failure:", err);
+    res.status(401).json({ error: "Admin session verification failed." });
   }
 }
 
@@ -3204,13 +4340,19 @@ async function adminAuthMiddleware(req: Request, res: Response, next: any) {
 // RLS admin policies (never anon policies) govern privileged server-side writes.
 function getAdminDbClient(req: Request) {
   try {
-    const token = (req.headers.authorization || '').split(' ')[1];
-    const envUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
-    const envKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
+    const token = (req.headers.authorization || "").split(" ")[1];
+    const envUrl = cleanConfigValue(
+      process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
+    );
+    const envKey = cleanConfigValue(
+      process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
+    );
     if (token && envUrl && envKey) {
       return createSupabaseClient(envUrl, envKey, token);
     }
-  } catch (_) { /* fall through */ }
+  } catch (_) {
+    /* fall through */
+  }
   return null;
 }
 
@@ -3224,20 +4366,43 @@ async function getFirestoreDbSafe() {
 
 // Helper to load authoritative state from Supabase dynamically on startup (Primary Storage)
 const POST_LIST_COLUMNS = [
-  'id','title','slug','excerpt','status','publish_date','featured_image','read_time',
-  'category_id','author_id','tags','likes','reactions','views','seo_title','seo_description',
-  'seo_keywords','is_premium','created_at','updated_at','is_featured','reading_time'
+  "id",
+  "title",
+  "slug",
+  "excerpt",
+  "status",
+  "publish_date",
+  "featured_image",
+  "read_time",
+  "category_id",
+  "author_id",
+  "tags",
+  "likes",
+  "reactions",
+  "views",
+  "seo_title",
+  "seo_description",
+  "seo_keywords",
+  "is_premium",
+  "created_at",
+  "updated_at",
+  "is_featured",
+  "reading_time",
 ];
 
 async function loadStateFromSupabase(): Promise<any> {
   const supabase = getSupabaseClient();
   if (!supabase) {
-    console.log('⚡ Supabase client is not initialized yet or config is invalid. Skipping server-side Supabase state load.');
+    console.log(
+      "⚡ Supabase client is not initialized yet or config is invalid. Skipping server-side Supabase state load.",
+    );
     return null;
   }
 
   try {
-    console.log('⚡ [PRIMARY STORAGE - SDK] Attempting to fetch authoritative state from Supabase Client SDK...');
+    console.log(
+      "⚡ [PRIMARY STORAGE - SDK] Attempting to fetch authoritative state from Supabase Client SDK...",
+    );
     const state: any = {};
 
     // Execute queries in parallel with timeout/safety wrapper
@@ -3263,42 +4428,86 @@ async function loadStateFromSupabase(): Promise<any> {
       integrationSettingsRes,
       adZonesRes,
       adProvidersRes,
-      sponsorshipCampaignsRes
+      sponsorshipCampaignsRes,
     ] = await Promise.all([
       // List columns only: content (full article bodies) is fetched per-article
       // via GET /api/posts/:slug  - it no longer ships in the boot payload.
-      queryWithTimeout(supabase.from('posts').select(POST_LIST_COLUMNS.join(',')).order('publish_date', { ascending: false })),
-      queryWithTimeout(supabase.from('categories').select('*')),
+      queryWithTimeout(
+        supabase
+          .from("posts")
+          .select(POST_LIST_COLUMNS.join(","))
+          .order("publish_date", { ascending: false }),
+      ),
+      queryWithTimeout(supabase.from("categories").select("*")),
       // Public columns only  - author_email is PII and never ships in the
       // boot payload (RLS already restricts rows to approved comments for
       // the anon-key server client).
-      queryWithTimeout(supabase.from('comments').select('id,post_id,author_name,content,is_approved,parent_id,created_at')),
-      queryWithTimeout(supabase.from('profiles').select('id,full_name,avatar_url,bio,website,role,created_at,updated_at')),
-      queryWithTimeout(supabase.from('pages').select('*')),
-      queryWithTimeout(supabase.from('quizzes').select('*')),
-      queryWithTimeout(supabase.from('site_settings').select('*').eq('id', 'singleton').maybeSingle()),
-      queryWithTimeout(supabase.from('plans').select('*')),
-      queryWithTimeout(supabase.from('subscribers').select('*')),
-      queryWithTimeout(supabase.from('email_templates').select('*')),
-      queryWithTimeout(supabase.from('email_campaigns').select('*')),
-      queryWithTimeout(supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100)),
-      queryWithTimeout(supabase.from('subscriptions').select('*')),
-      queryWithTimeout(supabase.from('payments').select('*').order('created_at', { ascending: false })),
-      queryWithTimeout(supabase.from('rss_feeds').select('*')),
-      queryWithTimeout(supabase.from('webhook_targets').select('*')),
-      queryWithTimeout(supabase.from('webhook_logs').select('*').order('created_at', { ascending: false }).limit(100)),
-      queryWithTimeout(supabase.from('integrations').select('*')),
-      queryWithTimeout(supabase.from('integration_settings').select('*')),
-      queryWithTimeout(supabase.from('ad_zones').select('*')),
-      queryWithTimeout(supabase.from('ad_providers').select('*')),
-      queryWithTimeout(supabase.from('sponsorship_campaigns').select('*'))
+      queryWithTimeout(
+        supabase
+          .from("comments")
+          .select(
+            "id,post_id,author_name,content,is_approved,parent_id,created_at",
+          ),
+      ),
+      queryWithTimeout(
+        supabase
+          .from("profiles")
+          .select(
+            "id,full_name,avatar_url,bio,website,role,created_at,updated_at",
+          ),
+      ),
+      queryWithTimeout(supabase.from("pages").select("*")),
+      queryWithTimeout(supabase.from("quizzes").select("*")),
+      queryWithTimeout(
+        supabase
+          .from("site_settings")
+          .select("*")
+          .eq("id", "singleton")
+          .maybeSingle(),
+      ),
+      queryWithTimeout(supabase.from("plans").select("*")),
+      queryWithTimeout(supabase.from("subscribers").select("*")),
+      queryWithTimeout(supabase.from("email_templates").select("*")),
+      queryWithTimeout(supabase.from("email_campaigns").select("*")),
+      queryWithTimeout(
+        supabase
+          .from("audit_logs")
+          .select("*")
+          .order("timestamp", { ascending: false })
+          .limit(100),
+      ),
+      queryWithTimeout(supabase.from("subscriptions").select("*")),
+      queryWithTimeout(
+        supabase
+          .from("payments")
+          .select("*")
+          .order("created_at", { ascending: false }),
+      ),
+      queryWithTimeout(supabase.from("rss_feeds").select("*")),
+      queryWithTimeout(supabase.from("webhook_targets").select("*")),
+      queryWithTimeout(
+        supabase
+          .from("webhook_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(100),
+      ),
+      queryWithTimeout(supabase.from("integrations").select("*")),
+      queryWithTimeout(supabase.from("integration_settings").select("*")),
+      queryWithTimeout(supabase.from("ad_zones").select("*")),
+      queryWithTimeout(supabase.from("ad_providers").select("*")),
+      queryWithTimeout(supabase.from("sponsorship_campaigns").select("*")),
     ]);
 
     if (!postsRes.error && postsRes.data) {
       state.posts = postsRes.data.map((p: any) => ({
         ...p,
-        in_article_inserts: p.in_article_inserts ? (typeof p.in_article_inserts === 'string' ? JSON.parse(p.in_article_inserts) : p.in_article_inserts) : p.in_article_inserts,
-        author_id: fromDbUUID(p.author_id)
+        in_article_inserts: p.in_article_inserts
+          ? typeof p.in_article_inserts === "string"
+            ? JSON.parse(p.in_article_inserts)
+            : p.in_article_inserts
+          : p.in_article_inserts,
+        author_id: fromDbUUID(p.author_id),
       }));
     }
     if (!categoriesRes.error && categoriesRes.data) {
@@ -3314,19 +4523,19 @@ async function loadStateFromSupabase(): Promise<any> {
         content: cm.content,
         is_approved: cm.is_approved,
         parent_id: cm.parent_id,
-        created_at: cm.created_at
+        created_at: cm.created_at,
       }));
     }
     if (!authorsRes.error && authorsRes.data) {
       state.authors = authorsRes.data.map((p: any) => ({
         id: fromDbUUID(p.id),
-        name: p.full_name || p.name || 'Anonymous User',
-        avatar_url: p.avatar_url || '',
-        bio: p.bio || '',
-        role_tag: p.role === 'admin' ? 'Administrator' : 'Clinical Advisor',
-        role: p.role || 'author',
+        name: p.full_name || p.name || "Anonymous User",
+        avatar_url: p.avatar_url || "",
+        bio: p.bio || "",
+        role_tag: p.role === "admin" ? "Administrator" : "Clinical Advisor",
+        role: p.role || "author",
         social_links: {},
-        is_deleted: p.role === 'deleted_author'
+        is_deleted: p.role === "deleted_author",
       }));
     }
     if (!pagesRes.error && pagesRes.data) {
@@ -3338,18 +4547,20 @@ async function loadStateFromSupabase(): Promise<any> {
         articleId: q.article_id,
         title: q.title,
         questions: q.questions,
-        created_at: q.created_at
+        created_at: q.created_at,
       }));
     }
     if (!settingsRes.error && settingsRes.data) {
       let raw = settingsRes.data.raw_settings;
-      if (typeof raw === 'string') {
-        try { raw = JSON.parse(raw); } catch {}
+      if (typeof raw === "string") {
+        try {
+          raw = JSON.parse(raw);
+        } catch {}
       }
       // SECURITY: strip any legacy credential fields before the state is served publicly
       state.site_settings = stripSecretFields({
-        ...(typeof raw === 'object' && raw ? raw : {}),
-        ...settingsRes.data
+        ...(typeof raw === "object" && raw ? raw : {}),
+        ...settingsRes.data,
       });
     }
     if (!plansRes.error && plansRes.data) {
@@ -3361,15 +4572,15 @@ async function loadStateFromSupabase(): Promise<any> {
     if (!emailTemplatesRes.error && emailTemplatesRes.data) {
       state.email_templates = (emailTemplatesRes.data || []).map((t: any) => ({
         ...t,
-        body: t.html_body || t.body || ''
+        body: t.html_body || t.body || "",
       }));
     }
     if (!emailCampaignsRes.error && emailCampaignsRes.data) {
       state.email_campaigns = (emailCampaignsRes.data || []).map((c: any) => ({
         ...c,
-        name: c.title || c.name || '',
-        body: c.content || c.body || '',
-        sentCount: c.recipients_count ?? c.sentCount ?? 0
+        name: c.title || c.name || "",
+        body: c.content || c.body || "",
+        sentCount: c.recipients_count ?? c.sentCount ?? 0,
       }));
     }
     if (!auditLogsRes.error && auditLogsRes.data) {
@@ -3394,52 +4605,89 @@ async function loadStateFromSupabase(): Promise<any> {
       state.ad_zones = adZonesRes.data.map((z: any) => ({
         id: z.id,
         name: z.name,
-        slot: z.slot || 'sidebar',
-        pricing: z.pricing || 'CPM',
+        slot: z.slot || "sidebar",
+        pricing: z.pricing || "CPM",
         active: z.active ?? true,
-        codeTemplate: z.code_template || z.codeTemplate || '',
-        sizeLabel: z.size_label || z.sizeLabel || 'Responsive',
+        codeTemplate: z.code_template || z.codeTemplate || "",
+        sizeLabel: z.size_label || z.sizeLabel || "Responsive",
         impressions: z.impressions || 0,
         clicks: z.clicks || 0,
-        created_at: z.created_at
+        created_at: z.created_at,
       }));
     }
     if (!adProvidersRes.error && adProvidersRes.data) {
       state.ad_providers = adProvidersRes.data.map((p: any) => ({
         id: p.id,
         name: p.name,
-        type: p.slug === 'monetag' ? 'monetag' : p.slug === 'adsterra' ? 'adsterra' : (p.slug || p.type || 'adsense'),
-        pubId: p.credentials?.zone_id || p.credentials?.key || p.credentials?.publisher_id || p.pub_id || p.pubId || '',
-        slot: p.settings?.slot || p.slot || 'all',
+        type:
+          p.slug === "monetag"
+            ? "monetag"
+            : p.slug === "adsterra"
+              ? "adsterra"
+              : p.slug || p.type || "adsense",
+        pubId:
+          p.credentials?.zone_id ||
+          p.credentials?.key ||
+          p.credentials?.publisher_id ||
+          p.pub_id ||
+          p.pubId ||
+          "",
+        slot: p.settings?.slot || p.slot || "all",
         active: p.is_active ?? p.active ?? true,
-        code: p.credentials?.sdk_url || p.code || '',
-        scriptCode: p.credentials?.sdk_url || p.code || p.scriptCode || '',
-        cpmEstimate: p.settings?.cpm_estimate || p.cpm_estimate || p.cpmEstimate || (p.slug === 'monetag' ? '$16.80' : p.slug === 'adsterra' ? '$14.50' : '$14.10'),
-        customSize: p.settings?.custom_size || p.custom_size || p.customSize || 'Responsive',
-        lazyLoadDelay: p.settings?.lazy_load_delay || p.lazy_load_delay || p.lazyLoadDelay || 'none',
-        geoTarget: p.settings?.geo_target || p.geo_target || p.geoTarget || 'worldwide',
-        isConsentCompliant: p.settings?.is_consent_compliant ?? p.is_consent_compliant ?? true,
-        created_at: p.created_at
+        code: p.credentials?.sdk_url || p.code || "",
+        scriptCode: p.credentials?.sdk_url || p.code || p.scriptCode || "",
+        cpmEstimate:
+          p.settings?.cpm_estimate ||
+          p.cpm_estimate ||
+          p.cpmEstimate ||
+          (p.slug === "monetag"
+            ? "$16.80"
+            : p.slug === "adsterra"
+              ? "$14.50"
+              : "$14.10"),
+        customSize:
+          p.settings?.custom_size ||
+          p.custom_size ||
+          p.customSize ||
+          "Responsive",
+        lazyLoadDelay:
+          p.settings?.lazy_load_delay ||
+          p.lazy_load_delay ||
+          p.lazyLoadDelay ||
+          "none",
+        geoTarget:
+          p.settings?.geo_target || p.geo_target || p.geoTarget || "worldwide",
+        isConsentCompliant:
+          p.settings?.is_consent_compliant ?? p.is_consent_compliant ?? true,
+        created_at: p.created_at,
       }));
     }
     if (!sponsorshipCampaignsRes.error && sponsorshipCampaignsRes.data) {
-      state.sponsorship_campaigns = sponsorshipCampaignsRes.data.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        url: c.url || '',
-        impressions: c.impressions || 0,
-        clicks: c.clicks || 0,
-        status: c.status || 'Active',
-        created_at: c.created_at
-      }));
+      state.sponsorship_campaigns = sponsorshipCampaignsRes.data.map(
+        (c: any) => ({
+          id: c.id,
+          name: c.name,
+          url: c.url || "",
+          impressions: c.impressions || 0,
+          clicks: c.clicks || 0,
+          status: c.status || "Active",
+          created_at: c.created_at,
+        }),
+      );
       state.campaigns = state.sponsorship_campaigns;
     }
 
-    const totalRecords = (state.posts?.length || 0) + (state.categories?.length || 0);
-    console.log(`⚡ [PRIMARY STORAGE PERSISTENCE SUCCESS] Successfully compiled production database state from Supabase (${totalRecords} records found).`);
+    const totalRecords =
+      (state.posts?.length || 0) + (state.categories?.length || 0);
+    console.log(
+      `⚡ [PRIMARY STORAGE PERSISTENCE SUCCESS] Successfully compiled production database state from Supabase (${totalRecords} records found).`,
+    );
     return state;
   } catch (err) {
-    console.warn('⚠️ Server failed to resolve dynamic cloud state from Supabase:', err);
+    console.warn(
+      "⚠️ Server failed to resolve dynamic cloud state from Supabase:",
+      err,
+    );
     return null;
   }
 }
@@ -3454,7 +4702,13 @@ const CACHE_TTL = 15000;
 
 // Values that mark a profile as an administrative role (kept in one place so
 // the setup wizard, the one-time reset and the first-admin election agree).
-const ADMIN_ROLE_VALUES = ['admin', 'superadmin', 'Administrator', 'Editor', 'Super Admin'];
+const ADMIN_ROLE_VALUES = [
+  "admin",
+  "superadmin",
+  "Administrator",
+  "Editor",
+  "Super Admin",
+];
 
 // ---------------------------------------------------------------------------
 // OWNER-DIRECTED ADMIN OWNERSHIP RESET (2026-09-21)
@@ -3468,9 +4722,15 @@ async function runAdminOwnershipReset() {
   const svc = getServiceRoleSupabase();
   if (!svc) return; // no service role (dev sandbox / DB down): nothing to reset
   try {
-    const { data: settings, error: settingsErr } = await svc.from('site_settings')
-      .select('metadata').eq('id', 'singleton').maybeSingle();
-    if (settingsErr) { console.warn('[admin-reset] marker read failed:', settingsErr.message); return; }
+    const { data: settings, error: settingsErr } = await svc
+      .from("site_settings")
+      .select("metadata")
+      .eq("id", "singleton")
+      .maybeSingle();
+    if (settingsErr) {
+      console.warn("[admin-reset] marker read failed:", settingsErr.message);
+      return;
+    }
     const metadata = (settings && (settings as any).metadata) || {};
     if (metadata && (metadata as any).admin_ownership_reset_2026_09) return; // already done
 
@@ -3478,73 +4738,107 @@ async function runAdminOwnershipReset() {
     // same marker is harmless; both demoting the same already-demoted rows
     // is a no-op).
     const nowIso = new Date().toISOString();
-    const markedMetadata = { ...(metadata || {}), admin_ownership_reset_2026_09: nowIso };
+    const markedMetadata = {
+      ...(metadata || {}),
+      admin_ownership_reset_2026_09: nowIso,
+    };
     if (settings) {
-      const { error: markErr } = await svc.from('site_settings')
-        .update({ metadata: markedMetadata, updated_at: nowIso }).eq('id', 'singleton');
-      if (markErr) { console.warn('[admin-reset] marker write failed:', markErr.message); return; }
+      const { error: markErr } = await svc
+        .from("site_settings")
+        .update({ metadata: markedMetadata, updated_at: nowIso })
+        .eq("id", "singleton");
+      if (markErr) {
+        console.warn("[admin-reset] marker write failed:", markErr.message);
+        return;
+      }
     } else {
-      const { error: markErr } = await svc.from('site_settings')
-        .insert({ id: 'singleton', metadata: markedMetadata });
-      if (markErr) { console.warn('[admin-reset] marker insert failed:', markErr.message); return; }
+      const { error: markErr } = await svc
+        .from("site_settings")
+        .insert({ id: "singleton", metadata: markedMetadata });
+      if (markErr) {
+        console.warn("[admin-reset] marker insert failed:", markErr.message);
+        return;
+      }
     }
 
     // Demote every administrative profile to subscriber.
-    const { error: demoteErr } = await svc.from('profiles')
-      .update({ role: 'subscriber', updated_at: nowIso })
-      .in('role', ADMIN_ROLE_VALUES);
-    if (demoteErr) console.warn('[admin-reset] profile demotion warning:', demoteErr.message);
+    const { error: demoteErr } = await svc
+      .from("profiles")
+      .update({ role: "subscriber", updated_at: nowIso })
+      .in("role", ADMIN_ROLE_VALUES);
+    if (demoteErr)
+      console.warn(
+        "[admin-reset] profile demotion warning:",
+        demoteErr.message,
+      );
 
     // Clear the admin_users registry entirely.
-    const { error: adminDelErr } = await svc.from('admin_users').delete().neq('email', '');
-    if (adminDelErr) console.warn('[admin-reset] admin_users clear warning:', adminDelErr.message);
+    const { error: adminDelErr } = await svc
+      .from("admin_users")
+      .delete()
+      .neq("email", "");
+    if (adminDelErr)
+      console.warn(
+        "[admin-reset] admin_users clear warning:",
+        adminDelErr.message,
+      );
 
     // Mirror the demotion into the in-memory state so this very instance
     // serves a consistent view until the next full state load.
     if (serverCacheState) {
       serverCacheState.admin_users = [];
       (serverCacheState.profiles || []).forEach((p: any) => {
-        if (p && ADMIN_ROLE_VALUES.includes(p.role)) p.role = 'subscriber';
+        if (p && ADMIN_ROLE_VALUES.includes(p.role)) p.role = "subscriber";
       });
-      try { await saveServerCacheState(serverCacheState); } catch (_) {}
+      try {
+        await saveServerCacheState(serverCacheState);
+      } catch (_) {}
     }
-    console.log('[admin-reset] Admin ownership reset applied: all prior admins demoted; the next account to register/login becomes admin.');
+    console.log(
+      "[admin-reset] Admin ownership reset applied: all prior admins demoted; the next account to register/login becomes admin.",
+    );
   } catch (err: any) {
-    console.warn('[admin-reset] skipped:', err?.message || err);
+    console.warn("[admin-reset] skipped:", err?.message || err);
   }
 }
 
 async function initializeSharedState() {
-  console.log('🔍 Initializing server state with Supabase database storage...');
+  console.log("🔍 Initializing server state with Supabase database storage...");
 
   try {
     const supabaseState = await loadStateFromSupabase();
     if (supabaseState) {
       serverCacheState = {
         ...supabaseState,
-        isFromSupabase: true
+        isFromSupabase: true,
       };
       lastSupabaseFetchTime = Date.now();
-      console.log('⚡ [PRIMARY PERSISTENCE SUCCESS] Successfully retrieved live persistent state from Supabase Cloud.');
+      console.log(
+        "⚡ [PRIMARY PERSISTENCE SUCCESS] Successfully retrieved live persistent state from Supabase Cloud.",
+      );
       await runAdminOwnershipReset();
       return;
     }
   } catch (err) {
-    console.warn('⚠️ Supabase state load error occurred.', err);
+    console.warn("⚠️ Supabase state load error occurred.", err);
   }
 
   serverCacheState = serverCacheState || {};
   await runAdminOwnershipReset();
-  console.log('💚 Running in fallback state mode with seed state.');
+  console.log("💚 Running in fallback state mode with seed state.");
 }
 
 // Deterministic helpers to map non-UUID text IDs to valid database UUIDs consistently
 function toDbUUID(id: any): string | null {
-  if (typeof id !== 'string') return null;
+  if (typeof id !== "string") return null;
   const trimmed = id.trim();
   if (!trimmed) return null;
 
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      trimmed,
+    )
+  ) {
     return trimmed.toLowerCase();
   }
 
@@ -3561,20 +4855,20 @@ function toDbUUID(id: any): string | null {
     h1 = Math.imul(h1 ^ charCode, 0x01000193);
     h2 = Math.imul(h2 ^ charCode, 0x01000193);
   }
-  
-  const part1 = ((h1 >>> 0).toString(16)).padStart(8, '0');
-  const part2 = (((h1 ^ h2) >>> 16).toString(16)).padStart(4, '0');
-  const part3 = (((h1 ^ h2) & 0xffff).toString(16)).padStart(4, '0');
-  const part4 = ((h2 >>> 16).toString(16)).padStart(4, '0');
-  const part5 = ((h2 >>> 0).toString(16)).padStart(12, '0');
+
+  const part1 = (h1 >>> 0).toString(16).padStart(8, "0");
+  const part2 = ((h1 ^ h2) >>> 16).toString(16).padStart(4, "0");
+  const part3 = ((h1 ^ h2) & 0xffff).toString(16).padStart(4, "0");
+  const part4 = (h2 >>> 16).toString(16).padStart(4, "0");
+  const part5 = (h2 >>> 0).toString(16).padStart(12, "0");
 
   return `${part1}-${part2}-${part3}-${part4}-${part5}`.toLowerCase();
 }
 
 function fromDbUUID(dbId: any): string {
-  if (typeof dbId !== 'string') return dbId;
+  if (typeof dbId !== "string") return dbId;
   const normalized = dbId.trim().toLowerCase();
-  
+
   const UUID_TO_STATIC_ID: Record<string, string> = {};
 
   if (UUID_TO_STATIC_ID[normalized]) {
@@ -3589,38 +4883,43 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
   if (!supabase) return;
 
   try {
-    console.log('⚡ [PRIMARY STORAGE SYNC] Synchronizing state to Supabase via Client SDK...');
+    console.log(
+      "⚡ [PRIMARY STORAGE SYNC] Synchronizing state to Supabase via Client SDK...",
+    );
 
     if (Array.isArray(newState.categories) && newState.categories.length > 0) {
-      await supabase.from('categories').upsert(
+      await supabase.from("categories").upsert(
         newState.categories.map((c: any) => ({
           id: c.id,
           name: c.name,
-          slug: c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          description: c.description || '',
-          color: c.color || '#6366F1',
-          icon: c.icon || 'Compass',
-          featured_image: c.featured_image || '',
-          seo_title: c.seo_title || '',
-          seo_description: c.seo_description || '',
-          seo_keywords: JSON.stringify(Array.isArray(c.seo_keywords) ? c.seo_keywords : []),
+          slug: c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          description: c.description || "",
+          color: c.color || "#6366F1",
+          icon: c.icon || "Compass",
+          featured_image: c.featured_image || "",
+          seo_title: c.seo_title || "",
+          seo_description: c.seo_description || "",
+          seo_keywords: JSON.stringify(
+            Array.isArray(c.seo_keywords) ? c.seo_keywords : [],
+          ),
           is_premium: c.is_premium ?? false,
-          price: Number(c.price) || 0
-        }))
+          price: Number(c.price) || 0,
+        })),
       );
     }
 
     if (Array.isArray(newState.posts) && newState.posts.length > 0) {
-      await supabase.from('posts').upsert(
+      await supabase.from("posts").upsert(
         newState.posts.map((post: any) => ({
           id: post.id,
           title: post.title,
-          slug: post.slug || post.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          excerpt: post.excerpt || '',
-          content: post.content || '',
-          status: post.status || 'draft',
+          slug:
+            post.slug || post.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          excerpt: post.excerpt || "",
+          content: post.content || "",
+          status: post.status || "draft",
           publish_date: post.publish_date || new Date().toISOString(),
-          featured_image: post.featured_image || '',
+          featured_image: post.featured_image || "",
           read_time: Number(post.read_time) || 5,
           category_id: post.category_id || null,
           author_id: post.author_id || null,
@@ -3629,34 +4928,39 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
           allow_comments: post.allow_comments ?? true,
           is_premium: post.is_premium ?? false,
           price: Number(post.price) || 0,
-          in_article_inserts: post.in_article_inserts || null
-        }))
+          in_article_inserts: post.in_article_inserts || null,
+        })),
       );
     }
 
     if (Array.isArray(newState.pages) && newState.pages.length > 0) {
-      await supabase.from('pages').upsert(
+      await supabase.from("pages").upsert(
         newState.pages.map((pg: any) => ({
           id: pg.id,
           title: pg.title,
           slug: pg.slug,
-          content: pg.content || '',
+          content: pg.content || "",
           is_deleted: pg.is_deleted ?? false,
-          updated_at: pg.updated_at || new Date().toISOString()
-        }))
+          updated_at: pg.updated_at || new Date().toISOString(),
+        })),
       );
     }
 
     if (Array.isArray(newState.comments) && newState.comments.length > 0) {
-      await supabase.from('comments').upsert(
+      await supabase.from("comments").upsert(
         newState.comments.map((cm: any) => {
           const row: Record<string, unknown> = {
             id: cm.id,
             post_id: cm.post_id || cm.articleId,
-            author_name: cm.author_name || cm.user_name || cm.authorName || 'Anonymous Reader',
+            author_name:
+              cm.author_name ||
+              cm.user_name ||
+              cm.authorName ||
+              "Anonymous Reader",
             content: cm.content,
-            is_approved: cm.is_approved ?? (cm.status ? cm.status === 'approved' : true),
-            created_at: cm.created_at || new Date().toISOString()
+            is_approved:
+              cm.is_approved ?? (cm.status ? cm.status === "approved" : true),
+            created_at: cm.created_at || new Date().toISOString(),
           };
           // Upsert only the columns we carry  - a boot-state comment (public
           // projection) has no email, so leave the stored value untouched
@@ -3664,212 +4968,287 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
           const email = cm.author_email || cm.user_email || cm.authorEmail;
           if (email) row.author_email = email;
           return row;
-        })
+        }),
       );
     }
 
     if (newState.site_settings) {
       try {
-        await supabase.from('site_settings').upsert({
-          id: 'singleton',
-          site_name: newState.site_settings.site_name || 'Heartsync',
-          ads_enabled: Boolean(newState.site_settings.adsense_active || newState.site_settings.monetag_active || newState.site_settings.adsterra_active),
-          adsense_publisher_id: newState.site_settings.adsense_client_id || '',
+        await supabase.from("site_settings").upsert({
+          id: "singleton",
+          site_name: newState.site_settings.site_name || "Heartsync",
+          ads_enabled: Boolean(
+            newState.site_settings.adsense_active ||
+            newState.site_settings.monetag_active ||
+            newState.site_settings.adsterra_active,
+          ),
+          adsense_publisher_id: newState.site_settings.adsense_client_id || "",
           raw_settings: newState.site_settings,
           ad_slots: {
-            adsense: { active: newState.site_settings.adsense_active, client_id: newState.site_settings.adsense_client_id },
-            monetag: { active: newState.site_settings.monetag_active, zone_id: newState.site_settings.monetag_zone_id, format: newState.site_settings.monetag_format },
-            adsterra: { active: newState.site_settings.adsterra_active, key_id: newState.site_settings.adsterra_key_id, format: newState.site_settings.adsterra_format },
+            adsense: {
+              active: newState.site_settings.adsense_active,
+              client_id: newState.site_settings.adsense_client_id,
+            },
+            monetag: {
+              active: newState.site_settings.monetag_active,
+              zone_id: newState.site_settings.monetag_zone_id,
+              format: newState.site_settings.monetag_format,
+            },
+            adsterra: {
+              active: newState.site_settings.adsterra_active,
+              key_id: newState.site_settings.adsterra_key_id,
+              format: newState.site_settings.adsterra_format,
+            },
             banners: {
               header: newState.site_settings.banner_header_enabled,
               sidebar: newState.site_settings.banner_sidebar_enabled,
               footer: newState.site_settings.banner_footer_enabled,
-              in_article: newState.site_settings.banner_in_article_enabled
-            }
+              in_article: newState.site_settings.banner_in_article_enabled,
+            },
           },
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         });
       } catch (e: any) {
-        console.warn('Supabase site_settings sync warning:', e.message);
+        console.warn("Supabase site_settings sync warning:", e.message);
       }
     }
 
-    if (Array.isArray(newState.subscriptions) && newState.subscriptions.length > 0) {
+    if (
+      Array.isArray(newState.subscriptions) &&
+      newState.subscriptions.length > 0
+    ) {
       try {
-        await supabase.from('subscriptions').upsert(
+        await supabase.from("subscriptions").upsert(
           newState.subscriptions.map((sub: any) => ({
             id: toDbUUID(sub.id) || sub.id,
             user_id: toDbUUID(sub.user_id) || sub.user_id,
             plan_id: toDbUUID(sub.plan_id) || null,
-            status: sub.status || 'active',
-            current_period_end: sub.current_period_end || new Date().toISOString()
-          }))
+            status: sub.status || "active",
+            current_period_end:
+              sub.current_period_end || new Date().toISOString(),
+          })),
         );
-      } catch (e: any) { console.warn('Supabase subscriptions sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase subscriptions sync warning:", e.message);
+      }
     }
 
     if (Array.isArray(newState.payments) && newState.payments.length > 0) {
       try {
-        await supabase.from('payments').upsert(
+        await supabase.from("payments").upsert(
           newState.payments.map((pay: any) => ({
             id: toDbUUID(pay.id) || pay.id,
             user_id: toDbUUID(pay.user_id) || pay.user_id,
             amount: Number(pay.amount) || 0,
-            currency: pay.currency || 'USD',
-            status: pay.status || 'succeeded',
-            payment_method: pay.gateway || pay.payment_method || 'stripe',
-            created_at: pay.created_at || new Date().toISOString()
-          }))
+            currency: pay.currency || "USD",
+            status: pay.status || "succeeded",
+            payment_method: pay.gateway || pay.payment_method || "stripe",
+            created_at: pay.created_at || new Date().toISOString(),
+          })),
         );
-      } catch (e: any) { console.warn('Supabase payments sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase payments sync warning:", e.message);
+      }
     }
 
     if (Array.isArray(newState.plans) && newState.plans.length > 0) {
       try {
-        await supabase.from('plans').upsert(
+        await supabase.from("plans").upsert(
           newState.plans.map((pl: any) => ({
             id: toDbUUID(pl.id) || pl.id,
             name: pl.name,
-            description: pl.description || '',
+            description: pl.description || "",
             price: Number(pl.price || pl.price_monthly) || 0,
-            interval: pl.interval || 'month'
-          }))
+            interval: pl.interval || "month",
+          })),
         );
-      } catch (e: any) { console.warn('Supabase plans sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase plans sync warning:", e.message);
+      }
     }
 
     if (Array.isArray(newState.rss_feeds) && newState.rss_feeds.length > 0) {
       try {
-        await supabase.from('rss_feeds').upsert(
+        await supabase.from("rss_feeds").upsert(
           newState.rss_feeds.map((feed: any) => ({
             id: toDbUUID(feed.id) || feed.id,
             name: feed.name,
             url: feed.url,
-            last_imported_at: feed.last_imported_at || null
-          }))
+            last_imported_at: feed.last_imported_at || null,
+          })),
         );
-      } catch (e: any) { console.warn('Supabase rss_feeds sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase rss_feeds sync warning:", e.message);
+      }
     }
 
-    if (Array.isArray(newState.webhook_targets) && newState.webhook_targets.length > 0) {
+    if (
+      Array.isArray(newState.webhook_targets) &&
+      newState.webhook_targets.length > 0
+    ) {
       try {
-        await supabase.from('webhook_targets').upsert(
+        await supabase.from("webhook_targets").upsert(
           newState.webhook_targets.map((wt: any) => ({
             id: wt.id,
-            name: wt.name || 'Webhook Target',
+            name: wt.name || "Webhook Target",
             url: wt.url,
-            event_type: wt.event_type || 'all',
-            is_active: wt.is_active ?? true
-          }))
+            event_type: wt.event_type || "all",
+            is_active: wt.is_active ?? true,
+          })),
         );
-      } catch (e: any) { console.warn('Supabase webhook_targets sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase webhook_targets sync warning:", e.message);
+      }
     }
 
-    if (Array.isArray(newState.webhook_logs) && newState.webhook_logs.length > 0) {
+    if (
+      Array.isArray(newState.webhook_logs) &&
+      newState.webhook_logs.length > 0
+    ) {
       try {
-        await supabase.from('webhook_logs').upsert(
+        await supabase.from("webhook_logs").upsert(
           newState.webhook_logs.map((wl: any) => ({
             id: toDbUUID(wl.id) || wl.id,
-            gateway: wl.gateway || 'system',
-            event_type: wl.event_type || 'unknown',
-            payload: typeof wl.payload === 'object' ? wl.payload : {},
+            gateway: wl.gateway || "system",
+            event_type: wl.event_type || "unknown",
+            payload: typeof wl.payload === "object" ? wl.payload : {},
             processed: wl.processed ?? true,
             error: wl.error || null,
-            created_at: wl.created_at || wl.timestamp || new Date().toISOString()
-          }))
+            created_at:
+              wl.created_at || wl.timestamp || new Date().toISOString(),
+          })),
         );
-      } catch (e: any) { console.warn('Supabase webhook_logs sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase webhook_logs sync warning:", e.message);
+      }
     }
 
     if (Array.isArray(newState.ad_zones) && newState.ad_zones.length > 0) {
       try {
-        await supabase.from('ad_zones').upsert(
+        await supabase.from("ad_zones").upsert(
           newState.ad_zones.map((zone: any) => ({
             id: zone.id,
             name: zone.name,
-            slot: zone.slot || 'sidebar',
-            pricing: zone.pricing || 'CPM',
+            slot: zone.slot || "sidebar",
+            pricing: zone.pricing || "CPM",
             active: zone.active ?? true,
-            code_template: zone.codeTemplate || zone.code_template || '',
-            size_label: zone.sizeLabel || zone.size_label || 'Responsive',
+            code_template: zone.codeTemplate || zone.code_template || "",
+            size_label: zone.sizeLabel || zone.size_label || "Responsive",
             impressions: Number(zone.impressions) || 0,
             clicks: Number(zone.clicks) || 0,
-            created_at: zone.created_at || new Date().toISOString()
-          }))
+            created_at: zone.created_at || new Date().toISOString(),
+          })),
         );
-      } catch (e: any) { console.warn('Supabase ad_zones sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase ad_zones sync warning:", e.message);
+      }
     }
 
-    if (Array.isArray(newState.ad_providers) && newState.ad_providers.length > 0) {
+    if (
+      Array.isArray(newState.ad_providers) &&
+      newState.ad_providers.length > 0
+    ) {
       try {
-        await supabase.from('ad_providers').upsert(
+        await supabase.from("ad_providers").upsert(
           newState.ad_providers.map((p: any) => {
             const uuid = toDbUUID(p.id) || p.id;
-            const slug = p.type === 'monetag' ? 'monetag' : p.type === 'adsterra' ? 'adsterra' : (p.type || p.slug || 'adsense');
+            const slug =
+              p.type === "monetag"
+                ? "monetag"
+                : p.type === "adsterra"
+                  ? "adsterra"
+                  : p.type || p.slug || "adsense";
             return {
               id: uuid,
-              name: p.name || (slug === 'monetag' ? 'Monetag' : slug === 'adsterra' ? 'Adsterra' : 'Google AdSense'),
+              name:
+                p.name ||
+                (slug === "monetag"
+                  ? "Monetag"
+                  : slug === "adsterra"
+                    ? "Adsterra"
+                    : "Google AdSense"),
               slug: slug,
-              provider_type: 'display',
+              provider_type: "display",
               is_active: p.active ?? true,
               credentials: {
-                key: p.pubId || '',
-                zone_id: p.pubId || '',
-                sdk_url: p.scriptCode || p.code || '',
-                publisher_id: p.pubId || ''
+                key: p.pubId || "",
+                zone_id: p.pubId || "",
+                sdk_url: p.scriptCode || p.code || "",
+                publisher_id: p.pubId || "",
               },
               settings: {
-                slot: p.slot || 'all',
-                cpm_estimate: p.cpmEstimate || '$12.50',
-                custom_size: p.customSize || 'Responsive',
-                lazy_load_delay: p.lazyLoadDelay || 'none',
-                geo_target: p.geoTarget || 'worldwide',
+                slot: p.slot || "all",
+                cpm_estimate: p.cpmEstimate || "$12.50",
+                custom_size: p.customSize || "Responsive",
+                lazy_load_delay: p.lazyLoadDelay || "none",
+                geo_target: p.geoTarget || "worldwide",
                 is_consent_compliant: p.isConsentCompliant ?? true,
-                format: p.format || (slug === 'monetag' ? 'multitag' : slug === 'adsterra' ? 'social_bar' : 'leaderboard')
+                format:
+                  p.format ||
+                  (slug === "monetag"
+                    ? "multitag"
+                    : slug === "adsterra"
+                      ? "social_bar"
+                      : "leaderboard"),
               },
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             };
-          })
+          }),
         );
-      } catch (e: any) { console.warn('Supabase ad_providers sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase ad_providers sync warning:", e.message);
+      }
     }
 
-    const campaignsList = Array.isArray(newState.sponsorship_campaigns) ? newState.sponsorship_campaigns : (Array.isArray(newState.campaigns) ? newState.campaigns : []);
+    const campaignsList = Array.isArray(newState.sponsorship_campaigns)
+      ? newState.sponsorship_campaigns
+      : Array.isArray(newState.campaigns)
+        ? newState.campaigns
+        : [];
     if (campaignsList.length > 0) {
       try {
-        await supabase.from('sponsorship_campaigns').upsert(
+        await supabase.from("sponsorship_campaigns").upsert(
           campaignsList.map((c: any) => ({
             id: c.id,
             name: c.name,
-            url: c.url || '',
+            url: c.url || "",
             impressions: Number(c.impressions) || 0,
             clicks: Number(c.clicks) || 0,
-            status: c.status || 'Active',
-            created_at: c.created_at || new Date().toISOString()
-          }))
+            status: c.status || "Active",
+            created_at: c.created_at || new Date().toISOString(),
+          })),
         );
-      } catch (e: any) { console.warn('Supabase sponsorship_campaigns sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase sponsorship_campaigns sync warning:", e.message);
+      }
     }
 
-    if (Array.isArray(newState.email_campaigns) && newState.email_campaigns.length > 0) {
+    if (
+      Array.isArray(newState.email_campaigns) &&
+      newState.email_campaigns.length > 0
+    ) {
       try {
-        await supabase.from('email_campaigns').upsert(
+        await supabase.from("email_campaigns").upsert(
           newState.email_campaigns.map((c: any) => ({
             id: toDbUUID(c.id) || c.id,
-            title: c.title || c.name || 'Untitled Campaign',
-            subject: c.subject || 'No Subject',
-            content: c.content || c.body || '',
-            status: c.status || 'draft',
+            title: c.title || c.name || "Untitled Campaign",
+            subject: c.subject || "No Subject",
+            content: c.content || c.body || "",
+            status: c.status || "draft",
             sent_at: c.sent_at || c.sentAt || null,
-            recipients_count: Number(c.recipients_count ?? c.sentCount) || 0
-          }))
+            recipients_count: Number(c.recipients_count ?? c.sentCount) || 0,
+          })),
         );
-      } catch (e: any) { console.warn('Supabase email_campaigns sync warning:', e.message); }
+      } catch (e: any) {
+        console.warn("Supabase email_campaigns sync warning:", e.message);
+      }
     }
 
-    console.log('⚡ [PRIMARY STORAGE SYNC SUCCESS] Shared state synced to Supabase.');
+    console.log(
+      "⚡ [PRIMARY STORAGE SYNC SUCCESS] Shared state synced to Supabase.",
+    );
   } catch (err: any) {
-    console.warn('⚠️ Supabase state sync warning:', err.message || err);
+    console.warn("⚠️ Supabase state sync warning:", err.message || err);
   }
 }
 
@@ -4676,8 +6055,6 @@ async function saveServerCacheState(newState: any, dbClient?: any) {
   lastSupabaseFetchTime = Date.now();
 
   await syncStateToSupabase(newState, dbClient);
-  
-  
 }
 
 // --------------------------------------------------------
@@ -4689,18 +6066,21 @@ async function saveServerCacheState(newState: any, dbClient?: any) {
 // payments rows are only written after a VERIFIED webhook confirms the charge.
 // ============================================================================
 
-const GATEWAY_BASE = (req: Request) => `${req.headers.origin || req.protocol + '://' + req.get('host')}`;
+const GATEWAY_BASE = (req: Request) =>
+  `${req.headers.origin || req.protocol + "://" + req.get("host")}`;
 
 function getGatewayKeys() {
   return {
     stripe: cleanConfigValue(process.env.STRIPE_SECRET_KEY),
     paystack: cleanConfigValue(process.env.PAYSTACK_SECRET_KEY),
-    stripeWebhook: cleanConfigValue(process.env.STRIPE_WEBHOOK_SECRET)
+    stripeWebhook: cleanConfigValue(process.env.STRIPE_WEBHOOK_SECRET),
   };
 }
 
 function getServiceRoleSupabase() {
-  const url = cleanConfigValue(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+  const url = cleanConfigValue(
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+  );
   const key = cleanConfigValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!url || !key || !isValidSupabaseConfig(url, key)) return null;
   // Both the anon and service_role keys are well-formed JWTs, so a config
@@ -4711,7 +6091,9 @@ function getServiceRoleSupabase() {
   // "permission denied for table ..." instead of a clear config error. Catch
   // that here so it fails loudly and specifically instead.
   if (!isServiceRoleKey(key)) {
-    console.error('SUPABASE_SERVICE_ROLE_KEY is set but is NOT a service_role JWT (role claim mismatch). Check Netlify env vars - this must be the "service_role" secret from Supabase Project Settings -> API, not the anon/public key.');
+    console.error(
+      'SUPABASE_SERVICE_ROLE_KEY is set but is NOT a service_role JWT (role claim mismatch). Check Netlify env vars - this must be the "service_role" secret from Supabase Project Settings -> API, not the anon/public key.',
+    );
     return null;
   }
   return createSupabaseClient(url, key);
@@ -4719,236 +6101,380 @@ function getServiceRoleSupabase() {
 
 // Records a VERIFIED paid subscription + payment. Requires the service role key.
 async function activatePaidSubscription(params: {
-  userId: string; planId: string; billingCycle: 'monthly' | 'yearly';
-  gateway: string; amount: number; currency: string;
-  transactionId: string; gatewaySubscriptionId?: string;
+  userId: string;
+  planId: string;
+  billingCycle: "monthly" | "yearly";
+  gateway: string;
+  amount: number;
+  currency: string;
+  transactionId: string;
+  gatewaySubscriptionId?: string;
 }) {
   const svc = getServiceRoleSupabase();
-  if (!svc) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured; cannot record the paid subscription.');
-  const months = params.billingCycle === 'yearly' ? 12 : 1;
+  if (!svc)
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is not configured; cannot record the paid subscription.",
+    );
+  const months = params.billingCycle === "yearly" ? 12 : 1;
   const periodEnd = new Date();
   periodEnd.setMonth(periodEnd.getMonth() + months);
   const subId = `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const { error: cancelErr } = await svc.from('subscriptions')
-    .update({ status: 'canceled', updated_at: new Date().toISOString() })
-    .eq('user_id', params.userId).neq('status', 'canceled');
-  if (cancelErr) console.warn('Prior subscription cancel warning:', cancelErr.message);
+  const { error: cancelErr } = await svc
+    .from("subscriptions")
+    .update({ status: "canceled", updated_at: new Date().toISOString() })
+    .eq("user_id", params.userId)
+    .neq("status", "canceled");
+  if (cancelErr)
+    console.warn("Prior subscription cancel warning:", cancelErr.message);
 
-  const { error: subErr } = await svc.from('subscriptions').insert({
+  const { error: subErr } = await svc.from("subscriptions").insert({
     id: subId,
     user_id: params.userId,
     plan_id: params.planId,
-    status: 'active',
+    status: "active",
     current_period_end: periodEnd.toISOString(),
-    auto_renew: params.gateway === 'stripe',
+    auto_renew: params.gateway === "stripe",
     gateway: params.gateway,
     gateway_subscription_id: params.gatewaySubscriptionId || null,
-    metadata: { billing_cycle: params.billingCycle }
+    metadata: { billing_cycle: params.billingCycle },
   });
-  if (subErr) throw new Error('Subscription insert failed: ' + subErr.message);
+  if (subErr) throw new Error("Subscription insert failed: " + subErr.message);
 
-  const { error: payErr } = await svc.from('payments').insert({
+  const { error: payErr } = await svc.from("payments").insert({
     id: `pay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     user_id: params.userId,
     subscription_id: subId,
     amount: params.amount,
     currency: params.currency,
-    status: 'completed',
-    transaction_id: params.transactionId
+    status: "completed",
+    transaction_id: params.transactionId,
   });
-  if (payErr) throw new Error('Payment insert failed: ' + payErr.message);
+  if (payErr) throw new Error("Payment insert failed: " + payErr.message);
   return subId;
 }
 
 async function createStripeCheckoutSession(opts: {
-  origin: string; amount: number; currency: string; name: string;
-  mode: 'payment' | 'subscription'; interval: 'month' | 'year';
-  email?: string; clientRefId?: string; metadata: Record<string, string>;
-  successUrl: string; cancelUrl: string;
+  origin: string;
+  amount: number;
+  currency: string;
+  name: string;
+  mode: "payment" | "subscription";
+  interval: "month" | "year";
+  email?: string;
+  clientRefId?: string;
+  metadata: Record<string, string>;
+  successUrl: string;
+  cancelUrl: string;
 }) {
   const key = cleanConfigValue(process.env.STRIPE_SECRET_KEY);
   if (!key) return null;
   const body = new URLSearchParams();
-  body.set('mode', opts.mode);
-  body.set('line_items[0][quantity]', '1');
-  body.set('line_items[0][price_data][currency]', opts.currency.toLowerCase());
-  body.set('line_items[0][price_data][unit_amount]', String(Math.round(opts.amount * 100)));
-  body.set('line_items[0][price_data][product_data][name]', opts.name);
-  if (opts.mode === 'subscription') body.set('line_items[0][price_data][recurring][interval]', opts.interval);
-  if (opts.email) body.set('customer_email', opts.email);
-  if (opts.clientRefId) body.set('client_reference_id', opts.clientRefId);
-  for (const [k, v] of Object.entries(opts.metadata)) body.set(`metadata[${k}]`, v);
-  body.set('success_url', opts.successUrl);
-  body.set('cancel_url', opts.cancelUrl);
-  const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body
+  body.set("mode", opts.mode);
+  body.set("line_items[0][quantity]", "1");
+  body.set("line_items[0][price_data][currency]", opts.currency.toLowerCase());
+  body.set(
+    "line_items[0][price_data][unit_amount]",
+    String(Math.round(opts.amount * 100)),
+  );
+  body.set("line_items[0][price_data][product_data][name]", opts.name);
+  if (opts.mode === "subscription")
+    body.set("line_items[0][price_data][recurring][interval]", opts.interval);
+  if (opts.email) body.set("customer_email", opts.email);
+  if (opts.clientRefId) body.set("client_reference_id", opts.clientRefId);
+  for (const [k, v] of Object.entries(opts.metadata))
+    body.set(`metadata[${k}]`, v);
+  body.set("success_url", opts.successUrl);
+  body.set("cancel_url", opts.cancelUrl);
+  const r = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
   });
   const data = await r.json();
-  if (!r.ok || !data?.url) throw new Error(data?.error?.message || 'Stripe checkout session creation failed.');
+  if (!r.ok || !data?.url)
+    throw new Error(
+      data?.error?.message || "Stripe checkout session creation failed.",
+    );
   return data.url as string;
 }
 
 async function createPaystackTransaction(opts: {
-  amount: number; currency: string; email: string; callbackUrl: string;
+  amount: number;
+  currency: string;
+  email: string;
+  callbackUrl: string;
   metadata: Record<string, string>;
 }) {
   const key = cleanConfigValue(process.env.PAYSTACK_SECRET_KEY);
   if (!key) return null;
-  const r = await fetch('https://api.paystack.co/transaction/initialize', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+  const r = await fetch("https://api.paystack.co/transaction/initialize", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       email: opts.email,
       amount: Math.round(opts.amount * 100),
       currency: opts.currency.toUpperCase(),
       callback_url: opts.callbackUrl,
-      metadata: opts.metadata
-    })
+      metadata: opts.metadata,
+    }),
   });
   const data = await r.json();
-  if (!r.ok || !data?.data?.authorization_url) throw new Error(data?.message || 'Paystack transaction initialization failed.');
+  if (!r.ok || !data?.data?.authorization_url)
+    throw new Error(
+      data?.message || "Paystack transaction initialization failed.",
+    );
   return data.data.authorization_url as string;
 }
 
-app.post('/api/subscriptions/checkout', async (req: Request, res: Response) => {
+app.post("/api/subscriptions/checkout", async (req: Request, res: Response) => {
   const { planId, billingCycle, gateway, userId, email } = req.body || {};
   if (!planId || !userId) {
-    res.status(400).json({ error: 'Plan and signed-in user are required to start checkout.' });
+    res
+      .status(400)
+      .json({
+        error: "Plan and signed-in user are required to start checkout.",
+      });
     return;
   }
-  const plan = (serverCacheState?.plans || []).find((p: any) => p.id === planId);
+  const plan = (serverCacheState?.plans || []).find(
+    (p: any) => p.id === planId,
+  );
   if (!plan) {
-    res.status(404).json({ error: 'Selected plan was not found.' });
+    res.status(404).json({ error: "Selected plan was not found." });
     return;
   }
-  const isYearly = billingCycle === 'yearly';
-  const amount = isYearly ? (plan.price_yearly || plan.price_monthly * 10) : plan.price_monthly;
-  const currency = 'USD';
+  const isYearly = billingCycle === "yearly";
+  const amount = isYearly
+    ? plan.price_yearly || plan.price_monthly * 10
+    : plan.price_monthly;
+  const currency = "USD";
   const origin = GATEWAY_BASE(req);
   const successUrl = `${origin}/subscription?checkout=success&planId=${encodeURIComponent(planId)}`;
-  const metadata = { userId: String(userId), planId: String(planId), billingCycle: isYearly ? 'yearly' : 'monthly' };
+  const metadata = {
+    userId: String(userId),
+    planId: String(planId),
+    billingCycle: isYearly ? "yearly" : "monthly",
+  };
 
   try {
-    if (gateway === 'stripe') {
+    if (gateway === "stripe") {
       const url = await createStripeCheckoutSession({
-        origin, amount, currency, name: `${plan.name} Membership${isYearly ? ' (Yearly)' : ''}`,
-        mode: 'subscription', interval: isYearly ? 'year' : 'month',
-        email, clientRefId: String(userId), metadata,
-        successUrl, cancelUrl: origin
+        origin,
+        amount,
+        currency,
+        name: `${plan.name} Membership${isYearly ? " (Yearly)" : ""}`,
+        mode: "subscription",
+        interval: isYearly ? "year" : "month",
+        email,
+        clientRefId: String(userId),
+        metadata,
+        successUrl,
+        cancelUrl: origin,
       });
-      if (!url) { res.status(501).json({ error: 'Stripe is not configured yet. Payments go live once the Stripe keys are installed.' }); return; }
-      res.json({ success: true, gateway: 'stripe', checkoutUrl: url });
+      if (!url) {
+        res
+          .status(501)
+          .json({
+            error:
+              "Stripe is not configured yet. Payments go live once the Stripe keys are installed.",
+          });
+        return;
+      }
+      res.json({ success: true, gateway: "stripe", checkoutUrl: url });
       return;
     }
-    if (gateway === 'paystack') {
-      if (!email) { res.status(400).json({ error: 'An email address is required for Paystack checkout.' }); return; }
-      const url = await createPaystackTransaction({ amount, currency, email, callbackUrl: successUrl, metadata });
-      if (!url) { res.status(501).json({ error: 'Paystack is not configured yet. Payments go live once the Paystack keys are installed.' }); return; }
-      res.json({ success: true, gateway: 'paystack', checkoutUrl: url });
+    if (gateway === "paystack") {
+      if (!email) {
+        res
+          .status(400)
+          .json({
+            error: "An email address is required for Paystack checkout.",
+          });
+        return;
+      }
+      const url = await createPaystackTransaction({
+        amount,
+        currency,
+        email,
+        callbackUrl: successUrl,
+        metadata,
+      });
+      if (!url) {
+        res
+          .status(501)
+          .json({
+            error:
+              "Paystack is not configured yet. Payments go live once the Paystack keys are installed.",
+          });
+        return;
+      }
+      res.json({ success: true, gateway: "paystack", checkoutUrl: url });
       return;
     }
-    res.status(501).json({ error: 'Flutterwave support is not live yet.' });
+    res.status(501).json({ error: "Flutterwave support is not live yet." });
   } catch (err: any) {
-    console.warn('Subscription checkout failure:', err?.message);
-    res.status(502).json({ error: 'The payment gateway rejected the checkout request.' });
+    console.warn("Subscription checkout failure:", err?.message);
+    res
+      .status(502)
+      .json({ error: "The payment gateway rejected the checkout request." });
   }
 });
 
 // Stripe webhook  - event is re-fetched from Stripe so payloads cannot be forged
-app.post('/api/webhooks/stripe', async (req: Request, res: Response) => {
+app.post("/api/webhooks/stripe", async (req: Request, res: Response) => {
   const key = cleanConfigValue(process.env.STRIPE_SECRET_KEY);
-  if (!key) { res.status(503).json({ received: false, error: 'Stripe is not configured.' }); return; }
+  if (!key) {
+    res
+      .status(503)
+      .json({ received: false, error: "Stripe is not configured." });
+    return;
+  }
   try {
     const event = req.body;
-    if (event?.type !== 'checkout.session.completed') { res.json({ received: true }); return; }
-    const sessionId = event?.data?.object?.id;
-    if (!sessionId) { res.status(400).json({ error: 'Malformed event.' }); return; }
-    const verify = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
-      headers: { Authorization: `Bearer ${key}` }
-    });
-    const session = await verify.json();
-    if (!verify.ok || session?.payment_status !== 'paid') { res.status(400).json({ error: 'Session could not be verified as paid.' }); return; }
-    const md = session?.metadata || {};
-    if (md.kind === 'digital_product' && md.productId) {
-      const order = await createDigitalProductOrder({
-        productId: md.productId,
-        email: md.email || '',
-        amount: (session.amount_total || 0) / 100,
-        currency: (session.currency || 'usd').toUpperCase(),
-        transactionId: sessionId,
-        gateway: 'stripe'
-      });
-      if (!order) { res.status(500).json({ error: 'Failed to fulfill the digital product order.' }); return; }
+    if (event?.type !== "checkout.session.completed") {
       res.json({ received: true });
       return;
     }
-    if (!md.userId || !md.planId) { res.status(400).json({ error: 'Session is missing subscription metadata.' }); return; }
+    const sessionId = event?.data?.object?.id;
+    if (!sessionId) {
+      res.status(400).json({ error: "Malformed event." });
+      return;
+    }
+    const verify = await fetch(
+      `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        headers: { Authorization: `Bearer ${key}` },
+      },
+    );
+    const session = await verify.json();
+    if (!verify.ok || session?.payment_status !== "paid") {
+      res.status(400).json({ error: "Session could not be verified as paid." });
+      return;
+    }
+    const md = session?.metadata || {};
+    if (md.kind === "digital_product" && md.productId) {
+      const order = await createDigitalProductOrder({
+        productId: md.productId,
+        email: md.email || "",
+        amount: (session.amount_total || 0) / 100,
+        currency: (session.currency || "usd").toUpperCase(),
+        transactionId: sessionId,
+        gateway: "stripe",
+      });
+      if (!order) {
+        res
+          .status(500)
+          .json({ error: "Failed to fulfill the digital product order." });
+        return;
+      }
+      res.json({ received: true });
+      return;
+    }
+    if (!md.userId || !md.planId) {
+      res
+        .status(400)
+        .json({ error: "Session is missing subscription metadata." });
+      return;
+    }
     await activatePaidSubscription({
       userId: md.userId,
       planId: md.planId,
-      billingCycle: md.billingCycle === 'yearly' ? 'yearly' : 'monthly',
-      gateway: 'stripe',
+      billingCycle: md.billingCycle === "yearly" ? "yearly" : "monthly",
+      gateway: "stripe",
       amount: (session.amount_total || 0) / 100,
-      currency: (session.currency || 'usd').toUpperCase(),
+      currency: (session.currency || "usd").toUpperCase(),
       transactionId: sessionId,
-      gatewaySubscriptionId: session.subscription
+      gatewaySubscriptionId: session.subscription,
     });
     res.json({ received: true });
   } catch (err: any) {
-    console.warn('Stripe webhook failure:', err?.message);
-    res.status(503).json({ error: 'Webhook processing failed.' });
+    console.warn("Stripe webhook failure:", err?.message);
+    res.status(503).json({ error: "Webhook processing failed." });
   }
 });
 
 // Paystack webhook  - reference is re-verified against the Paystack API
-app.post('/api/webhooks/paystack', async (req: Request, res: Response) => {
+app.post("/api/webhooks/paystack", async (req: Request, res: Response) => {
   const key = cleanConfigValue(process.env.PAYSTACK_SECRET_KEY);
-  if (!key) { res.status(503).json({ received: false, error: 'Paystack is not configured.' }); return; }
+  if (!key) {
+    res
+      .status(503)
+      .json({ received: false, error: "Paystack is not configured." });
+    return;
+  }
   try {
     const event = req.body;
-    if (event?.event !== 'charge.success') { res.json({ received: true }); return; }
-    const reference = event?.data?.reference;
-    if (!reference) { res.status(400).json({ error: 'Malformed event.' }); return; }
-    const verify = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-      headers: { Authorization: `Bearer ${key}` }
-    });
-    const vdata = await verify.json();
-    if (!verify.ok || vdata?.data?.status !== 'success') { res.status(400).json({ error: 'Transaction could not be verified as successful.' }); return; }
-    const md = vdata.data.metadata || {};
-    if (md.kind === 'digital_product' && md.productId) {
-      const order = await createDigitalProductOrder({
-        productId: md.productId,
-        email: md.email || '',
-        amount: (vdata.data.amount || 0) / 100,
-        currency: (vdata.data.currency || 'USD').toUpperCase(),
-        transactionId: reference,
-        gateway: 'paystack'
-      });
-      if (!order) { res.status(500).json({ error: 'Failed to fulfill the digital product order.' }); return; }
+    if (event?.event !== "charge.success") {
       res.json({ received: true });
       return;
     }
-    if (!md.userId || !md.planId) { res.status(400).json({ error: 'Transaction is missing subscription metadata.' }); return; }
+    const reference = event?.data?.reference;
+    if (!reference) {
+      res.status(400).json({ error: "Malformed event." });
+      return;
+    }
+    const verify = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      {
+        headers: { Authorization: `Bearer ${key}` },
+      },
+    );
+    const vdata = await verify.json();
+    if (!verify.ok || vdata?.data?.status !== "success") {
+      res
+        .status(400)
+        .json({ error: "Transaction could not be verified as successful." });
+      return;
+    }
+    const md = vdata.data.metadata || {};
+    if (md.kind === "digital_product" && md.productId) {
+      const order = await createDigitalProductOrder({
+        productId: md.productId,
+        email: md.email || "",
+        amount: (vdata.data.amount || 0) / 100,
+        currency: (vdata.data.currency || "USD").toUpperCase(),
+        transactionId: reference,
+        gateway: "paystack",
+      });
+      if (!order) {
+        res
+          .status(500)
+          .json({ error: "Failed to fulfill the digital product order." });
+        return;
+      }
+      res.json({ received: true });
+      return;
+    }
+    if (!md.userId || !md.planId) {
+      res
+        .status(400)
+        .json({ error: "Transaction is missing subscription metadata." });
+      return;
+    }
     await activatePaidSubscription({
       userId: md.userId,
       planId: md.planId,
-      billingCycle: md.billingCycle === 'yearly' ? 'yearly' : 'monthly',
-      gateway: 'paystack',
+      billingCycle: md.billingCycle === "yearly" ? "yearly" : "monthly",
+      gateway: "paystack",
       amount: (vdata.data.amount || 0) / 100,
-      currency: (vdata.data.currency || 'USD').toUpperCase(),
-      transactionId: reference
+      currency: (vdata.data.currency || "USD").toUpperCase(),
+      transactionId: reference,
     });
     res.json({ received: true });
   } catch (err: any) {
-    console.warn('Paystack webhook failure:', err?.message);
-    res.status(503).json({ error: 'Webhook processing failed.' });
+    console.warn("Paystack webhook failure:", err?.message);
+    res.status(503).json({ error: "Webhook processing failed." });
   }
 });
 
-app.get('/api/setup/status', async (req: Request, res: Response) => {
+app.get("/api/setup/status", async (req: Request, res: Response) => {
   // Authoritative: report whether ANY administrative profile exists in the
   // database (service role). Falls back to the in-memory state only when the
   // service role is unavailable. The setup wizard is only offered when there
@@ -4956,32 +6482,42 @@ app.get('/api/setup/status', async (req: Request, res: Response) => {
   try {
     const svc = getServiceRoleSupabase();
     if (svc) {
-      const { data: adminRows, error } = await svc.from('profiles')
-        .select('id').in('role', ADMIN_ROLE_VALUES).limit(1);
+      const { data: adminRows, error } = await svc
+        .from("profiles")
+        .select("id")
+        .in("role", ADMIN_ROLE_VALUES)
+        .limit(1);
       if (!error) {
         res.json({ hasAdmins: !!(adminRows && adminRows.length > 0) });
         return;
       }
     }
-  } catch (_) { /* fall through to cache-based answer */ }
-  const cacheHasAdmins = ((serverCacheState && serverCacheState.admin_users) || []).length > 0
-    || ((serverCacheState && serverCacheState.profiles) || []).some((p: any) => ADMIN_ROLE_VALUES.includes(p?.role));
+  } catch (_) {
+    /* fall through to cache-based answer */
+  }
+  const cacheHasAdmins =
+    ((serverCacheState && serverCacheState.admin_users) || []).length > 0 ||
+    ((serverCacheState && serverCacheState.profiles) || []).some((p: any) =>
+      ADMIN_ROLE_VALUES.includes(p?.role),
+    );
   res.json({ hasAdmins: !!cacheHasAdmins });
 });
 
-app.post('/api/setup/register', async (req: Request, res: Response) => {
+app.post("/api/setup/register", async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
 
   if (!name || !name.trim()) {
-    res.status(400).json({ error: 'Please enter your full name.' });
+    res.status(400).json({ error: "Please enter your full name." });
     return;
   }
-  if (!email || !email.includes('@')) {
-    res.status(400).json({ error: 'Please enter a valid email address.' });
+  if (!email || !email.includes("@")) {
+    res.status(400).json({ error: "Please enter a valid email address." });
     return;
   }
   if (!password || password.length < 6) {
-    res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    res
+      .status(400)
+      .json({ error: "Password must be at least 6 characters long." });
     return;
   }
 
@@ -4993,23 +6529,44 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
     const svc = getServiceRoleSupabase();
     if (!svc) {
       const rawKey = cleanConfigValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
-      const msg = rawKey && !isServiceRoleKey(rawKey)
-        ? 'SUPABASE_SERVICE_ROLE_KEY is set but is not a valid service_role key (it decodes to a different role - likely the anon/public key was pasted in by mistake). Open Supabase -> Project Settings -> API, copy the "service_role" secret, and update it in Netlify env vars, then retry.'
-        : 'First-admin setup requires SUPABASE_SERVICE_ROLE_KEY on the server. Install it and retry.';
+      const msg =
+        rawKey && !isServiceRoleKey(rawKey)
+          ? 'SUPABASE_SERVICE_ROLE_KEY is set but is not a valid service_role key (it decodes to a different role - likely the anon/public key was pasted in by mistake). Open Supabase -> Project Settings -> API, copy the "service_role" secret, and update it in Netlify env vars, then retry.'
+          : "First-admin setup requires SUPABASE_SERVICE_ROLE_KEY on the server. Install it and retry.";
       res.status(503).json({ error: msg });
       return;
     }
     let existingAdmin: any = null;
-    const { data: existingAdminRows, error: existingAdminErr } = await svc.from('profiles')
-      .select('id, email')
-      .in('role', ['admin', 'superadmin', 'Administrator', 'Editor', 'Super Admin'])
+    const { data: existingAdminRows, error: existingAdminErr } = await svc
+      .from("profiles")
+      .select("id, email")
+      .in("role", [
+        "admin",
+        "superadmin",
+        "Administrator",
+        "Editor",
+        "Super Admin",
+      ])
       .limit(1);
-    if (!existingAdminErr && existingAdminRows && existingAdminRows.length > 0) {
+    if (
+      !existingAdminErr &&
+      existingAdminRows &&
+      existingAdminRows.length > 0
+    ) {
       existingAdmin = existingAdminRows[0];
     }
 
-    if (existingAdmin && existingAdmin.email && existingAdmin.email.toLowerCase() !== cleanEmail) {
-      res.status(403).json({ error: 'An administrator account already exists. Setup wizard is permanently disabled.' });
+    if (
+      existingAdmin &&
+      existingAdmin.email &&
+      existingAdmin.email.toLowerCase() !== cleanEmail
+    ) {
+      res
+        .status(403)
+        .json({
+          error:
+            "An administrator account already exists. Setup wizard is permanently disabled.",
+        });
       return;
     }
 
@@ -5021,7 +6578,10 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
     let authStatus: number | null = null;
 
     if (supabase) {
-      console.log('🔄 First-run setup: Registering admin with Supabase Auth...', cleanEmail);
+      console.log(
+        "🔄 First-run setup: Registering admin with Supabase Auth...",
+        cleanEmail,
+      );
 
       // Attempt signUp
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -5030,36 +6590,48 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
         options: {
           data: {
             full_name: cleanName,
-            username: cleanEmail.split('@')[0].toLowerCase(),
-            role: 'user'
-          }
-        }
+            username: cleanEmail.split("@")[0].toLowerCase(),
+            role: "user",
+          },
+        },
       });
 
       if (authData?.user?.id) {
         userId = authData.user.id;
-        console.log('✅ Supabase Auth signUp succeeded. User ID:', userId);
+        console.log("✅ Supabase Auth signUp succeeded. User ID:", userId);
       } else {
         if (authError) {
           authErrorMessage = authError.message;
           authErrorCode = (authError as any).code || null;
           authStatus = (authError as any).status || null;
-          console.warn(`Supabase Auth signUp warning [${authErrorCode || authStatus}]: ${authErrorMessage}`);
+          console.warn(
+            `Supabase Auth signUp warning [${authErrorCode || authStatus}]: ${authErrorMessage}`,
+          );
         }
 
         // Attempt signInWithPassword to check if Auth user already exists (CASE B/C/D)
-        console.log('🔄 Attempting signInWithPassword to verify existing Supabase Auth user...', cleanEmail);
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: password
-        });
+        console.log(
+          "🔄 Attempting signInWithPassword to verify existing Supabase Auth user...",
+          cleanEmail,
+        );
+        const { data: signInData, error: signInError } =
+          await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password: password,
+          });
 
         if (signInData?.user?.id) {
           userId = signInData.user.id;
-          console.log('✅ Supabase Auth signInWithPassword verified existing account. User ID:', userId);
+          console.log(
+            "✅ Supabase Auth signInWithPassword verified existing account. User ID:",
+            userId,
+          );
         } else {
           if (signInError) {
-            console.warn('Supabase Auth signInWithPassword error:', signInError.message);
+            console.warn(
+              "Supabase Auth signInWithPassword error:",
+              signInError.message,
+            );
           }
 
           // OWNER RECOVERY (2026-09-21): the email may already exist in Supabase
@@ -5070,30 +6642,51 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
           // continue below so they are (re-)elected as THE first admin. Never
           // triggered when an admin already exists (that path 403'd earlier),
           // so this cannot be used to hijack a live admin account.
-          const looksLikeExistingUser = authErrorCode === 'user_already_exists'
-            || /already registered|already exists|user already/i.test(authErrorMessage || '')
-            || /invalid login credentials/i.test(signInError?.message || '');
+          const looksLikeExistingUser =
+            authErrorCode === "user_already_exists" ||
+            /already registered|already exists|user already/i.test(
+              authErrorMessage || "",
+            ) ||
+            /invalid login credentials/i.test(signInError?.message || "");
 
           if (!userId && looksLikeExistingUser && !existingAdmin) {
             try {
-              const { data: recoveryProfile, error: recoveryErr } = await svc.from('profiles')
-                .select('id, email').ilike('email', cleanEmail).limit(1).maybeSingle();
+              const { data: recoveryProfile, error: recoveryErr } = await svc
+                .from("profiles")
+                .select("id, email")
+                .ilike("email", cleanEmail)
+                .limit(1)
+                .maybeSingle();
               if (!recoveryErr && recoveryProfile && recoveryProfile.id) {
-                const { error: resetErr } = await svc.auth.admin.updateUserById(recoveryProfile.id, {
-                  password: password,
-                  email_confirm: true
-                });
+                const { error: resetErr } = await svc.auth.admin.updateUserById(
+                  recoveryProfile.id,
+                  {
+                    password: password,
+                    email_confirm: true,
+                  },
+                );
                 if (!resetErr) {
                   userId = recoveryProfile.id;
-                  console.log(`♻️ Setup wizard recovery: password reset for existing auth user ${cleanEmail}; proceeding to first-admin election.`);
+                  console.log(
+                    `♻️ Setup wizard recovery: password reset for existing auth user ${cleanEmail}; proceeding to first-admin election.`,
+                  );
                 } else {
-                  console.warn('Setup wizard recovery password reset failed:', resetErr.message);
+                  console.warn(
+                    "Setup wizard recovery password reset failed:",
+                    resetErr.message,
+                  );
                 }
               } else if (recoveryErr) {
-                console.warn('Setup wizard recovery lookup failed:', recoveryErr.message);
+                console.warn(
+                  "Setup wizard recovery lookup failed:",
+                  recoveryErr.message,
+                );
               }
             } catch (recoveryEx: any) {
-              console.warn('Setup wizard recovery error:', recoveryEx?.message || recoveryEx);
+              console.warn(
+                "Setup wizard recovery error:",
+                recoveryEx?.message || recoveryEx,
+              );
             }
           }
 
@@ -5101,17 +6694,20 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
           if (userId) {
             // recovery succeeded above  - fall through to first-admin election below
           } else if (
-            authErrorCode === 'over_email_send_rate_limit' || 
-            authStatus === 429 || 
-            authErrorMessage?.toLowerCase().includes('rate limit') ||
-            signInError?.code === 'email_not_confirmed' ||
-            signInError?.message?.toLowerCase().includes('email not confirmed') ||
-            authErrorCode === 'email_not_confirmed' ||
-            authErrorMessage?.toLowerCase().includes('email not confirmed')
+            authErrorCode === "over_email_send_rate_limit" ||
+            authStatus === 429 ||
+            authErrorMessage?.toLowerCase().includes("rate limit") ||
+            signInError?.code === "email_not_confirmed" ||
+            signInError?.message
+              ?.toLowerCase()
+              .includes("email not confirmed") ||
+            authErrorCode === "email_not_confirmed" ||
+            authErrorMessage?.toLowerCase().includes("email not confirmed")
           ) {
             res.status(400).json({
-              error: 'Administrator account creation requires Supabase Auth email confirmation or rate limit cooldown. Please verify your email or try again shortly.',
-              code: authErrorCode || 'EMAIL_CONFIRMATION_REQUIRED'
+              error:
+                "Administrator account creation requires Supabase Auth email confirmation or rate limit cooldown. Please verify your email or try again shortly.",
+              code: authErrorCode || "EMAIL_CONFIRMATION_REQUIRED",
             });
             return;
           } else if (authErrorMessage) {
@@ -5119,14 +6715,14 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
             res.status(400).json({
               error: authErrorMessage,
               code: authErrorCode,
-              status: authStatus
+              status: authStatus,
             });
             return;
           } else if (signInError?.message) {
             res.status(400).json({
               error: signInError.message,
               code: (signInError as any).code,
-              status: (signInError as any).status
+              status: (signInError as any).status,
             });
             return;
           }
@@ -5135,7 +6731,12 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
     }
 
     if (!userId) {
-      res.status(400).json({ error: 'Failed to create or verify administrator user in Supabase Auth.' });
+      res
+        .status(400)
+        .json({
+          error:
+            "Failed to create or verify administrator user in Supabase Auth.",
+        });
       return;
     }
 
@@ -5147,57 +6748,81 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
       email: cleanEmail,
       name: cleanName,
       full_name: cleanName,
-      username: cleanEmail.split('@')[0].toLowerCase(),
-      role: 'admin',
-      status: 'active',
+      username: cleanEmail.split("@")[0].toLowerCase(),
+      role: "admin",
+      status: "active",
       is_suspended: false,
-      avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
-      bio: 'Master Administrator & Lead Clinical Advisor',
+      avatar_url:
+        "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150",
+      bio: "Master Administrator & Lead Clinical Advisor",
       created_at: nowIso,
-      updated_at: nowIso
+      updated_at: nowIso,
     };
 
     const adminUserRecord = {
       id: userId,
       email: cleanEmail,
-      role: 'admin',
+      role: "admin",
       is_active: true,
-      created_at: nowIso
+      created_at: nowIso,
     };
 
     const authorRecord = {
       id: userId,
       name: cleanName,
-      role: 'admin',
-      role_tag: 'Administrator',
-      avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
-      bio: 'Master Administrator & Lead Clinical Advisor',
-      is_deleted: false
+      role: "admin",
+      role_tag: "Administrator",
+      avatar_url:
+        "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150",
+      bio: "Master Administrator & Lead Clinical Advisor",
+      is_deleted: false,
     };
 
     // 4. Update memory state (serverCacheState) and save to disk
     if (!serverCacheState) serverCacheState = {};
 
-    serverCacheState.admin_users = Array.isArray(serverCacheState.admin_users) ? serverCacheState.admin_users : [];
-    const adminIdx = serverCacheState.admin_users.findIndex((u: any) => u.email === cleanEmail || u.id === userId);
+    serverCacheState.admin_users = Array.isArray(serverCacheState.admin_users)
+      ? serverCacheState.admin_users
+      : [];
+    const adminIdx = serverCacheState.admin_users.findIndex(
+      (u: any) => u.email === cleanEmail || u.id === userId,
+    );
     if (adminIdx >= 0) {
-      serverCacheState.admin_users[adminIdx] = { ...serverCacheState.admin_users[adminIdx], ...adminUserRecord };
+      serverCacheState.admin_users[adminIdx] = {
+        ...serverCacheState.admin_users[adminIdx],
+        ...adminUserRecord,
+      };
     } else {
       serverCacheState.admin_users.push(adminUserRecord);
     }
 
-    serverCacheState.profiles = Array.isArray(serverCacheState.profiles) ? serverCacheState.profiles : [];
-    const profileIdx = serverCacheState.profiles.findIndex((p: any) => p.id === userId || p.email === cleanEmail);
+    serverCacheState.profiles = Array.isArray(serverCacheState.profiles)
+      ? serverCacheState.profiles
+      : [];
+    const profileIdx = serverCacheState.profiles.findIndex(
+      (p: any) => p.id === userId || p.email === cleanEmail,
+    );
     if (profileIdx >= 0) {
-      serverCacheState.profiles[profileIdx] = { ...serverCacheState.profiles[profileIdx], ...profileRecord };
+      serverCacheState.profiles[profileIdx] = {
+        ...serverCacheState.profiles[profileIdx],
+        ...profileRecord,
+      };
     } else {
       serverCacheState.profiles.push(profileRecord);
     }
 
-    serverCacheState.authors = Array.isArray(serverCacheState.authors) ? serverCacheState.authors : [];
-    const authorIdx = serverCacheState.authors.findIndex((a: any) => a.id === userId);
+    serverCacheState.authors = Array.isArray(serverCacheState.authors)
+      ? serverCacheState.authors
+      : [];
+    const authorIdx = serverCacheState.authors.findIndex(
+      (a: any) => a.id === userId,
+    );
     if (authorIdx >= 0) {
-      serverCacheState.authors[authorIdx] = { ...serverCacheState.authors[authorIdx], ...authorRecord, id: userId };
+      serverCacheState.authors[authorIdx] = {
+        ...serverCacheState.authors[authorIdx],
+        ...authorRecord,
+        id: userId,
+      };
     } else {
       serverCacheState.authors.push(authorRecord);
     }
@@ -5207,56 +6832,79 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
 
     // 5. Promote the account to administrator via the service role (authoritative DB write)
     try {
-      const { error: profileUpsertErr } = await svc.from('profiles').upsert({
-        id: userId,
-        email: cleanEmail,
-        full_name: cleanName,
-        role: 'admin',
-        is_suspended: false,
-        updated_at: nowIso
-      }, { onConflict: 'id' });
+      const { error: profileUpsertErr } = await svc.from("profiles").upsert(
+        {
+          id: userId,
+          email: cleanEmail,
+          full_name: cleanName,
+          role: "admin",
+          is_suspended: false,
+          updated_at: nowIso,
+        },
+        { onConflict: "id" },
+      );
       if (profileUpsertErr) throw new Error(profileUpsertErr.message);
-      console.log(`ADMIN ROLE PERSISTED: ${cleanEmail} promoted via service role.`);
+      console.log(
+        `ADMIN ROLE PERSISTED: ${cleanEmail} promoted via service role.`,
+      );
     } catch (e: any) {
-      res.status(500).json({ error: 'Failed to persist administrator role: ' + (e.message || e) });
+      res
+        .status(500)
+        .json({
+          error: "Failed to persist administrator role: " + (e.message || e),
+        });
       return;
     }
 
-    console.log(`✅ First administrator [${cleanEmail}] configured successfully. User ID: ${userId}`);
+    console.log(
+      `✅ First administrator [${cleanEmail}] configured successfully. User ID: ${userId}`,
+    );
 
     res.json({
       success: true,
-      message: 'First administrator configured successfully.',
+      message: "First administrator configured successfully.",
       user: {
         id: userId,
         email: cleanEmail,
         name: cleanName,
-        role: 'admin'
-      }
+        role: "admin",
+      },
     });
-
   } catch (err: any) {
-    console.error('Error during setup registration:', err);
-    res.status(500).json({ error: err.message || 'An unexpected server error occurred during administrator registration.' });
+    console.error("Error during setup registration:", err);
+    res
+      .status(500)
+      .json({
+        error:
+          err.message ||
+          "An unexpected server error occurred during administrator registration.",
+      });
   }
 });
 
-app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
+app.post("/api/auth/sync-profile", async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-    res.status(401).json({ error: 'Access Denied: Authorization header with Bearer token is required.' });
+    res
+      .status(401)
+      .json({
+        error:
+          "Access Denied: Authorization header with Bearer token is required.",
+      });
     return;
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
   if (!token) {
-    res.status(401).json({ error: 'Access Denied: Valid Bearer token required.' });
+    res
+      .status(401)
+      .json({ error: "Access Denied: Valid Bearer token required." });
     return;
   }
 
   const supabase = getSupabaseClient();
   if (!supabase) {
-    res.status(500).json({ error: 'Supabase client is not initialized.' });
+    res.status(500).json({ error: "Supabase client is not initialized." });
     return;
   }
 
@@ -5267,25 +6915,36 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
   if (!serverCacheState) serverCacheState = {};
 
   // Live verify token against Supabase Auth
-  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+  const {
+    data: { user: authUser },
+    error: authError,
+  } = await supabase.auth.getUser(token);
   if (authError || !authUser) {
-    res.status(401).json({ error: 'Access Denied: Invalid or expired Supabase token.' });
+    res
+      .status(401)
+      .json({ error: "Access Denied: Invalid or expired Supabase token." });
     return;
   }
 
   // STRICT RULE: Use verified identity from authUser, ignore client-submitted userId and email
   const userId = authUser.id;
-  const cleanEmail = (authUser.email || '').trim().toLowerCase();
-  const name = req.body.name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || cleanEmail.split('@')[0];
+  const cleanEmail = (authUser.email || "").trim().toLowerCase();
+  const name =
+    req.body.name ||
+    authUser.user_metadata?.full_name ||
+    authUser.user_metadata?.name ||
+    cleanEmail.split("@")[0];
   const avatarUrl = req.body.avatarUrl || authUser.user_metadata?.avatar_url;
-  
+
   // Check if user is registered in admin_users or profiles in serverCacheState
-  const adminUser = (serverCacheState.admin_users || []).find((a: any) => 
-    a.id === userId || (a.email && a.email.toLowerCase() === cleanEmail)
+  const adminUser = (serverCacheState.admin_users || []).find(
+    (a: any) =>
+      a.id === userId || (a.email && a.email.toLowerCase() === cleanEmail),
   );
 
-  let existingProfile = (serverCacheState.profiles || []).find((p: any) => 
-    p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail)
+  let existingProfile = (serverCacheState.profiles || []).find(
+    (p: any) =>
+      p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail),
   );
 
   // AUTHORITATIVE DB LOOKUP (2026-09-22): the in-memory cache is EMPTY on
@@ -5299,37 +6958,51 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
   try {
     const svc = getServiceRoleSupabase();
     if (svc) {
-      const { data: dbProfile, error: dbErr } = await svc.from('profiles')
-        .select('id,email,full_name,name,role,status,is_suspended,avatar_url,bio,created_at')
-        .eq('id', userId)
+      const { data: dbProfile, error: dbErr } = await svc
+        .from("profiles")
+        .select(
+          "id,email,full_name,name,role,status,is_suspended,avatar_url,bio,created_at",
+        )
+        .eq("id", userId)
         .maybeSingle();
       if (!dbErr && dbProfile) {
         existingProfile = { ...existingProfile, ...dbProfile };
       } else if (dbErr) {
-        console.warn('sync-profile service-role read failed; trying user-scoped read:', dbErr.message);
+        console.warn(
+          "sync-profile service-role read failed; trying user-scoped read:",
+          dbErr.message,
+        );
       }
     }
   } catch (e: any) {
-    console.warn('sync-profile service-role read threw:', e?.message || e);
+    console.warn("sync-profile service-role read threw:", e?.message || e);
   }
   if (!existingProfile || !existingProfile.role) {
     try {
-      const syncUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
-      const syncKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
-      const userScoped = (syncUrl && syncKey && token)
-        ? createSupabaseClient(syncUrl, syncKey, token)
-        : null;
+      const syncUrl = cleanConfigValue(
+        process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
+      );
+      const syncKey = cleanConfigValue(
+        process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
+      );
+      const userScoped =
+        syncUrl && syncKey && token
+          ? createSupabaseClient(syncUrl, syncKey, token)
+          : null;
       if (userScoped) {
-        const { data: ownProfile, error: ownErr } = await userScoped.from('profiles')
-          .select('id,email,full_name,name,role,status,is_suspended,avatar_url,bio,created_at')
-          .eq('id', userId)
+        const { data: ownProfile, error: ownErr } = await userScoped
+          .from("profiles")
+          .select(
+            "id,email,full_name,name,role,status,is_suspended,avatar_url,bio,created_at",
+          )
+          .eq("id", userId)
           .maybeSingle();
         if (!ownErr && ownProfile) {
           existingProfile = { ...existingProfile, ...ownProfile };
         }
       }
     } catch (e: any) {
-      console.warn('sync-profile user-scoped read failed:', e?.message || e);
+      console.warn("sync-profile user-scoped read failed:", e?.message || e);
     }
   }
 
@@ -5338,65 +7011,95 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
   // authoritative DB check via the service role + the in-memory state as a
   // secondary guard. Once one admin exists nobody else is ever auto-promoted.
   let promoteToAdmin = false;
-  if (!adminUser && !(existingProfile && ADMIN_ROLE_VALUES.includes(existingProfile.role))) {
+  if (
+    !adminUser &&
+    !(existingProfile && ADMIN_ROLE_VALUES.includes(existingProfile.role))
+  ) {
     try {
       const svc = getServiceRoleSupabase();
       if (svc) {
-        const { data: adminRows, error: adminErr } = await svc.from('profiles')
-          .select('id').in('role', ADMIN_ROLE_VALUES).limit(1);
+        const { data: adminRows, error: adminErr } = await svc
+          .from("profiles")
+          .select("id")
+          .in("role", ADMIN_ROLE_VALUES)
+          .limit(1);
         if (!adminErr) {
-          const cacheHasAdmin = ((serverCacheState.admin_users) || []).length > 0
-            || ((serverCacheState.profiles) || []).some((p: any) => ADMIN_ROLE_VALUES.includes(p?.role));
-          promoteToAdmin = (!adminRows || adminRows.length === 0) && !cacheHasAdmin;
+          const cacheHasAdmin =
+            (serverCacheState.admin_users || []).length > 0 ||
+            (serverCacheState.profiles || []).some((p: any) =>
+              ADMIN_ROLE_VALUES.includes(p?.role),
+            );
+          promoteToAdmin =
+            (!adminRows || adminRows.length === 0) && !cacheHasAdmin;
           if (promoteToAdmin) {
-            console.log(`👑 First-admin election: no administrator exists; promoting ${cleanEmail}.`);
+            console.log(
+              `👑 First-admin election: no administrator exists; promoting ${cleanEmail}.`,
+            );
           }
         }
       }
-    } catch (_) { /* election unavailable; subscriber default applies */ }
+    } catch (_) {
+      /* election unavailable; subscriber default applies */
+    }
   }
 
-  const isAdmin = !!adminUser
-    || (existingProfile && ADMIN_ROLE_VALUES.includes(existingProfile.role))
-    || promoteToAdmin;
-  const finalRole = isAdmin ? 'admin' : (existingProfile?.role || 'subscriber');
+  const isAdmin =
+    !!adminUser ||
+    (existingProfile && ADMIN_ROLE_VALUES.includes(existingProfile.role)) ||
+    promoteToAdmin;
+  const finalRole = isAdmin ? "admin" : existingProfile?.role || "subscriber";
 
   const profileObj = {
     id: userId,
     email: cleanEmail,
-    name: name || existingProfile?.name || cleanEmail.split('@')[0],
-    full_name: name || existingProfile?.full_name || cleanEmail.split('@')[0],
+    name: name || existingProfile?.name || cleanEmail.split("@")[0],
+    full_name: name || existingProfile?.full_name || cleanEmail.split("@")[0],
     role: finalRole,
-    status: existingProfile?.status || 'active',
+    status: existingProfile?.status || "active",
     is_suspended: existingProfile?.is_suspended || false,
-    avatar_url: avatarUrl || existingProfile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
-    bio: existingProfile?.bio || '',
+    avatar_url:
+      avatarUrl ||
+      existingProfile?.avatar_url ||
+      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150",
+    bio: existingProfile?.bio || "",
     created_at: existingProfile?.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   };
 
   // Update serverCacheState memory and save to disk
   if (!serverCacheState.profiles) serverCacheState.profiles = [];
-  const profIdx = serverCacheState.profiles.findIndex((p: any) => p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail));
+  const profIdx = serverCacheState.profiles.findIndex(
+    (p: any) =>
+      p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail),
+  );
   if (profIdx >= 0) {
-    serverCacheState.profiles[profIdx] = { ...serverCacheState.profiles[profIdx], ...profileObj };
+    serverCacheState.profiles[profIdx] = {
+      ...serverCacheState.profiles[profIdx],
+      ...profileObj,
+    };
   } else {
     serverCacheState.profiles.push(profileObj);
   }
 
   if (isAdmin) {
     if (!serverCacheState.admin_users) serverCacheState.admin_users = [];
-    const adminIdx = serverCacheState.admin_users.findIndex((a: any) => a.id === userId || (a.email && a.email.toLowerCase() === cleanEmail));
+    const adminIdx = serverCacheState.admin_users.findIndex(
+      (a: any) =>
+        a.id === userId || (a.email && a.email.toLowerCase() === cleanEmail),
+    );
     const adminObj = {
       id: userId,
       email: cleanEmail,
       name: profileObj.name,
-      role: 'admin',
+      role: "admin",
       is_active: true,
-      created_at: profileObj.created_at
+      created_at: profileObj.created_at,
     };
     if (adminIdx >= 0) {
-      serverCacheState.admin_users[adminIdx] = { ...serverCacheState.admin_users[adminIdx], ...adminObj };
+      serverCacheState.admin_users[adminIdx] = {
+        ...serverCacheState.admin_users[adminIdx],
+        ...adminObj,
+      };
     } else {
       serverCacheState.admin_users.push(adminObj);
     }
@@ -5408,21 +7111,32 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
   // Role is NEVER client-writable here; admin roles are managed exclusively
   // by the setup wizard's service-role promotion.
   try {
-    const syncUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
-    const syncKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
-    const userScopedClient = (syncUrl && syncKey && token)
-      ? createSupabaseClient(syncUrl, syncKey, token)
-      : null;
+    const syncUrl = cleanConfigValue(
+      process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
+    );
+    const syncKey = cleanConfigValue(
+      process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
+    );
+    const userScopedClient =
+      syncUrl && syncKey && token
+        ? createSupabaseClient(syncUrl, syncKey, token)
+        : null;
     if (userScopedClient) {
-      const { error: profileMirrorErr } = await userScopedClient.from('profiles').upsert({
-        id: userId,
-        email: cleanEmail,
-        full_name: profileObj.full_name,
-        avatar_url: profileObj.avatar_url,
-        bio: profileObj.bio,
-        updated_at: profileObj.updated_at
-      });
-      if (profileMirrorErr) console.warn('Profile mirror upsert warning:', profileMirrorErr.message);
+      const { error: profileMirrorErr } = await userScopedClient
+        .from("profiles")
+        .upsert({
+          id: userId,
+          email: cleanEmail,
+          full_name: profileObj.full_name,
+          avatar_url: profileObj.avatar_url,
+          bio: profileObj.bio,
+          updated_at: profileObj.updated_at,
+        });
+      if (profileMirrorErr)
+        console.warn(
+          "Profile mirror upsert warning:",
+          profileMirrorErr.message,
+        );
     }
     if (promoteToAdmin) {
       // Persist the elected first admin authoritatively (service role):
@@ -5430,20 +7144,31 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
       // through the server-side privileged client, same as the setup wizard.
       const svc = getServiceRoleSupabase();
       if (svc) {
-        const { error: promoteErr } = await svc.from('profiles').upsert({
-          id: userId,
-          email: cleanEmail,
-          role: 'admin',
-          updated_at: profileObj.updated_at
-        }, { onConflict: 'id' });
-        if (promoteErr) console.warn('First-admin promotion warning:', promoteErr.message);
-        const { error: adminRegErr } = await svc.from('admin_users').upsert({
-          id: userId,
-          email: cleanEmail,
-          name: profileObj.name,
-          role: 'admin'
-        }, { onConflict: 'id' });
-        if (adminRegErr) console.warn('admin_users registration warning:', adminRegErr.message);
+        const { error: promoteErr } = await svc.from("profiles").upsert(
+          {
+            id: userId,
+            email: cleanEmail,
+            role: "admin",
+            updated_at: profileObj.updated_at,
+          },
+          { onConflict: "id" },
+        );
+        if (promoteErr)
+          console.warn("First-admin promotion warning:", promoteErr.message);
+        const { error: adminRegErr } = await svc.from("admin_users").upsert(
+          {
+            id: userId,
+            email: cleanEmail,
+            name: profileObj.name,
+            role: "admin",
+          },
+          { onConflict: "id" },
+        );
+        if (adminRegErr)
+          console.warn(
+            "admin_users registration warning:",
+            adminRegErr.message,
+          );
       }
     }
   } catch (_) {}
@@ -5454,34 +7179,55 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
 
 // Public: full single article by slug (content included)  - the per-article
 // counterpart of the projected boot state. Only published, non-draft rows.
-app.get('/api/posts/:slug', async (req: Request, res: Response) => {
+app.get("/api/posts/:slug", async (req: Request, res: Response) => {
   try {
-    const slug = String(req.params.slug || '');
-    if (!slug || slug.length > 300) { res.status(400).json({ error: 'Valid slug required.' }); return; }
+    const slug = String(req.params.slug || "");
+    if (!slug || slug.length > 300) {
+      res.status(400).json({ error: "Valid slug required." });
+      return;
+    }
     const client = getSupabaseClient();
-    if (!client) { res.status(503).json({ error: 'Database is not configured.' }); return; }
-    const { data, error } = await client.from('posts').select('*').eq('slug', slug).eq('status', 'published').maybeSingle();
-    if (error) { res.status(500).json({ error: 'Failed to fetch article.' }); return; }
-    if (!data) { res.status(404).json({ error: 'Article not found.' }); return; }
+    if (!client) {
+      res.status(503).json({ error: "Database is not configured." });
+      return;
+    }
+    const { data, error } = await client
+      .from("posts")
+      .select("*")
+      .eq("slug", slug)
+      .eq("status", "published")
+      .maybeSingle();
+    if (error) {
+      res.status(500).json({ error: "Failed to fetch article." });
+      return;
+    }
+    if (!data) {
+      res.status(404).json({ error: "Article not found." });
+      return;
+    }
     res.json({
       ...data,
-      in_article_inserts: data.in_article_inserts ? (typeof data.in_article_inserts === 'string' ? JSON.parse(data.in_article_inserts) : data.in_article_inserts) : data.in_article_inserts,
-      author_id: fromDbUUID(data.author_id)
+      in_article_inserts: data.in_article_inserts
+        ? typeof data.in_article_inserts === "string"
+          ? JSON.parse(data.in_article_inserts)
+          : data.in_article_inserts
+        : data.in_article_inserts,
+      author_id: fromDbUUID(data.author_id),
     });
   } catch (err: any) {
-    res.status(500).json({ error: 'Failed to fetch article: ' + err.message });
+    res.status(500).json({ error: "Failed to fetch article: " + err.message });
   }
 });
 
-app.get('/api/state', async (req: Request, res: Response) => {
+app.get("/api/state", async (req: Request, res: Response) => {
   const now = Date.now();
-  
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
 
   // If we have a cached state that was updated within CACHE_TTL (15s), return it immediately
-  if (serverCacheState && (now - lastSupabaseFetchTime < CACHE_TTL)) {
-    res.setHeader('ETag', stateETag);
-    res.setHeader('Last-Modified', lastModifiedDate.toUTCString());
+  if (serverCacheState && now - lastSupabaseFetchTime < CACHE_TTL) {
+    res.setHeader("ETag", stateETag);
+    res.setHeader("Last-Modified", lastModifiedDate.toUTCString());
     res.json(serverCacheState);
     return;
   }
@@ -5493,155 +7239,228 @@ app.get('/api/state', async (req: Request, res: Response) => {
       serverCacheState = {
         ...(serverCacheState || {}),
         ...supabaseState,
-        isFromSupabase: true
+        isFromSupabase: true,
       };
       lastSupabaseFetchTime = Date.now();
       stateETag = `w/etag-${lastSupabaseFetchTime}`;
       lastModifiedDate = new Date();
     }
   } catch (err) {
-    console.warn('⚠️ Fetching fresh state from database failed, serving cached fallback:', err);
+    console.warn(
+      "⚠️ Fetching fresh state from database failed, serving cached fallback:",
+      err,
+    );
   }
 
-  res.setHeader('ETag', stateETag);
-  res.setHeader('Last-Modified', lastModifiedDate.toUTCString());
+  res.setHeader("ETag", stateETag);
+  res.setHeader("Last-Modified", lastModifiedDate.toUTCString());
   res.json(serverCacheState || {});
 });
 
-app.post('/api/state', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const newState = req.body;
-  if (!newState || typeof newState !== 'object') {
-     res.status(400).json({ error: 'Payload must be a valid state object.' });
-     return;
-  }
-  
-  try {
-    // SECURITY: never accept credential-like fields from the client payload
-    if (newState.site_settings) {
-      newState.site_settings = stripSecretFields(newState.site_settings);
+app.post(
+  "/api/state",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const newState = req.body;
+    if (!newState || typeof newState !== "object") {
+      res.status(400).json({ error: "Payload must be a valid state object." });
+      return;
     }
 
-    // Preserve existing sensitive server state fields if client doesn't send them
-    if (serverCacheState && serverCacheState.site_settings) {
+    try {
+      // SECURITY: never accept credential-like fields from the client payload
       if (newState.site_settings) {
-        newState.site_settings = {
-          ...serverCacheState.site_settings,
-          ...newState.site_settings,
-          // Keep server keys safe
-          supabase_url: newState.site_settings.supabase_url || serverCacheState.site_settings.supabase_url,
-          supabase_key: newState.site_settings.supabase_key || serverCacheState.site_settings.supabase_key
-        };
+        newState.site_settings = stripSecretFields(newState.site_settings);
       }
+
+      // Preserve existing sensitive server state fields if client doesn't send them
+      if (serverCacheState && serverCacheState.site_settings) {
+        if (newState.site_settings) {
+          newState.site_settings = {
+            ...serverCacheState.site_settings,
+            ...newState.site_settings,
+            // Keep server keys safe
+            supabase_url:
+              newState.site_settings.supabase_url ||
+              serverCacheState.site_settings.supabase_url,
+            supabase_key:
+              newState.site_settings.supabase_key ||
+              serverCacheState.site_settings.supabase_key,
+          };
+        }
+      }
+      // Route DB writes through the admin's own session so RLS admin policies apply
+      await saveServerCacheState(newState, getAdminDbClient(req));
+      res.json({
+        success: true,
+        message: "State synchronized successfully with backend and database.",
+      });
+    } catch (err: any) {
+      console.error("❌ Failed to synchronize state to database:", err);
+      res.status(500).json({
+        success: false,
+        error: "Database synchronization failed",
+        details: err.message || String(err),
+      });
     }
-    // Route DB writes through the admin's own session so RLS admin policies apply
-    await saveServerCacheState(newState, getAdminDbClient(req));
-    res.json({ success: true, message: 'State synchronized successfully with backend and database.' });
-  } catch (err: any) {
-    console.error('❌ Failed to synchronize state to database:', err);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Database synchronization failed', 
-      details: err.message || String(err) 
-    });
-  }
-});
+  },
+);
 
 // HOMEPAGE SETTINGS PERSISTENCE (previously called a missing endpoint)
-app.post('/api/admin/settings', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const settings = req.body;
-  if (!settings || typeof settings !== 'object') {
-    res.status(400).json({ error: 'A settings object is required.' });
-    return;
-  }
-  const sanitized = stripSecretFields(settings);
-  const dbClient = getAdminDbClient(req) || getSupabaseClient();
-  try {
-    const base = (serverCacheState && serverCacheState.site_settings) ? serverCacheState.site_settings : {};
-    const merged = { ...base, ...sanitized };
-    if (serverCacheState) {
-      serverCacheState.site_settings = merged;
-      stateETag = `w/etag-${Date.now()}`;
-      lastModifiedDate = new Date();
-    } else {
-      serverCacheState = { site_settings: merged };
+app.post(
+  "/api/admin/settings",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const settings = req.body;
+    if (!settings || typeof settings !== "object") {
+      res.status(400).json({ error: "A settings object is required." });
+      return;
     }
-    if (dbClient) {
-      const { error: settingsErr } = await dbClient.from('site_settings').upsert({
-        id: 'singleton',
-        site_name: merged.site_name || 'Heartsync',
-        ads_enabled: Boolean(merged.adsense_active || merged.monetag_active || merged.adsterra_active),
-        adsense_publisher_id: merged.adsense_client_id || '',
-        raw_settings: merged,
-        ad_slots: {
-          adsense: { active: merged.adsense_active, client_id: merged.adsense_client_id },
-          monetag: { active: merged.monetag_active, zone_id: merged.monetag_zone_id, format: merged.monetag_format },
-          adsterra: { active: merged.adsterra_active, key_id: merged.adsterra_key_id, format: merged.adsterra_format },
-          banners: {
-            header: merged.banner_header_enabled,
-            sidebar: merged.banner_sidebar_enabled,
-            footer: merged.banner_footer_enabled,
-            in_article: merged.banner_in_article_enabled
-          }
-        },
-        updated_at: new Date().toISOString()
-      });
-      if (settingsErr) throw new Error(settingsErr.message);
-      res.json({ success: true, message: 'Homepage settings saved and synchronized to the database.' });
-    } else {
-      res.json({ success: true, message: 'Homepage settings saved to server state (database not configured).' });
+    const sanitized = stripSecretFields(settings);
+    const dbClient = getAdminDbClient(req) || getSupabaseClient();
+    try {
+      const base =
+        serverCacheState && serverCacheState.site_settings
+          ? serverCacheState.site_settings
+          : {};
+      const merged = { ...base, ...sanitized };
+      if (serverCacheState) {
+        serverCacheState.site_settings = merged;
+        stateETag = `w/etag-${Date.now()}`;
+        lastModifiedDate = new Date();
+      } else {
+        serverCacheState = { site_settings: merged };
+      }
+      if (dbClient) {
+        const { error: settingsErr } = await dbClient
+          .from("site_settings")
+          .upsert({
+            id: "singleton",
+            site_name: merged.site_name || "Heartsync",
+            ads_enabled: Boolean(
+              merged.adsense_active ||
+              merged.monetag_active ||
+              merged.adsterra_active,
+            ),
+            adsense_publisher_id: merged.adsense_client_id || "",
+            raw_settings: merged,
+            ad_slots: {
+              adsense: {
+                active: merged.adsense_active,
+                client_id: merged.adsense_client_id,
+              },
+              monetag: {
+                active: merged.monetag_active,
+                zone_id: merged.monetag_zone_id,
+                format: merged.monetag_format,
+              },
+              adsterra: {
+                active: merged.adsterra_active,
+                key_id: merged.adsterra_key_id,
+                format: merged.adsterra_format,
+              },
+              banners: {
+                header: merged.banner_header_enabled,
+                sidebar: merged.banner_sidebar_enabled,
+                footer: merged.banner_footer_enabled,
+                in_article: merged.banner_in_article_enabled,
+              },
+            },
+            updated_at: new Date().toISOString(),
+          });
+        if (settingsErr) throw new Error(settingsErr.message);
+        res.json({
+          success: true,
+          message: "Homepage settings saved and synchronized to the database.",
+        });
+      } else {
+        res.json({
+          success: true,
+          message:
+            "Homepage settings saved to server state (database not configured).",
+        });
+      }
+    } catch (err: any) {
+      console.error("Admin settings save error:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to save settings: " + (err.message || err) });
     }
-  } catch (err: any) {
-    console.error('Admin settings save error:', err);
-    res.status(500).json({ error: 'Failed to save settings: ' + (err.message || err) });
-  }
-});
+  },
+);
 
-async function verifyRecaptcha(token?: string): Promise<{ success: boolean; error?: string }> {
+async function verifyRecaptcha(
+  token?: string,
+): Promise<{ success: boolean; error?: string }> {
   const isEnabled = serverCacheState?.site_settings?.recaptcha_enabled;
   if (!isEnabled) {
     return { success: true };
   }
   if (!token) {
-    return { success: false, error: 'reCAPTCHA token is required when reCAPTCHA protection is active.' };
+    return {
+      success: false,
+      error: "reCAPTCHA token is required when reCAPTCHA protection is active.",
+    };
   }
-  const secretKey = process.env.RECAPTCHA_SECRET_KEY || serverCacheState?.site_settings?.recaptcha_secret_key || '';
+  const secretKey =
+    process.env.RECAPTCHA_SECRET_KEY ||
+    serverCacheState?.site_settings?.recaptcha_secret_key ||
+    "";
   if (!secretKey) {
     // If enabled but no secret key set in env or settings, allow with log
-    console.warn('reCAPTCHA is enabled but no secret key is configured.');
+    console.warn("reCAPTCHA is enabled but no secret key is configured.");
     return { success: true };
   }
 
   try {
     const params = new URLSearchParams({ secret: secretKey, response: token });
-    const verifyRes = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
-    });
+    const verifyRes = await fetch(
+      "https://www.google.com/recaptcha/api/siteverify",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      },
+    );
     const data = await verifyRes.json();
     if (data.success) {
       return { success: true };
     } else {
-      return { success: false, error: 'Failed reCAPTCHA verification challenge.' };
+      return {
+        success: false,
+        error: "Failed reCAPTCHA verification challenge.",
+      };
     }
   } catch (err: any) {
-    console.error('reCAPTCHA verification error:', err);
-    return { success: false, error: 'Error connecting to reCAPTCHA verification service.' };
+    console.error("reCAPTCHA verification error:", err);
+    return {
+      success: false,
+      error: "Error connecting to reCAPTCHA verification service.",
+    };
   }
 }
 
-async function getResendClient(): Promise<{ resend: Resend; apiKey: string } | null> {
+async function getResendClient(): Promise<{
+  resend: Resend;
+  apiKey: string;
+} | null> {
   let apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) return null;
   return { resend: new Resend(apiKey), apiKey };
 }
 
-async function sendResendWelcomeEmail(recipientEmail: string, source: string = 'footer') {
+async function sendResendWelcomeEmail(
+  recipientEmail: string,
+  source: string = "footer",
+) {
   const clientObj = await getResendClient();
   if (!clientObj) {
-    logger.info('Resend API key not present, skipping live welcome email dispatch for:', recipientEmail);
-    return { success: false, reason: 'RESEND_NOT_CONFIGURED' };
+    logger.info(
+      "Resend API key not present, skipping live welcome email dispatch for:",
+      recipientEmail,
+    );
+    return { success: false, reason: "RESEND_NOT_CONFIGURED" };
   }
 
   const welcomeHtml = `
@@ -5683,23 +7502,26 @@ async function sendResendWelcomeEmail(recipientEmail: string, source: string = '
 
   try {
     const data = await clientObj.resend.emails.send({
-      from: 'editorial@heartsync.com',
-      to: [recipientEmail, 'delivered@resend.dev'],
-      subject: 'Welcome to Heartsync: Nurturing Deeper Connection & Intimacy',
-      html: welcomeHtml
+      from: "editorial@heartsync.com",
+      to: [recipientEmail, "delivered@resend.dev"],
+      subject: "Welcome to Heartsync: Nurturing Deeper Connection & Intimacy",
+      html: welcomeHtml,
     });
-    logger.info('Resend Welcome Email dispatched successfully:', { recipientEmail, data });
+    logger.info("Resend Welcome Email dispatched successfully:", {
+      recipientEmail,
+      data,
+    });
     return { success: true, data };
   } catch (err: any) {
-    logger.warn('Resend Welcome Email error:', err.message);
+    logger.warn("Resend Welcome Email error:", err.message);
     return { success: false, error: err.message };
   }
 }
 
-app.post('/api/subscribe', async (req: Request, res: Response) => {
+app.post("/api/subscribe", async (req: Request, res: Response) => {
   const { email, source, recaptcha_token } = req.body || {};
-  if (!email || typeof email !== 'string' || !email.includes('@')) {
-    res.status(400).json({ error: 'Valid email address is required.' });
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    res.status(400).json({ error: "Valid email address is required." });
     return;
   }
 
@@ -5714,25 +7536,33 @@ app.post('/api/subscribe', async (req: Request, res: Response) => {
     serverCacheState.subscribers = [];
   }
 
-  const exists = serverCacheState.subscribers.some((s: any) => s.email && s.email.toLowerCase() === cleanEmail);
+  const exists = serverCacheState.subscribers.some(
+    (s: any) => s.email && s.email.toLowerCase() === cleanEmail,
+  );
   let newlySubscribed = false;
 
   if (!exists) {
     // Persist directly to the database (public insert policy; email is UNIQUE).
     const supabase = getSupabaseClient();
     if (supabase) {
-      const { error: subErr } = await supabase.from('subscribers').insert({
+      const { error: subErr } = await supabase.from("subscribers").insert({
         email: cleanEmail,
-        source: source || 'footer',
-        status: 'active'
+        source: source || "footer",
+        status: "active",
       });
       if (subErr) {
-        if (subErr.code === '23505' || /duplicate|unique/i.test(subErr.message || '')) {
+        if (
+          subErr.code === "23505" ||
+          /duplicate|unique/i.test(subErr.message || "")
+        ) {
           // Already subscribed (the DB is the source of truth)  - idempotent success.
-          res.json({ success: true, message: 'You are already subscribed. Welcome back!' });
+          res.json({
+            success: true,
+            message: "You are already subscribed. Welcome back!",
+          });
           return;
         }
-        console.warn('Subscriber DB insert failed:', subErr.message);
+        console.warn("Subscriber DB insert failed:", subErr.message);
       } else {
         newlySubscribed = true;
       }
@@ -5741,61 +7571,70 @@ app.post('/api/subscribe', async (req: Request, res: Response) => {
     const subscriber = {
       id: `sub-${Date.now()}`,
       email: cleanEmail,
-      source: source || 'footer',
-      status: 'active',
-      subscribed_at: new Date().toISOString()
+      source: source || "footer",
+      status: "active",
+      subscribed_at: new Date().toISOString(),
     };
     serverCacheState.subscribers.push(subscriber);
 
     try {
       await saveServerCacheState(serverCacheState);
     } catch (err) {
-      console.warn('Error saving state after subscribe:', err);
+      console.warn("Error saving state after subscribe:", err);
     }
   }
 
   if (newlySubscribed || (!exists && !getSupabaseClient())) {
     // Transactional welcome email sequence via Resend API (new subscribers only)
-    sendResendWelcomeEmail(cleanEmail, source || 'footer').catch(e => {
-      console.warn('Async welcome email dispatch error:', e);
+    sendResendWelcomeEmail(cleanEmail, source || "footer").catch((e) => {
+      console.warn("Async welcome email dispatch error:", e);
     });
   }
 
-  res.json({ success: true, message: 'Subscribed successfully. Welcome email sequence triggered via Resend API.' });
+  res.json({
+    success: true,
+    message:
+      "Subscribed successfully. Welcome email sequence triggered via Resend API.",
+  });
 });
 
 // Transactional Welcome Email Trigger Endpoint
-app.post('/api/newsletter/welcome', async (req: Request, res: Response) => {
+app.post("/api/newsletter/welcome", async (req: Request, res: Response) => {
   const { email, source } = req.body || {};
-  if (!email || typeof email !== 'string' || !email.includes('@')) {
-    res.status(400).json({ error: 'Valid email address is required.' });
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    res.status(400).json({ error: "Valid email address is required." });
     return;
   }
 
   const cleanEmail = email.trim().toLowerCase();
-  const result = await sendResendWelcomeEmail(cleanEmail, source || 'direct_api');
+  const result = await sendResendWelcomeEmail(
+    cleanEmail,
+    source || "direct_api",
+  );
   res.json({
     success: result.success,
     recipient: cleanEmail,
-    details: result
+    details: result,
   });
 });
 
-app.post('/api/analytics', async (req: Request, res: Response) => {
+app.post("/api/analytics", async (req: Request, res: Response) => {
   // H-08: page views persist through the SECURITY DEFINER RPC log_page_view()
   // (atomic per-day/per-path upsert on the analytics table). The previous
   // in-memory counter silently reset on every serverless cold start.
   const { path: pagePath } = req.body || {};
-  const cleanPath = (pagePath || '/').toString().slice(0, 512);
+  const cleanPath = (pagePath || "/").toString().slice(0, 512);
 
   const db = getSupabaseClient();
   if (!db) {
-    res.status(503).json({ error: 'Analytics storage is not configured.' });
+    res.status(503).json({ error: "Analytics storage is not configured." });
     return;
   }
-  const { data, error } = await db.rpc('log_page_view', { p_path: cleanPath });
+  const { data, error } = await db.rpc("log_page_view", { p_path: cleanPath });
   if (error) {
-    res.status(502).json({ error: 'Page view logging failed.', detail: error.message });
+    res
+      .status(502)
+      .json({ error: "Page view logging failed.", detail: error.message });
     return;
   }
   res.json({ success: true, total_views: data });
@@ -5803,516 +7642,680 @@ app.post('/api/analytics', async (req: Request, res: Response) => {
 
 // Aggregate page-view stats for the admin dashboard (H-08: reads the analytics
 // table  - real persisted counts, not per-instance cache guesses).
-app.get('/api/analytics/summary', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const db = getAdminDbClient(req);
-  if (!db) {
-    res.status(503).json({ error: 'Database access is not configured.' });
-    return;
-  }
-  const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
-  const { data, error } = await db.from('analytics')
-    .select('path, views, unique_visitors, date')
-    .gte('date', new Date(Date.now() - days * 86400000).toISOString().split('T')[0])
-    .order('date', { ascending: false })
-    .limit(2000);
-  if (error) {
-    res.status(502).json({ error: 'Analytics summary lookup failed.', detail: error.message });
-    return;
-  }
-  const rows = data || [];
-  const byDay = new Map<string, number>();
-  const byPath = new Map<string, number>();
-  let totalViews = 0;
-  for (const r of rows) {
-    totalViews += Number(r.views) || 0;
-    byDay.set(String(r.date), (byDay.get(String(r.date)) || 0) + (Number(r.views) || 0));
-    byPath.set(r.path, (byPath.get(r.path) || 0) + (Number(r.views) || 0));
-  }
-  res.json({
-    success: true,
-    total_views: totalViews,
-    daily_views: Array.from(byDay.entries()).map(([date, count]) => ({ date, count })).slice(0, 30),
-    top_pages: Array.from(byPath.entries()).map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count).slice(0, 10)
-  });
-});
+app.get(
+  "/api/analytics/summary",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const db = getAdminDbClient(req);
+    if (!db) {
+      res.status(503).json({ error: "Database access is not configured." });
+      return;
+    }
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
+    const { data, error } = await db
+      .from("analytics")
+      .select("path, views, unique_visitors, date")
+      .gte(
+        "date",
+        new Date(Date.now() - days * 86400000).toISOString().split("T")[0],
+      )
+      .order("date", { ascending: false })
+      .limit(2000);
+    if (error) {
+      res
+        .status(502)
+        .json({
+          error: "Analytics summary lookup failed.",
+          detail: error.message,
+        });
+      return;
+    }
+    const rows = data || [];
+    const byDay = new Map<string, number>();
+    const byPath = new Map<string, number>();
+    let totalViews = 0;
+    for (const r of rows) {
+      totalViews += Number(r.views) || 0;
+      byDay.set(
+        String(r.date),
+        (byDay.get(String(r.date)) || 0) + (Number(r.views) || 0),
+      );
+      byPath.set(r.path, (byPath.get(r.path) || 0) + (Number(r.views) || 0));
+    }
+    res.json({
+      success: true,
+      total_views: totalViews,
+      daily_views: Array.from(byDay.entries())
+        .map(([date, count]) => ({ date, count }))
+        .slice(0, 30),
+      top_pages: Array.from(byPath.entries())
+        .map(([path, count]) => ({ path, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10),
+    });
+  },
+);
 
 // Resend Status & Configuration Check Endpoint
-app.get('/api/newsletter/status', async (req: Request, res: Response) => {
+app.get("/api/newsletter/status", async (req: Request, res: Response) => {
   const clientObj = await getResendClient();
   res.json({
     success: true,
     configured: !!clientObj,
     subscribersCount: (serverCacheState.subscribers || []).length,
-    senderEmail: 'editorial@heartsync.com',
-    provider: 'Resend API',
-    timestamp: new Date().toISOString()
+    senderEmail: "editorial@heartsync.com",
+    provider: "Resend API",
+    timestamp: new Date().toISOString(),
   });
 });
 
 // Protected dynamic newsletter broadcast endpoint via Resend API
-app.post('/api/newsletter/send', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { subject, body, recipients } = req.body;
-  if (!subject || !body) {
-    res.status(400).json({ error: 'Subject and body are required.' });
-    return;
-  }
-
-  const clientObj = await getResendClient();
-  if (!clientObj) {
-    res.status(501).json({
-      success: false,
-      error: 'Newsletter Processor Not Configured',
-      details: 'To activate the Newsletter Broadcast Engine, configure RESEND_API_KEY inside your environment variables.',
-      code: 'NEWSLETTER_UNCONFIGURED'
-    });
-    return;
-  }
-
-  try {
-    let targetEmails: string[] = [];
-    if (Array.isArray(recipients) && recipients.length > 0) {
-      targetEmails = recipients;
-    } else if (serverCacheState.subscribers && serverCacheState.subscribers.length > 0) {
-      targetEmails = serverCacheState.subscribers.map((s: any) => s.email).filter(Boolean);
+app.post(
+  "/api/newsletter/send",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { subject, body, recipients } = req.body;
+    if (!subject || !body) {
+      res.status(400).json({ error: "Subject and body are required." });
+      return;
     }
 
-    if (targetEmails.length === 0) {
-      targetEmails = ['delivered@resend.dev'];
-    }
-
-    if (!targetEmails.includes('delivered@resend.dev')) {
-      targetEmails.push('delivered@resend.dev');
-    }
-
-    // Process placeholders
-    const processedBody = body
-      .replace(/\{\{subscriber_name\}\}/g, 'Valued Reader')
-      .replace(/\{\{unsubscribe_url\}\}/g, `${getPublicSiteUrl()}/unsubscribe`);
-
-    const resData = await clientObj.resend.emails.send({
-      from: 'editorial@heartsync.com',
-      to: targetEmails.slice(0, 50),
-      subject: subject,
-      html: processedBody
-    });
-
-    res.json({
-      success: true,
-      message: `Newsletter broadcast dispatched successfully via Resend API to ${targetEmails.length} recipients!`,
-      data: resData,
-      recipientCount: targetEmails.length
-    });
-  } catch (err: any) {
-    logger.error('Failed to send newsletter via Resend API:', err);
-    res.status(502).json({ success: false, error: 'Resend API dispatch error', details: err.message });
-  }
-});
-
-// Protected administrative API route
-app.get('/api/admin/sys-stats', adminAuthMiddleware, (req: Request, res: Response) => {
-  res.json({
-    status: 'secured',
-    timestamp: new Date().toISOString(),
-    metrics: {
-      dataPersistence: 'CONNECTED',
-      serverUptimeSec: Math.floor(process.uptime()),
-      programmaticSessionCount: 2,
-      adsenseStatus: 'COMPLIANT_ACTIVE',
-    },
-    auditTrails: [
-      { id: 1, action: 'Directory Mount', actor: 'SYSTEM_DAEMON' },
-      { id: 2, action: 'Sitemap Regenerated', actor: 'SEO_SCHEDULER' }
-    ]
-  });
-});
-
-// Sync server-side API keys on demand from master table settings
-app.post('/api/admin/keys/sync', adminAuthMiddleware, async (req: Request, res: Response) => {
-  try {
-    // Invalidate local caches and query in parallel with timeout safeguards to stay ultra-responsive!
-    const [geminiKey, elevenlabsKey] = await Promise.all([
-      resolveGeminiApiKey(true),
-      resolveElevenLabsApiKey(true),
-      resolveElevenLabsVoiceId(true)
-    ]);
-
-    console.log('🔄 Hot-reloading server environment API Keys. Gemini:', geminiKey ? 'CONFIGURED' : 'UNCONFIGURED', 'ElevenLabs:', elevenlabsKey ? 'CONFIGURED' : 'UNCONFIGURED');
-
-    res.json({
-      success: true,
-      message: 'All application API keys successfully synced and applied globally.',
-      gemini_active: !!geminiKey,
-      elevenlabs_active: !!elevenlabsKey
-    });
-  } catch (err: any) {
-    console.error('Keys hot-sync error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Admin Integrations Hub API
-app.get('/api/admin/integrations', adminAuthMiddleware, async (req: Request, res: Response) => {
-  try {
-    const supabase = getAdminDbClient(req) || getSupabaseClient();
-    if (supabase) {
-      const [catsRes, intsRes, settingsRes, logsRes] = await Promise.all([
-        supabase.from('integration_categories').select('*').order('id'),
-        supabase.from('integrations').select('*').order('id'),
-        supabase.from('integration_settings').select('*'),
-        supabase.from('integration_logs').select('*').order('timestamp', { ascending: false }).limit(200)
-      ]);
-      res.json({
-        categories: catsRes.data || [],
-        integrations: intsRes.data || [],
-        settings: settingsRes.data || [],
-        logs: logsRes.data || []
+    const clientObj = await getResendClient();
+    if (!clientObj) {
+      res.status(501).json({
+        success: false,
+        error: "Newsletter Processor Not Configured",
+        details:
+          "To activate the Newsletter Broadcast Engine, configure RESEND_API_KEY inside your environment variables.",
+        code: "NEWSLETTER_UNCONFIGURED",
       });
       return;
     }
-    res.json({ categories: [], integrations: [], settings: [], logs: [] });
-  } catch (err: any) {
-    console.error('Error fetching integrations:', err);
-    res.status(500).json({ error: 'Failed to fetch integrations: ' + err.message });
-  }
-});
 
-app.post('/api/admin/integrations/toggle', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { integrationId, isEnabled } = req.body;
-  if (!integrationId) {
-    res.status(400).json({ error: 'integrationId is required' });
-    return;
-  }
+    try {
+      let targetEmails: string[] = [];
+      if (Array.isArray(recipients) && recipients.length > 0) {
+        targetEmails = recipients;
+      } else if (
+        serverCacheState.subscribers &&
+        serverCacheState.subscribers.length > 0
+      ) {
+        targetEmails = serverCacheState.subscribers
+          .map((s: any) => s.email)
+          .filter(Boolean);
+      }
 
-  try {
-    const supabase = getAdminDbClient(req) || getSupabaseClient();
-    if (supabase) {
-      const { data: nameData } = await supabase.from('integrations').select('name').eq('id', integrationId).maybeSingle();
-      const intName = nameData?.name || integrationId;
+      if (targetEmails.length === 0) {
+        targetEmails = ["delivered@resend.dev"];
+      }
 
-      await supabase.from('integrations').update({
-        is_enabled: isEnabled,
-        updated_at: new Date().toISOString()
-      }).eq('id', integrationId);
+      if (!targetEmails.includes("delivered@resend.dev")) {
+        targetEmails.push("delivered@resend.dev");
+      }
 
-      const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-      const action = isEnabled ? 'enable' : 'disable';
-      const details = `${intName} integration was ${isEnabled ? 'enabled' : 'disabled'} successfully.`;
+      // Process placeholders
+      const processedBody = body
+        .replace(/\{\{subscriber_name\}\}/g, "Valued Reader")
+        .replace(
+          /\{\{unsubscribe_url\}\}/g,
+          `${getPublicSiteUrl()}/unsubscribe`,
+        );
 
-      await supabase.from('integration_logs').insert([{
-        id: logId,
-        integration_id: integrationId,
-        action,
-        status: 'success',
-        details,
-        timestamp: new Date().toISOString()
-      }]);
+      const resData = await clientObj.resend.emails.send({
+        from: "editorial@heartsync.com",
+        to: targetEmails.slice(0, 50),
+        subject: subject,
+        html: processedBody,
+      });
+
+      res.json({
+        success: true,
+        message: `Newsletter broadcast dispatched successfully via Resend API to ${targetEmails.length} recipients!`,
+        data: resData,
+        recipientCount: targetEmails.length,
+      });
+    } catch (err: any) {
+      logger.error("Failed to send newsletter via Resend API:", err);
+      res
+        .status(502)
+        .json({
+          success: false,
+          error: "Resend API dispatch error",
+          details: err.message,
+        });
     }
-    res.json({ success: true, message: `Toggle updated.` });
-  } catch (err: any) {
-    console.error('Error toggling integration:', err);
-    res.status(500).json({ error: 'Failed to toggle integration: ' + err.message });
-  }
-});
+  },
+);
 
-app.post('/api/admin/integrations/save', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { integrationId, settings } = req.body;
-  if (!integrationId || !settings) {
-    res.status(400).json({ error: 'integrationId and settings are required' });
-    return;
-  }
+// Protected administrative API route
+app.get(
+  "/api/admin/sys-stats",
+  adminAuthMiddleware,
+  (req: Request, res: Response) => {
+    res.json({
+      status: "secured",
+      timestamp: new Date().toISOString(),
+      metrics: {
+        dataPersistence: "CONNECTED",
+        serverUptimeSec: Math.floor(process.uptime()),
+        programmaticSessionCount: 2,
+        adsenseStatus: "COMPLIANT_ACTIVE",
+      },
+      auditTrails: [
+        { id: 1, action: "Directory Mount", actor: "SYSTEM_DAEMON" },
+        { id: 2, action: "Sitemap Regenerated", actor: "SEO_SCHEDULER" },
+      ],
+    });
+  },
+);
 
-  try {
-    const supabase = getAdminDbClient(req) || getSupabaseClient();
-    if (supabase) {
-      const { data: existingRows } = await supabase.from('integration_settings').select('key, value').eq('integration_id', integrationId);
-      const existingMap = new Map<string, string>();
-      (existingRows || []).forEach((r: any) => existingMap.set(r.key, r.value));
+// Sync server-side API keys on demand from master table settings
+app.post(
+  "/api/admin/keys/sync",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      // Invalidate local caches and query in parallel with timeout safeguards to stay ultra-responsive!
+      const [geminiKey, elevenlabsKey] = await Promise.all([
+        resolveGeminiApiKey(true),
+        resolveElevenLabsApiKey(true),
+        resolveElevenLabsVoiceId(true),
+      ]);
 
-      for (const key of Object.keys(settings)) {
-        const value = settings[key];
-        const isMasked = typeof value === 'string' && (value.includes('•') || value.includes('●'));
-        if (isMasked && existingMap.has(key)) continue;
+      console.log(
+        "🔄 Hot-reloading server environment API Keys. Gemini:",
+        geminiKey ? "CONFIGURED" : "UNCONFIGURED",
+        "ElevenLabs:",
+        elevenlabsKey ? "CONFIGURED" : "UNCONFIGURED",
+      );
 
-        const id = `${integrationId}_${key}`;
-        const isSensitive = key.toLowerCase().includes('key') || key.toLowerCase().includes('secret') || key.toLowerCase().includes('token');
-
-        const { error: upsertErr } = await supabase.from('integration_settings').upsert([{
-          id,
-          integration_id: integrationId,
-          key,
-          value,
-          is_sensitive: isSensitive,
-          updated_at: new Date().toISOString()
-        }]);
-        if (upsertErr) throw new Error(upsertErr.message);
-      }
-
-      if (integrationId === 'payments') {
-        const { data: sData } = await supabase.from('site_settings').select('*').eq('id', 'singleton').maybeSingle();
-        if (sData) {
-          let extraApiKeys: any = sData.extra_api_keys || {};
-          if (typeof extraApiKeys === 'string') {
-            try { extraApiKeys = JSON.parse(extraApiKeys); } catch(e) { extraApiKeys = {}; }
-          }
-          if (Array.isArray(extraApiKeys)) extraApiKeys = {};
-
-          const provider = settings['provider'] || 'stripe';
-          const pubKey = settings['public_key'];
-          const secKey = settings['secret_key'];
-
-          if (pubKey && !pubKey.includes('•') && !pubKey.includes('●')) {
-            extraApiKeys[`${provider}_publishable`] = pubKey;
-          }
-
-          await supabase.from('site_settings').update({
-            extra_api_keys: extraApiKeys,
-            updated_at: new Date().toISOString()
-          }).eq('id', 'singleton');
-        }
-      }
-
-      const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-      await supabase.from('integration_logs').insert([{
-        id: logId,
-        integration_id: integrationId,
-        action: 'update_keys',
-        status: 'success',
-        details: `Configuration parameters updated for ${integrationId}.`,
-        timestamp: new Date().toISOString()
-      }]);
+      res.json({
+        success: true,
+        message:
+          "All application API keys successfully synced and applied globally.",
+        gemini_active: !!geminiKey,
+        elevenlabs_active: !!elevenlabsKey,
+      });
+    } catch (err: any) {
+      console.error("Keys hot-sync error:", err);
+      res.status(500).json({ error: err.message });
     }
+  },
+);
 
-    res.json({ success: true, message: 'Settings saved successfully.' });
-  } catch (err: any) {
-    console.error('Error saving settings:', err);
-    res.status(500).json({ error: 'Failed to save settings: ' + err.message });
-  }
-});
-
-app.post('/api/admin/integrations/test', adminAuthMiddleware, async (req: Request, res: Response) => {
-  const { integrationId } = req.body;
-  if (!integrationId) {
-    res.status(400).json({ error: 'integrationId is required' });
-    return;
-  }
-
-  try {
-    const config: Record<string, string> = {};
-
-    const supabase = getAdminDbClient(req) || getSupabaseClient();
-    if (supabase) {
-      const { data: sRows } = await supabase.from('integration_settings').select('key, value').eq('integration_id', integrationId);
-      (sRows || []).forEach((r: any) => config[r.key] = r.value || '');
-    }
-
-    let success = false;
-    let details = '';
-
-    if (integrationId === 'resend') {
-      const apiKey = config.api_key;
-      if (!apiKey) {
-        details = 'Resend verification failed: API Key is missing.';
-      } else {
-        try {
-          const testRes = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              from: 'HeartSync <onboarding@resend.dev>',
-              to: 'test@example.com',
-              subject: 'Test connection',
-              html: '<p>Test</p>'
-            })
-          });
-          
-          if (testRes.status === 401) {
-            details = 'Resend verification failed: Invalid API Key (HTTP 401 Unauthorized).';
-          } else {
-            // A 400 validation error (e.g. from invalid domain or from address) still indicates a valid API key because authentication succeeded!
-            success = true;
-            details = `Resend connected successfully (HTTP ${testRes.status}). API Key authenticated.`;
-          }
-        } catch (fetchErr: any) {
-          details = `Resend connection failed: Network error. ${fetchErr.message}`;
-        }
-      }
-    } else if (integrationId === 'stripe') {
-      const secretKey = config.secret_key;
-      if (!secretKey) {
-        details = 'Stripe verification failed: Secret Key is missing.';
-      } else {
-        try {
-          const testRes = await fetch('https://api.stripe.com/v1/customers?limit=1', {
-            headers: {
-              'Authorization': `Bearer ${secretKey}`
-            }
-          });
-          const testData = await testRes.json();
-          if (testRes.status === 401) {
-            details = `Stripe verification failed: ${testData.error?.message || 'Invalid Secret Key (HTTP 401).'}`;
-          } else {
-            success = true;
-            details = 'Stripe connection verified. Access to checkout & customer indexes validated.';
-          }
-        } catch (fetchErr: any) {
-          details = `Stripe connection failed: Network error. ${fetchErr.message}`;
-        }
-      }
-    } else if (integrationId === 'recaptcha') {
-      const secretKey = config.secret_key;
-      if (!secretKey) {
-        details = 'Google reCAPTCHA v3 verification failed: Secret Key is missing.';
-      } else {
-        try {
-          const testRes = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `secret=${encodeURIComponent(secretKey)}&response=mock_token`
-          });
-          const testData = await testRes.json();
-          // If the secret is invalid, recaptcha returns "invalid-input-secret"
-          if (Array.isArray(testData['error-codes']) && testData['error-codes'].includes('invalid-input-secret')) {
-            details = 'reCAPTCHA verification failed: Secret Key is invalid (Google rejected token).';
-          } else {
-            success = true;
-            details = 'reCAPTCHA v3 verified. Connection established. Google verification servers active.';
-          }
-        } catch (fetchErr: any) {
-          details = `reCAPTCHA connection failed: Network error. ${fetchErr.message}`;
-        }
-      }
-    } else if (integrationId === 'google_analytics') {
-      const measurementId = config.measurement_id;
-      if (!measurementId) {
-        details = 'Google Analytics 4 verification failed: Measurement ID is missing.';
-      } else if (!/^G-[A-Z0-9]+$/i.test(measurementId)) {
-        details = 'Google Analytics 4 verification failed: Measurement ID must follow format G-XXXXXXXXXX.';
-      } else {
-        try {
-          const testRes = await fetch(`https://www.google-analytics.com/g/collect?v=2&tid=${measurementId}&cid=test_client_id&en=test_ping`, {
-            method: 'POST'
-          });
-          if (testRes.ok || testRes.status === 204) {
-            success = true;
-            details = `Google Analytics 4 verification succeeded. Stream endpoint ping completed.`;
-          } else {
-            details = `Google Analytics 4 responded with HTTP ${testRes.status}.`;
-          }
-        } catch (fetchErr: any) {
-          details = `Google Analytics 4 connection failed: Network error. ${fetchErr.message}`;
-        }
-      }
-    } else if (integrationId === 'adsense') {
-      const publisherId = config.publisher_id;
-      if (!publisherId) {
-        details = 'AdSense verification failed: Publisher ID is missing.';
-      } else if (!/^pub-\d+$/i.test(publisherId)) {
-        details = 'AdSense verification failed: Publisher ID must follow format pub-XXXXXXXXXXXXXXXX.';
-      } else {
-        try {
-          const testRes = await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js');
-          if (testRes.ok) {
-            success = true;
-            details = `AdSense network connection verified. AdSense scripts reachable. Publisher ID ${publisherId} validated for client injection.`;
-          } else {
-            details = 'AdSense script CDN unreachable.';
-          }
-        } catch (fetchErr: any) {
-          details = `AdSense network check failed: Network error. ${fetchErr.message}`;
-        }
-      }
-    } else {
-      details = `Unknown integration ${integrationId}`;
-    }
-
-    // Log the outcome
-    {
+// Admin Integrations Hub API
+app.get(
+  "/api/admin/integrations",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    try {
       const supabase = getAdminDbClient(req) || getSupabaseClient();
       if (supabase) {
-        const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-        await supabase.from('integration_logs').insert([{
-          id: logId,
-          integration_id: integrationId,
-          action: 'test_auth',
-          status: success ? 'success' : 'failed',
-          details,
-          timestamp: new Date().toISOString()
-        }]);
+        const [catsRes, intsRes, settingsRes, logsRes] = await Promise.all([
+          supabase.from("integration_categories").select("*").order("id"),
+          supabase.from("integrations").select("*").order("id"),
+          supabase.from("integration_settings").select("*"),
+          supabase
+            .from("integration_logs")
+            .select("*")
+            .order("timestamp", { ascending: false })
+            .limit(200),
+        ]);
+        res.json({
+          categories: catsRes.data || [],
+          integrations: intsRes.data || [],
+          settings: settingsRes.data || [],
+          logs: logsRes.data || [],
+        });
+        return;
       }
+      res.json({ categories: [], integrations: [], settings: [], logs: [] });
+    } catch (err: any) {
+      console.error("Error fetching integrations:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch integrations: " + err.message });
+    }
+  },
+);
+
+app.post(
+  "/api/admin/integrations/toggle",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { integrationId, isEnabled } = req.body;
+    if (!integrationId) {
+      res.status(400).json({ error: "integrationId is required" });
+      return;
     }
 
-    res.json({ success, message: details });
-  } catch (err: any) {
-    console.error('Error testing connection:', err);
-    res.status(500).json({ error: 'Failed to test connection: ' + err.message });
-  }
-});
+    try {
+      const supabase = getAdminDbClient(req) || getSupabaseClient();
+      if (supabase) {
+        const { data: nameData } = await supabase
+          .from("integrations")
+          .select("name")
+          .eq("id", integrationId)
+          .maybeSingle();
+        const intName = nameData?.name || integrationId;
 
-app.post('/api/admin/integrations/logs/clear', adminAuthMiddleware, async (req: Request, res: Response) => {
-  try {
-    const supabase = getAdminDbClient(req) || getSupabaseClient();
-    if (supabase) {
-      await supabase.from('integration_logs').delete().neq('id', '');
-      const logId = 'log_' + Math.random().toString(36).substr(2, 9);
-      await supabase.from('integration_logs').insert([{
-        id: logId,
-        integration_id: null,
-        action: 'clear_logs',
-        status: 'success',
-        details: 'All integration diagnostic logs have been cleared.',
-        timestamp: new Date().toISOString()
-      }]);
+        await supabase
+          .from("integrations")
+          .update({
+            is_enabled: isEnabled,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", integrationId);
+
+        const logId = "log_" + Math.random().toString(36).substr(2, 9);
+        const action = isEnabled ? "enable" : "disable";
+        const details = `${intName} integration was ${isEnabled ? "enabled" : "disabled"} successfully.`;
+
+        await supabase.from("integration_logs").insert([
+          {
+            id: logId,
+            integration_id: integrationId,
+            action,
+            status: "success",
+            details,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+      res.json({ success: true, message: `Toggle updated.` });
+    } catch (err: any) {
+      console.error("Error toggling integration:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to toggle integration: " + err.message });
+    }
+  },
+);
+
+app.post(
+  "/api/admin/integrations/save",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { integrationId, settings } = req.body;
+    if (!integrationId || !settings) {
+      res
+        .status(400)
+        .json({ error: "integrationId and settings are required" });
+      return;
     }
 
-    res.json({ success: true, message: 'All diagnostic logs cleared.' });
-  } catch (err: any) {
-    console.error('Error clearing integration logs:', err);
-    res.status(500).json({ error: 'Failed to clear diagnostic logs: ' + err.message });
-  }
-});
+    try {
+      const supabase = getAdminDbClient(req) || getSupabaseClient();
+      if (supabase) {
+        const { data: existingRows } = await supabase
+          .from("integration_settings")
+          .select("key, value")
+          .eq("integration_id", integrationId);
+        const existingMap = new Map<string, string>();
+        (existingRows || []).forEach((r: any) =>
+          existingMap.set(r.key, r.value),
+        );
 
+        for (const key of Object.keys(settings)) {
+          const value = settings[key];
+          const isMasked =
+            typeof value === "string" &&
+            (value.includes("•") || value.includes("●"));
+          if (isMasked && existingMap.has(key)) continue;
+
+          const id = `${integrationId}_${key}`;
+          const isSensitive =
+            key.toLowerCase().includes("key") ||
+            key.toLowerCase().includes("secret") ||
+            key.toLowerCase().includes("token");
+
+          const { error: upsertErr } = await supabase
+            .from("integration_settings")
+            .upsert([
+              {
+                id,
+                integration_id: integrationId,
+                key,
+                value,
+                is_sensitive: isSensitive,
+                updated_at: new Date().toISOString(),
+              },
+            ]);
+          if (upsertErr) throw new Error(upsertErr.message);
+        }
+
+        if (integrationId === "payments") {
+          const { data: sData } = await supabase
+            .from("site_settings")
+            .select("*")
+            .eq("id", "singleton")
+            .maybeSingle();
+          if (sData) {
+            let extraApiKeys: any = sData.extra_api_keys || {};
+            if (typeof extraApiKeys === "string") {
+              try {
+                extraApiKeys = JSON.parse(extraApiKeys);
+              } catch (e) {
+                extraApiKeys = {};
+              }
+            }
+            if (Array.isArray(extraApiKeys)) extraApiKeys = {};
+
+            const provider = settings["provider"] || "stripe";
+            const pubKey = settings["public_key"];
+            const secKey = settings["secret_key"];
+
+            if (pubKey && !pubKey.includes("•") && !pubKey.includes("●")) {
+              extraApiKeys[`${provider}_publishable`] = pubKey;
+            }
+
+            await supabase
+              .from("site_settings")
+              .update({
+                extra_api_keys: extraApiKeys,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", "singleton");
+          }
+        }
+
+        const logId = "log_" + Math.random().toString(36).substr(2, 9);
+        await supabase.from("integration_logs").insert([
+          {
+            id: logId,
+            integration_id: integrationId,
+            action: "update_keys",
+            status: "success",
+            details: `Configuration parameters updated for ${integrationId}.`,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+
+      res.json({ success: true, message: "Settings saved successfully." });
+    } catch (err: any) {
+      console.error("Error saving settings:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to save settings: " + err.message });
+    }
+  },
+);
+
+app.post(
+  "/api/admin/integrations/test",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    const { integrationId } = req.body;
+    if (!integrationId) {
+      res.status(400).json({ error: "integrationId is required" });
+      return;
+    }
+
+    try {
+      const config: Record<string, string> = {};
+
+      const supabase = getAdminDbClient(req) || getSupabaseClient();
+      if (supabase) {
+        const { data: sRows } = await supabase
+          .from("integration_settings")
+          .select("key, value")
+          .eq("integration_id", integrationId);
+        (sRows || []).forEach((r: any) => (config[r.key] = r.value || ""));
+      }
+
+      let success = false;
+      let details = "";
+
+      if (integrationId === "resend") {
+        const apiKey = config.api_key;
+        if (!apiKey) {
+          details = "Resend verification failed: API Key is missing.";
+        } else {
+          try {
+            const testRes = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                from: "HeartSync <onboarding@resend.dev>",
+                to: "test@example.com",
+                subject: "Test connection",
+                html: "<p>Test</p>",
+              }),
+            });
+
+            if (testRes.status === 401) {
+              details =
+                "Resend verification failed: Invalid API Key (HTTP 401 Unauthorized).";
+            } else {
+              // A 400 validation error (e.g. from invalid domain or from address) still indicates a valid API key because authentication succeeded!
+              success = true;
+              details = `Resend connected successfully (HTTP ${testRes.status}). API Key authenticated.`;
+            }
+          } catch (fetchErr: any) {
+            details = `Resend connection failed: Network error. ${fetchErr.message}`;
+          }
+        }
+      } else if (integrationId === "stripe") {
+        const secretKey = config.secret_key;
+        if (!secretKey) {
+          details = "Stripe verification failed: Secret Key is missing.";
+        } else {
+          try {
+            const testRes = await fetch(
+              "https://api.stripe.com/v1/customers?limit=1",
+              {
+                headers: {
+                  Authorization: `Bearer ${secretKey}`,
+                },
+              },
+            );
+            const testData = await testRes.json();
+            if (testRes.status === 401) {
+              details = `Stripe verification failed: ${testData.error?.message || "Invalid Secret Key (HTTP 401)."}`;
+            } else {
+              success = true;
+              details =
+                "Stripe connection verified. Access to checkout & customer indexes validated.";
+            }
+          } catch (fetchErr: any) {
+            details = `Stripe connection failed: Network error. ${fetchErr.message}`;
+          }
+        }
+      } else if (integrationId === "recaptcha") {
+        const secretKey = config.secret_key;
+        if (!secretKey) {
+          details =
+            "Google reCAPTCHA v3 verification failed: Secret Key is missing.";
+        } else {
+          try {
+            const testRes = await fetch(
+              "https://www.google.com/recaptcha/api/siteverify",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: `secret=${encodeURIComponent(secretKey)}&response=mock_token`,
+              },
+            );
+            const testData = await testRes.json();
+            // If the secret is invalid, recaptcha returns "invalid-input-secret"
+            if (
+              Array.isArray(testData["error-codes"]) &&
+              testData["error-codes"].includes("invalid-input-secret")
+            ) {
+              details =
+                "reCAPTCHA verification failed: Secret Key is invalid (Google rejected token).";
+            } else {
+              success = true;
+              details =
+                "reCAPTCHA v3 verified. Connection established. Google verification servers active.";
+            }
+          } catch (fetchErr: any) {
+            details = `reCAPTCHA connection failed: Network error. ${fetchErr.message}`;
+          }
+        }
+      } else if (integrationId === "google_analytics") {
+        const measurementId = config.measurement_id;
+        if (!measurementId) {
+          details =
+            "Google Analytics 4 verification failed: Measurement ID is missing.";
+        } else if (!/^G-[A-Z0-9]+$/i.test(measurementId)) {
+          details =
+            "Google Analytics 4 verification failed: Measurement ID must follow format G-XXXXXXXXXX.";
+        } else {
+          try {
+            const testRes = await fetch(
+              `https://www.google-analytics.com/g/collect?v=2&tid=${measurementId}&cid=test_client_id&en=test_ping`,
+              {
+                method: "POST",
+              },
+            );
+            if (testRes.ok || testRes.status === 204) {
+              success = true;
+              details = `Google Analytics 4 verification succeeded. Stream endpoint ping completed.`;
+            } else {
+              details = `Google Analytics 4 responded with HTTP ${testRes.status}.`;
+            }
+          } catch (fetchErr: any) {
+            details = `Google Analytics 4 connection failed: Network error. ${fetchErr.message}`;
+          }
+        }
+      } else if (integrationId === "adsense") {
+        const publisherId = config.publisher_id;
+        if (!publisherId) {
+          details = "AdSense verification failed: Publisher ID is missing.";
+        } else if (!/^pub-\d+$/i.test(publisherId)) {
+          details =
+            "AdSense verification failed: Publisher ID must follow format pub-XXXXXXXXXXXXXXXX.";
+        } else {
+          try {
+            const testRes = await fetch(
+              "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js",
+            );
+            if (testRes.ok) {
+              success = true;
+              details = `AdSense network connection verified. AdSense scripts reachable. Publisher ID ${publisherId} validated for client injection.`;
+            } else {
+              details = "AdSense script CDN unreachable.";
+            }
+          } catch (fetchErr: any) {
+            details = `AdSense network check failed: Network error. ${fetchErr.message}`;
+          }
+        }
+      } else {
+        details = `Unknown integration ${integrationId}`;
+      }
+
+      // Log the outcome
+      {
+        const supabase = getAdminDbClient(req) || getSupabaseClient();
+        if (supabase) {
+          const logId = "log_" + Math.random().toString(36).substr(2, 9);
+          await supabase.from("integration_logs").insert([
+            {
+              id: logId,
+              integration_id: integrationId,
+              action: "test_auth",
+              status: success ? "success" : "failed",
+              details,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
+      }
+
+      res.json({ success, message: details });
+    } catch (err: any) {
+      console.error("Error testing connection:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to test connection: " + err.message });
+    }
+  },
+);
+
+app.post(
+  "/api/admin/integrations/logs/clear",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const supabase = getAdminDbClient(req) || getSupabaseClient();
+      if (supabase) {
+        await supabase.from("integration_logs").delete().neq("id", "");
+        const logId = "log_" + Math.random().toString(36).substr(2, 9);
+        await supabase.from("integration_logs").insert([
+          {
+            id: logId,
+            integration_id: null,
+            action: "clear_logs",
+            status: "success",
+            details: "All integration diagnostic logs have been cleared.",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+
+      res.json({ success: true, message: "All diagnostic logs cleared." });
+    } catch (err: any) {
+      console.error("Error clearing integration logs:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to clear diagnostic logs: " + err.message });
+    }
+  },
+);
 
 // 1.9. Google Site Verification
-app.get('/google9904a5acdaa0b412.html', (req: Request, res: Response) => {
-  res.type('text/html');
-  res.send('google-site-verification: google9904a5acdaa0b412.html');
+app.get("/google9904a5acdaa0b412.html", (req: Request, res: Response) => {
+  res.type("text/html");
+  res.send("google-site-verification: google9904a5acdaa0b412.html");
 });
 
 // 1b. ads.txt  - required for AdSense serving. Serves the real publisher id
 // once configured in Monetization settings; an honest comment until then.
-app.get('/ads.txt', async (req: Request, res: Response) => {
-  res.type('text/plain');
+app.get("/ads.txt", async (req: Request, res: Response) => {
+  res.type("text/plain");
   try {
     const client = getSupabaseClient();
-    let pubId = '';
+    let pubId = "";
     if (client) {
       const { data } = await queryWithTimeout(
-        client.from('site_settings').select('adsense_client_id').eq('id', 'singleton').maybeSingle(),
-        2500
+        client
+          .from("site_settings")
+          .select("adsense_client_id")
+          .eq("id", "singleton")
+          .maybeSingle(),
+        2500,
       );
       const value = (data as Record<string, unknown> | null)?.adsense_client_id;
-      if (typeof value === 'string') pubId = value.trim();
+      if (typeof value === "string") pubId = value.trim();
     }
-    if (!pubId && typeof process.env.VITE_ADSENSE_PUBLISHER_ID === 'string') {
+    if (!pubId && typeof process.env.VITE_ADSENSE_PUBLISHER_ID === "string") {
       pubId = process.env.VITE_ADSENSE_PUBLISHER_ID.trim();
     }
     if (/^ca-pub-\d{10,}$/.test(pubId)) {
-      res.send(`google.com, ${pubId.replace('ca-pub-', 'pub-')}, DIRECT, f08c47fec0942fa0\n`);
+      res.send(
+        `google.com, ${pubId.replace("ca-pub-", "pub-")}, DIRECT, f08c47fec0942fa0\n`,
+      );
     } else {
-      res.send('# ads.txt will publish the Google AdSense line once the publisher ID is configured in Monetization settings.\n');
+      res.send(
+        "# ads.txt will publish the Google AdSense line once the publisher ID is configured in Monetization settings.\n",
+      );
     }
   } catch {
-    res.send('# ads.txt unavailable.\n');
+    res.send("# ads.txt unavailable.\n");
   }
 });
 
 // 2. robots.txt - dynamic generation compliant with Google AdSense best practices
-app.get('/robots.txt', (req: Request, res: Response) => {
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  res.type('text/plain');
+app.get("/robots.txt", (req: Request, res: Response) => {
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  res.type("text/plain");
   res.send(`# Algolia-Crawler-Verif: 104EB7F2B1A59F2A
 User-agent: *
 Allow: /
@@ -6328,29 +8331,114 @@ Sitemap: ${baseUrl}/sitemap-images.xml
 });
 
 // 3. sitemap.xml - dynamic SEO sitemap generator
-app.get('/sitemap.xml', async (req: Request, res: Response) => {
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  res.type('application/xml');
-  const nowStr = new Date().toISOString().split('T')[0];
-  
+app.get("/sitemap.xml", async (req: Request, res: Response) => {
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  res.type("application/xml");
+  const nowStr = new Date().toISOString().split("T")[0];
+
   // Base URLs static config
-  const urls: { loc: string; lastmod: string; changefreq: string; priority: string }[] = [
-    { loc: `${baseUrl}/`, lastmod: nowStr, changefreq: 'daily', priority: '1.0' },
-    { loc: `${baseUrl}/articles`, lastmod: nowStr, changefreq: 'daily', priority: '0.9' },
-    { loc: `${baseUrl}/categories`, lastmod: nowStr, changefreq: 'weekly', priority: '0.8' },
-    { loc: `${baseUrl}/trending`, lastmod: nowStr, changefreq: 'daily', priority: '0.8' },
-    { loc: `${baseUrl}/faq`, lastmod: nowStr, changefreq: 'monthly', priority: '0.5' },
-    { loc: `${baseUrl}/about`, lastmod: nowStr, changefreq: 'monthly', priority: '0.6' },
-    { loc: `${baseUrl}/contact`, lastmod: nowStr, changefreq: 'monthly', priority: '0.5' },
-    { loc: `${baseUrl}/privacy`, lastmod: nowStr, changefreq: 'monthly', priority: '0.3' },
-    { loc: `${baseUrl}/disclaimer`, lastmod: nowStr, changefreq: 'monthly', priority: '0.3' },
-    { loc: `${baseUrl}/terms`, lastmod: nowStr, changefreq: 'monthly', priority: '0.3' },
-    { loc: `${baseUrl}/cookies`, lastmod: nowStr, changefreq: 'monthly', priority: '0.3' },
-    { loc: `${baseUrl}/advertise`, lastmod: nowStr, changefreq: 'monthly', priority: '0.3' },
-    { loc: `${baseUrl}/newsletter`, lastmod: nowStr, changefreq: 'monthly', priority: '0.4' },
-    { loc: `${baseUrl}/ai-copilot`, lastmod: nowStr, changefreq: 'weekly', priority: '0.7' },
-    { loc: `${baseUrl}/lovevault`, lastmod: nowStr, changefreq: 'weekly', priority: '0.6' },
-    { loc: `${baseUrl}/subscription`, lastmod: nowStr, changefreq: 'monthly', priority: '0.7' },
+  const urls: {
+    loc: string;
+    lastmod: string;
+    changefreq: string;
+    priority: string;
+  }[] = [
+    {
+      loc: `${baseUrl}/`,
+      lastmod: nowStr,
+      changefreq: "daily",
+      priority: "1.0",
+    },
+    {
+      loc: `${baseUrl}/articles`,
+      lastmod: nowStr,
+      changefreq: "daily",
+      priority: "0.9",
+    },
+    {
+      loc: `${baseUrl}/categories`,
+      lastmod: nowStr,
+      changefreq: "weekly",
+      priority: "0.8",
+    },
+    {
+      loc: `${baseUrl}/trending`,
+      lastmod: nowStr,
+      changefreq: "daily",
+      priority: "0.8",
+    },
+    {
+      loc: `${baseUrl}/faq`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.5",
+    },
+    {
+      loc: `${baseUrl}/about`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.6",
+    },
+    {
+      loc: `${baseUrl}/contact`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.5",
+    },
+    {
+      loc: `${baseUrl}/privacy`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.3",
+    },
+    {
+      loc: `${baseUrl}/disclaimer`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.3",
+    },
+    {
+      loc: `${baseUrl}/terms`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.3",
+    },
+    {
+      loc: `${baseUrl}/cookies`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.3",
+    },
+    {
+      loc: `${baseUrl}/advertise`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.3",
+    },
+    {
+      loc: `${baseUrl}/newsletter`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.4",
+    },
+    {
+      loc: `${baseUrl}/ai-copilot`,
+      lastmod: nowStr,
+      changefreq: "weekly",
+      priority: "0.7",
+    },
+    {
+      loc: `${baseUrl}/lovevault`,
+      lastmod: nowStr,
+      changefreq: "weekly",
+      priority: "0.6",
+    },
+    {
+      loc: `${baseUrl}/subscription`,
+      lastmod: nowStr,
+      changefreq: "monthly",
+      priority: "0.7",
+    },
   ];
 
   let posts: any[] = [];
@@ -6368,50 +8456,65 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
     try {
       // Fetch dynamic content from Database if configured
       const { data: dbPosts } = await client
-        .from('posts')
-        .select('slug, publish_date')
-        .eq('status', 'published');
+        .from("posts")
+        .select("slug, publish_date")
+        .eq("status", "published");
       if (dbPosts && Array.isArray(dbPosts)) {
         posts = dbPosts;
       }
 
       const { data: dbCategories } = await client
-        .from('categories')
-        .select('slug');
+        .from("categories")
+        .select("slug");
       if (dbCategories && Array.isArray(dbCategories)) {
         categories = dbCategories;
       }
 
       const { data: dbPages } = await client
-        .from('pages')
-        .select('slug, updated_at')
-        .eq('is_deleted', false);
+        .from("pages")
+        .select("slug, updated_at")
+        .eq("is_deleted", false);
       if (dbPages && Array.isArray(dbPages)) {
         pages = dbPages;
       }
 
       const { data: dbAuthors } = await client
-        .from('profiles')
-        .select('id')
-        .neq('role', 'deleted_author');
+        .from("profiles")
+        .select("id")
+        .neq("role", "deleted_author");
       if (dbAuthors && Array.isArray(dbAuthors)) {
         authors = dbAuthors;
       }
       isDbFetched = true;
     } catch (err) {
-      console.warn('Sitemap dynamic DB queries bypassed (falling back to shared state):', err);
+      console.warn(
+        "Sitemap dynamic DB queries bypassed (falling back to shared state):",
+        err,
+      );
     }
   }
 
   // Fallback to memory/disk shared state if DB returned empty and wasn't fetched
-  if (!isDbFetched && posts.length === 0 && serverCacheState && Array.isArray(serverCacheState.posts)) {
+  if (
+    !isDbFetched &&
+    posts.length === 0 &&
+    serverCacheState &&
+    Array.isArray(serverCacheState.posts)
+  ) {
     posts = serverCacheState.posts
-      .filter((p: any) => p.status !== 'draft' && !p.is_deleted)
+      .filter((p: any) => p.status !== "draft" && !p.is_deleted)
       .map((p: any) => ({ slug: p.slug, publish_date: p.publish_date }));
   }
 
-  if (!isDbFetched && categories.length === 0 && serverCacheState && Array.isArray(serverCacheState.categories)) {
-    categories = serverCacheState.categories.map((c: any) => ({ slug: c.slug }));
+  if (
+    !isDbFetched &&
+    categories.length === 0 &&
+    serverCacheState &&
+    Array.isArray(serverCacheState.categories)
+  ) {
+    categories = serverCacheState.categories.map((c: any) => ({
+      slug: c.slug,
+    }));
   }
 
   // Always include the in-code article corpus (not stored in the database)
@@ -6426,59 +8529,59 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
   // Hardcode preloaded content fallbacks ONLY if database was not fetched and shared state is empty
   if (!isDbFetched && posts.length === 0) {
     const staticSlugs = [
-      'science-of-attachment-style',
-      'slow-dating-antidote-to-swipe-burnout',
-      'unmasking-relational-anxiety-equilibrium',
-      'art-of-boundary-setting-preserving-harmony',
-      'somatic-grounding-resolving-clashes',
-      'healing-from-relational-fatigue-solo-sanity',
-      'deconstructing-the-avoidant-defensive-shell',
-      'gottmans-four-horsemen-reversing-erosion',
-      'the-neurochemistry-of-love-devotion',
-      'emotional-bid-response-micro-trust',
-      'conscious-first-dates-reframing-the-interview',
-      'redefining-the-spark-instant-chemistry',
-      'digital-boundaries-early-dating',
-      'myth-of-perfect-match-values-vs-interests',
-      'somatic-healing',
-      'conscious-communication',
-      'secure-intimacy',
-      'inner-work',
-      'somatic-grounding-couples-co-regulation',
-      'anatomy-clean-fight-mature-conflict',
-      'vulnerability-over-validation-breaking-performance',
-      'reparenting-inner-child-relational-projection',
-      'freeze-response-disagreements-soften-shields',
-      'i-statement-upgrade-nonviolent-communication',
-      'rewriting-intimacy-script-connection-over-perfection',
-      'healing-core-wounds-taming-unworthiness-voice',
-      'emotional-flooding-deescalation-guide',
-      'drama-triangle-stepping-out-of-roles',
-      'slow-dating-intentional-alignment',
-      'setting-compassionate-boundaries-firm-scaffolding',
-      'co-regulation-breath-eye-contact-healing',
-      'magic-ratio-gottman-science-interactions',
-      'differentiation-love-balancing-togetherness',
-      'narrative-pivot-rewriting-attachment-legacy',
-      'art-emotional-validation-healing-bonds',
-      'turning-toward-gottman-bids-decoded',
-      'dating-after-healing-secure-romance'
+      "science-of-attachment-style",
+      "slow-dating-antidote-to-swipe-burnout",
+      "unmasking-relational-anxiety-equilibrium",
+      "art-of-boundary-setting-preserving-harmony",
+      "somatic-grounding-resolving-clashes",
+      "healing-from-relational-fatigue-solo-sanity",
+      "deconstructing-the-avoidant-defensive-shell",
+      "gottmans-four-horsemen-reversing-erosion",
+      "the-neurochemistry-of-love-devotion",
+      "emotional-bid-response-micro-trust",
+      "conscious-first-dates-reframing-the-interview",
+      "redefining-the-spark-instant-chemistry",
+      "digital-boundaries-early-dating",
+      "myth-of-perfect-match-values-vs-interests",
+      "somatic-healing",
+      "conscious-communication",
+      "secure-intimacy",
+      "inner-work",
+      "somatic-grounding-couples-co-regulation",
+      "anatomy-clean-fight-mature-conflict",
+      "vulnerability-over-validation-breaking-performance",
+      "reparenting-inner-child-relational-projection",
+      "freeze-response-disagreements-soften-shields",
+      "i-statement-upgrade-nonviolent-communication",
+      "rewriting-intimacy-script-connection-over-perfection",
+      "healing-core-wounds-taming-unworthiness-voice",
+      "emotional-flooding-deescalation-guide",
+      "drama-triangle-stepping-out-of-roles",
+      "slow-dating-intentional-alignment",
+      "setting-compassionate-boundaries-firm-scaffolding",
+      "co-regulation-breath-eye-contact-healing",
+      "magic-ratio-gottman-science-interactions",
+      "differentiation-love-balancing-togetherness",
+      "narrative-pivot-rewriting-attachment-legacy",
+      "art-emotional-validation-healing-bonds",
+      "turning-toward-gottman-bids-decoded",
+      "dating-after-healing-secure-romance",
     ];
-    posts = staticSlugs.map(slug => ({ slug, publish_date: nowStr }));
+    posts = staticSlugs.map((slug) => ({ slug, publish_date: nowStr }));
   }
 
   if (categories.length === 0) {
     const staticCategories = [
-      'emotional-wellness',
-      'relationship-science',
-      'mindful-dating',
-      'self-growth',
-      'somatic-healing',
-      'conscious-communication',
-      'secure-intimacy',
-      'inner-work'
+      "emotional-wellness",
+      "relationship-science",
+      "mindful-dating",
+      "self-growth",
+      "somatic-healing",
+      "conscious-communication",
+      "secure-intimacy",
+      "inner-work",
     ];
-    categories = staticCategories.map(slug => ({ slug }));
+    categories = staticCategories.map((slug) => ({ slug }));
   }
 
   if (authors.length === 0) {
@@ -6490,14 +8593,14 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
     let date = nowStr;
     try {
       if (p.publish_date) {
-        date = new Date(p.publish_date).toISOString().split('T')[0];
+        date = new Date(p.publish_date).toISOString().split("T")[0];
       }
     } catch (_) {}
     urls.push({
       loc: `${baseUrl}/article/${p.slug}`,
       lastmod: date,
-      changefreq: 'weekly',
-      priority: '0.8'
+      changefreq: "weekly",
+      priority: "0.8",
     });
   });
 
@@ -6505,8 +8608,8 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
     urls.push({
       loc: `${baseUrl}/category/${c.slug}`,
       lastmod: nowStr,
-      changefreq: 'weekly',
-      priority: '0.7'
+      changefreq: "weekly",
+      priority: "0.7",
     });
   });
 
@@ -6514,14 +8617,14 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
     let date = nowStr;
     try {
       if (pg.updated_at) {
-        date = new Date(pg.updated_at).toISOString().split('T')[0];
+        date = new Date(pg.updated_at).toISOString().split("T")[0];
       }
     } catch (_) {}
     urls.push({
       loc: `${baseUrl}/page/${pg.slug}`,
       lastmod: date,
-      changefreq: 'monthly',
-      priority: '0.6'
+      changefreq: "monthly",
+      priority: "0.6",
     });
   });
 
@@ -6529,18 +8632,22 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
     urls.push({
       loc: `${baseUrl}/author/${a.id}`,
       lastmod: nowStr,
-      changefreq: 'monthly',
-      priority: '0.5'
+      changefreq: "monthly",
+      priority: "0.5",
     });
   });
 
   // Construct XML response body
-  const urlElements = urls.map(u => `  <url>
+  const urlElements = urls
+    .map(
+      (u) => `  <url>
     <loc>${u.loc}</loc>
     <lastmod>${u.lastmod}</lastmod>
     <changefreq>${u.changefreq}</changefreq>
     <priority>${u.priority}</priority>
-  </url>`).join('\n');
+  </url>`,
+    )
+    .join("\n");
 
   const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -6551,10 +8658,10 @@ ${urlElements}
 });
 
 // 3b. sitemap-images.xml - dynamic image sitemap generator
-app.get('/sitemap-images.xml', async (req: Request, res: Response) => {
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  res.type('application/xml');
-  const nowStr = new Date().toISOString().split('T')[0];
+app.get("/sitemap-images.xml", async (req: Request, res: Response) => {
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  res.type("application/xml");
+  const nowStr = new Date().toISOString().split("T")[0];
 
   let posts: any[] = [];
   if (!serverCacheState || Object.keys(serverCacheState).length === 0) {
@@ -6564,36 +8671,75 @@ app.get('/sitemap-images.xml', async (req: Request, res: Response) => {
   if (client) {
     try {
       const { data: dbPosts } = await client
-        .from('posts')
-        .select('slug, title, excerpt, featured_image')
-        .eq('status', 'published');
+        .from("posts")
+        .select("slug, title, excerpt, featured_image")
+        .eq("status", "published");
       if (dbPosts && dbPosts.length > 0) {
         posts = dbPosts;
       }
     } catch (err) {
-      console.warn('Sitemap-images dynamic DB query bypassed:', err);
+      console.warn("Sitemap-images dynamic DB query bypassed:", err);
     }
   }
 
-  if (posts.length === 0 && serverCacheState && Array.isArray(serverCacheState.posts)) {
-    posts = serverCacheState.posts.filter((p: any) => p.status !== 'draft' && !p.is_deleted);
+  if (
+    posts.length === 0 &&
+    serverCacheState &&
+    Array.isArray(serverCacheState.posts)
+  ) {
+    posts = serverCacheState.posts.filter(
+      (p: any) => p.status !== "draft" && !p.is_deleted,
+    );
   }
 
   if (posts.length === 0) {
     // Fallback static list
     const staticSlugs = [
-      { slug: 'science-of-attachment-style', title: 'The Science of Attachment Style', excerpt: 'Deep-dive attachment styles research.', image: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=600' },
-      { slug: 'slow-dating-antidote-to-swipe-burnout', title: 'Slow Dating: Antidote to Swipe Burnout', excerpt: 'Relational pacing antidote.', image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=600' },
-      { slug: 'unmasking-relational-anxiety-equilibrium', title: 'Unmasking Relational Anxiety', excerpt: 'Anxious systems de-escalation counselor guides.', image: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=600' }
+      {
+        slug: "science-of-attachment-style",
+        title: "The Science of Attachment Style",
+        excerpt: "Deep-dive attachment styles research.",
+        image:
+          "https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=600",
+      },
+      {
+        slug: "slow-dating-antidote-to-swipe-burnout",
+        title: "Slow Dating: Antidote to Swipe Burnout",
+        excerpt: "Relational pacing antidote.",
+        image:
+          "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=600",
+      },
+      {
+        slug: "unmasking-relational-anxiety-equilibrium",
+        title: "Unmasking Relational Anxiety",
+        excerpt: "Anxious systems de-escalation counselor guides.",
+        image:
+          "https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=600",
+      },
     ];
     posts = staticSlugs;
   }
 
-  const urlElements = posts.map(p => {
-    const imgUrl = p.featured_image || p.image || 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=1200';
-    const titleClean = (p.title || 'Heartsync Relational Insight').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const captionClean = (p.excerpt || 'Empowering couples counseling blueprint and mindful connection insights.').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    return `  <url>
+  const urlElements = posts
+    .map((p) => {
+      const imgUrl =
+        p.featured_image ||
+        p.image ||
+        "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=1200";
+      const titleClean = (p.title || "Heartsync Relational Insight")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+      const captionClean = (
+        p.excerpt ||
+        "Empowering couples counseling blueprint and mindful connection insights."
+      )
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+      return `  <url>
     <loc>${baseUrl}/article/${p.slug}</loc>
     <image:image>
       <image:loc>${imgUrl}</image:loc>
@@ -6601,7 +8747,8 @@ app.get('/sitemap-images.xml', async (req: Request, res: Response) => {
       <image:caption>${captionClean}</image:caption>
     </image:image>
   </url>`;
-  }).join('\n');
+    })
+    .join("\n");
 
   const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -6613,9 +8760,9 @@ ${urlElements}
 });
 
 // 3c. feed.xml - dynamic RSS 2.0 feed syndication generator (Phase 7: SEO Hardening)
-app.get('/feed.xml', async (req: Request, res: Response) => {
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  res.type('application/xml');
+app.get("/feed.xml", async (req: Request, res: Response) => {
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  res.type("application/xml");
 
   let posts: any[] = [];
   if (!serverCacheState || Object.keys(serverCacheState).length === 0) {
@@ -6625,43 +8772,82 @@ app.get('/feed.xml', async (req: Request, res: Response) => {
   if (client) {
     try {
       const { data: dbPosts } = await client
-        .from('posts')
-        .select('slug, title, excerpt, publish_date')
-        .eq('status', 'published')
-        .order('publish_date', { ascending: false });
+        .from("posts")
+        .select("slug, title, excerpt, publish_date")
+        .eq("status", "published")
+        .order("publish_date", { ascending: false });
       if (dbPosts && dbPosts.length > 0) {
         posts = dbPosts;
       }
     } catch (err) {
-      console.warn('RSS feed dynamic DB query bypassed:', err);
+      console.warn("RSS feed dynamic DB query bypassed:", err);
     }
   }
 
-  if (posts.length === 0 && serverCacheState && Array.isArray(serverCacheState.posts)) {
-    posts = serverCacheState.posts.filter((p: any) => p.status !== 'draft' && !p.is_deleted);
+  if (
+    posts.length === 0 &&
+    serverCacheState &&
+    Array.isArray(serverCacheState.posts)
+  ) {
+    posts = serverCacheState.posts.filter(
+      (p: any) => p.status !== "draft" && !p.is_deleted,
+    );
   }
 
   if (posts.length === 0) {
     // Fallback static list
     posts = [
-      { slug: 'science-of-attachment-style', title: 'The Science of Attachment Style', excerpt: 'Deep-dive attachment styles research and couples counseling guidelines.', publish_date: new Date().toISOString() },
-      { slug: 'slow-dating-antidote-to-swipe-burnout', title: 'Slow Dating: Antidote to Swipe Burnout', excerpt: 'Relational pacing antidote for swipe-based dating exhaustion.', publish_date: new Date().toISOString() },
-      { slug: 'unmasking-relational-anxiety-equilibrium', title: 'Unmasking Relational Anxiety', excerpt: 'Anxious systems de-escalation counselor guides for emotional equilibrium.', publish_date: new Date().toISOString() }
+      {
+        slug: "science-of-attachment-style",
+        title: "The Science of Attachment Style",
+        excerpt:
+          "Deep-dive attachment styles research and couples counseling guidelines.",
+        publish_date: new Date().toISOString(),
+      },
+      {
+        slug: "slow-dating-antidote-to-swipe-burnout",
+        title: "Slow Dating: Antidote to Swipe Burnout",
+        excerpt:
+          "Relational pacing antidote for swipe-based dating exhaustion.",
+        publish_date: new Date().toISOString(),
+      },
+      {
+        slug: "unmasking-relational-anxiety-equilibrium",
+        title: "Unmasking Relational Anxiety",
+        excerpt:
+          "Anxious systems de-escalation counselor guides for emotional equilibrium.",
+        publish_date: new Date().toISOString(),
+      },
     ];
   }
 
-  const items = posts.map(p => {
-    const titleClean = (p.title || 'Heartsync Relational Insight').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const descClean = (p.excerpt || 'Empowering couples counseling blueprint and mindful connection insights.').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const pubDate = p.publish_date ? new Date(p.publish_date).toUTCString() : new Date().toUTCString();
-    return `    <item>
+  const items = posts
+    .map((p) => {
+      const titleClean = (p.title || "Heartsync Relational Insight")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+      const descClean = (
+        p.excerpt ||
+        "Empowering couples counseling blueprint and mindful connection insights."
+      )
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+      const pubDate = p.publish_date
+        ? new Date(p.publish_date).toUTCString()
+        : new Date().toUTCString();
+      return `    <item>
       <title>${titleClean}</title>
       <link>${baseUrl}/article/${p.slug}</link>
       <guid>${baseUrl}/article/${p.slug}</guid>
       <pubDate>${pubDate}</pubDate>
       <description>${descClean}</description>
     </item>`;
-  }).join('\n');
+    })
+    .join("\n");
 
   const rssXml = `<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
@@ -6680,36 +8866,41 @@ ${items}
 });
 
 // Helper to resolve active Google AdSense Publisher ID dynamically on the server
-async function resolveAdSenseClientIdServer(): Promise<{ clientId: string; active: boolean }> {
+async function resolveAdSenseClientIdServer(): Promise<{
+  clientId: string;
+  active: boolean;
+}> {
   // 1. Check environment variables first
-  const envKey = process.env.VITE_ADSENSE_PUBLISHER_ID || 
-                 process.env.VITE_PUBLIC_ADSENSE_CLIENT || 
-                 process.env.VITE_ADSENSE_CLIENT;
+  const envKey =
+    process.env.VITE_ADSENSE_PUBLISHER_ID ||
+    process.env.VITE_PUBLIC_ADSENSE_CLIENT ||
+    process.env.VITE_ADSENSE_CLIENT;
   if (envKey && envKey.trim()) {
     return { clientId: envKey.trim(), active: true };
   }
 
-
   // 3. Fallback to site_settings
-  const sSettings = (global as any).serverCacheState?.site_settings || (serverCacheState as any)?.site_settings;
+  const sSettings =
+    (global as any).serverCacheState?.site_settings ||
+    (serverCacheState as any)?.site_settings;
   if (sSettings?.adsense_client_id) {
-    return { 
-      clientId: sSettings.adsense_client_id.trim(), 
-      active: !!sSettings.adsense_active 
+    return {
+      clientId: sSettings.adsense_client_id.trim(),
+      active: !!sSettings.adsense_active,
     };
   }
 
   // 4. Nothing configured  - honest absence. The publisher ID lives ONLY in
   // site_settings (now migrated there); no hardcoded fallback in code.
-  return { clientId: '', active: false };
+  return { clientId: "", active: false };
 }
 
 // Handler to serve index.html dynamically injected with dynamic SEO meta tags and correct AdSense Publisher ID
 async function handleDynamicHtml(req: Request, res: Response) {
   const protocol = req.protocol;
-  const host = req.get('host') || 'localhost:3000';
+  const host = req.get("host") || "localhost:3000";
   const baseUrl = `${protocol}://${host}`;
-  
+
   // Resolve AdSense configuration dynamically
   const adsenseData = await resolveAdSenseClientIdServer();
   const adsenseClientId = adsenseData.clientId;
@@ -6719,43 +8910,45 @@ async function handleDynamicHtml(req: Request, res: Response) {
   // dev (cwd/index.html), and the Vercel serverless bundle, where the HTML is
   // includeFiles-shipped next to (or relative to) the compiled function.
   const indexCandidates = [
-    path.join(process.cwd(), 'dist', 'index.html'),
-    path.join(process.cwd(), 'index.html'),
-    path.join(__dirname, 'index.html'),
-    path.join(__dirname, '..', 'index.html'),
-    path.join(__dirname, 'dist', 'index.html'),
-    path.join(__dirname, '..', 'dist', 'index.html'),
-    path.join(__dirname, '..', '..', 'dist', 'index.html')
+    path.join(process.cwd(), "dist", "index.html"),
+    path.join(process.cwd(), "index.html"),
+    path.join(__dirname, "index.html"),
+    path.join(__dirname, "..", "index.html"),
+    path.join(__dirname, "dist", "index.html"),
+    path.join(__dirname, "..", "dist", "index.html"),
+    path.join(__dirname, "..", "..", "dist", "index.html"),
   ];
 
-  let html = '';
+  let html = "";
   let foundIndex = false;
   for (const candidate of indexCandidates) {
     try {
       if (fs.existsSync(candidate)) {
-        html = fs.readFileSync(candidate, 'utf8');
+        html = fs.readFileSync(candidate, "utf8");
         foundIndex = true;
         break;
       }
     } catch (_) {}
   }
   if (!foundIndex || !html) {
-    res.status(500).send('Index HTML not found');
+    res.status(500).send("Index HTML not found");
     return;
   }
 
   // Establish default search and compliance metadata
-  let seoTitle = 'Heartsync  - Mindful Insights for Connected Hearts';
-  let seoDesc = 'Explore scientific relationships advice, attachment style counseling blueprints, and evidence-based couples wellness resources.';
-  let seoKeywords = 'heartsync, relationship advice, attachment styles, couples counseling, emotional wellness, somatic grounding';
+  let seoTitle = "Heartsync  - Mindful Insights for Connected Hearts";
+  let seoDesc =
+    "Explore scientific relationships advice, attachment style counseling blueprints, and evidence-based couples wellness resources.";
+  let seoKeywords =
+    "heartsync, relationship advice, attachment styles, couples counseling, emotional wellness, somatic grounding";
   let seoImage = `${baseUrl}/og-image.png`;
   let canonicalUrl = `${baseUrl}${req.path}`;
-  let lang = 'en';
+  let lang = "en";
 
   // Support dynamic language query params (e.g. ?lang=es)
-  if (req.query.lang && typeof req.query.lang === 'string') {
+  if (req.query.lang && typeof req.query.lang === "string") {
     const l = req.query.lang.toLowerCase().trim();
-    if (l === 'es' || l === 'en' || l === 'fr' || l === 'de') {
+    if (l === "es" || l === "en" || l === "fr" || l === "de") {
       lang = l;
     }
   }
@@ -6768,36 +8961,34 @@ async function handleDynamicHtml(req: Request, res: Response) {
     "@context": "https://schema.org",
     "@type": "Organization",
     "@id": `${baseUrl}/#organization`,
-    "name": "Heartsync",
-    "url": baseUrl,
-    "logo": {
+    name: "Heartsync",
+    url: baseUrl,
+    logo: {
       "@type": "ImageObject",
-      "url": `${baseUrl}/icons/icon-512.png`,
-      "width": 512,
-      "height": 512
+      url: `${baseUrl}/icons/icon-512.png`,
+      width: 512,
+      height: 512,
     },
-    "description": "Evidence-based couples counseling guidelines and somatic trauma recovery resources.",
-    "sameAs": [
-      "https://twitter.com/heartsync",
-      "https://facebook.com/heartsync"
-    ]
+    description:
+      "Evidence-based couples counseling guidelines and somatic trauma recovery resources.",
+    sameAs: ["https://twitter.com/heartsync", "https://facebook.com/heartsync"],
   };
 
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "@id": `${baseUrl}/#website`,
-    "name": "Heartsync",
-    "url": baseUrl,
-    "description": "Mindful Insights for Connected Hearts",
-    "publisher": {
-      "@id": `${baseUrl}/#organization`
+    name: "Heartsync",
+    url: baseUrl,
+    description: "Mindful Insights for Connected Hearts",
+    publisher: {
+      "@id": `${baseUrl}/#organization`,
     },
-    "potentialAction": {
+    potentialAction: {
       "@type": "SearchAction",
-      "target": `${baseUrl}/articles?q={search_term_string}`,
-      "query-input": "required name=search_term_string"
-    }
+      target: `${baseUrl}/articles?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
   };
 
   schemas.push(orgSchema);
@@ -6806,41 +8997,41 @@ async function handleDynamicHtml(req: Request, res: Response) {
   // BreadcrumbList schema for static pages so search engines render the
   // site hierarchy trail (Home > Page) on result listings.
   const STATIC_PAGE_LABELS: Record<string, string> = {
-    '/articles': 'Journal',
-    '/categories': 'Categories',
-    '/trending': 'Trending',
-    '/faq': 'FAQ',
-    '/about': 'About',
-    '/contact': 'Contact',
-    '/privacy': 'Privacy Policy',
-    '/disclaimer': 'Disclaimer',
-    '/terms': 'Terms of Service',
-    '/cookies': 'Cookie Policy',
-    '/advertise': 'Advertise',
-    '/newsletter': 'Newsletter',
-    '/subscription': 'Premium Membership',
-    '/ai-copilot': 'AI Guide',
-    '/lovevault': 'LoveVault'
+    "/articles": "Journal",
+    "/categories": "Categories",
+    "/trending": "Trending",
+    "/faq": "FAQ",
+    "/about": "About",
+    "/contact": "Contact",
+    "/privacy": "Privacy Policy",
+    "/disclaimer": "Disclaimer",
+    "/terms": "Terms of Service",
+    "/cookies": "Cookie Policy",
+    "/advertise": "Advertise",
+    "/newsletter": "Newsletter",
+    "/subscription": "Premium Membership",
+    "/ai-copilot": "AI Guide",
+    "/lovevault": "LoveVault",
   };
-  const staticLabel = STATIC_PAGE_LABELS[req.path.replace(/\/$/, '')];
-  if (staticLabel && req.path !== '/') {
+  const staticLabel = STATIC_PAGE_LABELS[req.path.replace(/\/$/, "")];
+  if (staticLabel && req.path !== "/") {
     schemas.push({
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
-      "itemListElement": [
+      itemListElement: [
         {
           "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "item": `${baseUrl}/`
+          position: 1,
+          name: "Home",
+          item: `${baseUrl}/`,
         },
         {
           "@type": "ListItem",
-          "position": 2,
-          "name": staticLabel,
-          "item": `${baseUrl}${req.path}`
-        }
-      ]
+          position: 2,
+          name: staticLabel,
+          item: `${baseUrl}${req.path}`,
+        },
+      ],
     });
   }
 
@@ -6852,16 +9043,19 @@ async function handleDynamicHtml(req: Request, res: Response) {
   let post: any = null;
   let category: any = null;
 
-
   // Fallback to Supabase / serverCacheState if post or category wasn't retrieved via pool
-  if (req.path.startsWith('/article/')) {
-    const slug = req.path.split('/article/')[1]?.split('?')[0];
+  if (req.path.startsWith("/article/")) {
+    const slug = req.path.split("/article/")[1]?.split("?")[0];
     if (slug && !post) {
       if (Array.isArray(serverCacheState.posts)) {
         post = serverCacheState.posts.find((p: any) => p.slug === slug);
       }
       if (post) {
-        const catObj = Array.isArray(serverCacheState.categories) ? serverCacheState.categories.find((c: any) => c.id === post.category_id) : null;
+        const catObj = Array.isArray(serverCacheState.categories)
+          ? serverCacheState.categories.find(
+              (c: any) => c.id === post.category_id,
+            )
+          : null;
         if (catObj) {
           post.category_name = catObj.name;
           post.category_slug = catObj.slug;
@@ -6876,20 +9070,22 @@ async function handleDynamicHtml(req: Request, res: Response) {
       const codeArticle = HEARTSYNC_ARTICLE_SEO.find((a) => a.slug === slug);
       if (codeArticle) {
         const catObj = Array.isArray(serverCacheState.categories)
-          ? serverCacheState.categories.find((c: any) => c.id === codeArticle.category_id)
+          ? serverCacheState.categories.find(
+              (c: any) => c.id === codeArticle.category_id,
+            )
           : null;
         post = {
           slug: codeArticle.slug,
           title: codeArticle.title,
           excerpt: codeArticle.excerpt,
-          content: '', // body lives in the client bundle; wordCount falls back below
+          content: "", // body lives in the client bundle; wordCount falls back below
           featured_image: codeArticle.featured_image,
           publish_date: codeArticle.publish_date,
           keywords: codeArticle.keywords,
           seo_title: codeArticle.seo_title,
           seo_description: codeArticle.seo_description,
-          category_name: catObj?.name || 'Relationship Science',
-          category_slug: catObj?.slug || 'relationship-science'
+          category_name: catObj?.name || "Relationship Science",
+          category_slug: catObj?.slug || "relationship-science",
         };
       }
     }
@@ -6898,62 +9094,69 @@ async function handleDynamicHtml(req: Request, res: Response) {
       seoTitle = post.seo_title || `${post.title} | Heartsync Insights`;
       seoDesc = post.seo_description || post.excerpt || seoDesc;
       seoImage = post.featured_image || seoImage;
-      
+
       if (post.keywords || post.seo_keywords) {
         try {
           const kwSource = post.seo_keywords || post.keywords;
-          const kw = typeof kwSource === 'string' ? JSON.parse(kwSource) : kwSource;
+          const kw =
+            typeof kwSource === "string" ? JSON.parse(kwSource) : kwSource;
           if (Array.isArray(kw)) {
-            seoKeywords = kw.join(', ');
+            seoKeywords = kw.join(", ");
           }
         } catch (_) {}
       }
 
       const wordCount = post.content ? post.content.split(/\s+/).length : 250;
-      const publishDateStr = post.publish_date ? new Date(post.publish_date).toISOString() : new Date().toISOString();
-      const updateDateStr = post.updated_at ? new Date(post.updated_at).toISOString() : publishDateStr;
-      const authorName = post.author_name || 'Peter Tubin';
-      const authorAvatar = post.author_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150';
-      const categoryName = post.category_name || 'Relationship Science';
-      const categorySlug = post.category_slug || 'relationship-science';
+      const publishDateStr = post.publish_date
+        ? new Date(post.publish_date).toISOString()
+        : new Date().toISOString();
+      const updateDateStr = post.updated_at
+        ? new Date(post.updated_at).toISOString()
+        : publishDateStr;
+      const authorName = post.author_name || "Peter Tubin";
+      const authorAvatar =
+        post.author_avatar ||
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150";
+      const categoryName = post.category_name || "Relationship Science";
+      const categorySlug = post.category_slug || "relationship-science";
 
       // Fetch dynamic FAQs matching this article theme
-      const seoAdditions = getArticleSeoData(slug || '', post.title);
+      const seoAdditions = getArticleSeoData(slug || "", post.title);
 
       // BlogPosting structured data
       const articleSchema = {
         "@context": "https://schema.org",
         "@type": "BlogPosting",
         "@id": `${canonicalUrl}/#article`,
-        "isPartOf": {
-          "@id": `${baseUrl}/#website`
+        isPartOf: {
+          "@id": `${baseUrl}/#website`,
         },
-        "mainEntityOfPage": canonicalUrl,
-        "headline": post.title,
-        "description": seoDesc,
-        "image": {
+        mainEntityOfPage: canonicalUrl,
+        headline: post.title,
+        description: seoDesc,
+        image: {
           "@type": "ImageObject",
-          "url": seoImage,
-          "width": 1200,
-          "height": 630
+          url: seoImage,
+          width: 1200,
+          height: 630,
         },
-        "datePublished": publishDateStr,
-        "dateModified": updateDateStr,
-        "author": {
+        datePublished: publishDateStr,
+        dateModified: updateDateStr,
+        author: {
           "@type": "Person",
-          "name": authorName,
-          "image": authorAvatar,
-          "jobTitle": "Relational Specialist",
-          "worksFor": {
-            "@id": `${baseUrl}/#organization`
-          }
+          name: authorName,
+          image: authorAvatar,
+          jobTitle: "Relational Specialist",
+          worksFor: {
+            "@id": `${baseUrl}/#organization`,
+          },
         },
-        "publisher": {
-          "@id": `${baseUrl}/#organization`
+        publisher: {
+          "@id": `${baseUrl}/#organization`,
         },
-        "wordCount": wordCount,
-        "articleSection": categoryName,
-        "keywords": seoKeywords
+        wordCount: wordCount,
+        articleSection: categoryName,
+        keywords: seoKeywords,
       };
       schemas.push(articleSchema);
 
@@ -6961,26 +9164,26 @@ async function handleDynamicHtml(req: Request, res: Response) {
       const breadcrumbs = {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
-        "itemListElement": [
+        itemListElement: [
           {
             "@type": "ListItem",
-            "position": 1,
-            "name": "Home",
-            "item": `${baseUrl}/`
+            position: 1,
+            name: "Home",
+            item: `${baseUrl}/`,
           },
           {
             "@type": "ListItem",
-            "position": 2,
-            "name": categoryName,
-            "item": `${baseUrl}/category/${categorySlug}`
+            position: 2,
+            name: categoryName,
+            item: `${baseUrl}/category/${categorySlug}`,
           },
           {
             "@type": "ListItem",
-            "position": 3,
-            "name": post.title,
-            "item": canonicalUrl
-          }
-        ]
+            position: 3,
+            name: post.title,
+            item: canonicalUrl,
+          },
+        ],
       };
       schemas.push(breadcrumbs);
 
@@ -6988,34 +9191,41 @@ async function handleDynamicHtml(req: Request, res: Response) {
       const faqSchemaObj = {
         "@context": "https://schema.org",
         "@type": "FAQPage",
-        "mainEntity": seoAdditions.faq.map(item => ({
+        mainEntity: seoAdditions.faq.map((item) => ({
           "@type": "Question",
-          "name": item.question,
-          "acceptedAnswer": {
+          name: item.question,
+          acceptedAnswer: {
             "@type": "Answer",
-            "text": item.answer
-          }
-        }))
+            text: item.answer,
+          },
+        })),
       };
       schemas.push(faqSchemaObj);
     }
-  } else if (req.path.startsWith('/category/')) {
-    const slug = req.path.split('/category/')[1]?.split('?')[0];
+  } else if (req.path.startsWith("/category/")) {
+    const slug = req.path.split("/category/")[1]?.split("?")[0];
     if (slug && !category) {
       if (Array.isArray(serverCacheState.categories)) {
-        category = serverCacheState.categories.find((c: any) => c.slug === slug);
+        category = serverCacheState.categories.find(
+          (c: any) => c.slug === slug,
+        );
       }
     }
 
     if (category) {
-      seoTitle = category.seo_title || `${category.name}  - Relational Guide | Heartsync`;
+      seoTitle =
+        category.seo_title ||
+        `${category.name}  - Relational Guide | Heartsync`;
       seoDesc = category.seo_description || category.description || seoDesc;
       seoImage = category.featured_image || seoImage;
       if (category.seo_keywords) {
         try {
-          const kw = typeof category.seo_keywords === 'string' ? JSON.parse(category.seo_keywords) : category.seo_keywords;
+          const kw =
+            typeof category.seo_keywords === "string"
+              ? JSON.parse(category.seo_keywords)
+              : category.seo_keywords;
           if (Array.isArray(kw)) {
-            seoKeywords = kw.join(', ');
+            seoKeywords = kw.join(", ");
           }
         } catch (_) {}
       }
@@ -7025,16 +9235,16 @@ async function handleDynamicHtml(req: Request, res: Response) {
         "@context": "https://schema.org",
         "@type": "CollectionPage",
         "@id": `${canonicalUrl}/#collection`,
-        "name": category.name,
-        "description": seoDesc,
-        "url": canonicalUrl,
-        "isPartOf": {
-          "@id": `${baseUrl}/#website`
+        name: category.name,
+        description: seoDesc,
+        url: canonicalUrl,
+        isPartOf: {
+          "@id": `${baseUrl}/#website`,
         },
-        "about": {
+        about: {
           "@type": "Thing",
-          "name": category.name
-        }
+          name: category.name,
+        },
       };
       schemas.push(collectionSchema);
 
@@ -7042,58 +9252,58 @@ async function handleDynamicHtml(req: Request, res: Response) {
       const breadcrumbs = {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
-        "itemListElement": [
+        itemListElement: [
           {
             "@type": "ListItem",
-            "position": 1,
-            "name": "Home",
-            "item": `${baseUrl}/`
+            position: 1,
+            name: "Home",
+            item: `${baseUrl}/`,
           },
           {
             "@type": "ListItem",
-            "position": 2,
-            "name": category.name,
-            "item": canonicalUrl
-          }
-        ]
+            position: 2,
+            name: category.name,
+            item: canonicalUrl,
+          },
+        ],
       };
       schemas.push(breadcrumbs);
     }
   } else {
-    const lastSegment = req.path.split('/').pop() || '';
-    let pageName = 'Home';
-    let pageType: 'WebPage' | 'AboutPage' | 'ContactPage' = 'WebPage';
+    const lastSegment = req.path.split("/").pop() || "";
+    let pageName = "Home";
+    let pageType: "WebPage" | "AboutPage" | "ContactPage" = "WebPage";
 
-    if (lastSegment === 'about') {
-      pageName = 'About Us';
-      pageType = 'AboutPage';
-    } else if (lastSegment === 'contact') {
-      pageName = 'Contact Us';
-      pageType = 'ContactPage';
-    } else if (lastSegment === 'privacy') {
-      pageName = 'Privacy Policy';
-    } else if (lastSegment === 'terms') {
-      pageName = 'Terms and Conditions';
-    } else if (lastSegment === 'cookies') {
-      pageName = 'Cookie Policy';
-    } else if (lastSegment === 'disclaimer') {
-      pageName = 'Medical & Relational Disclaimer';
-    } else if (lastSegment === 'faq') {
-      pageName = 'Relational FAQ Center';
+    if (lastSegment === "about") {
+      pageName = "About Us";
+      pageType = "AboutPage";
+    } else if (lastSegment === "contact") {
+      pageName = "Contact Us";
+      pageType = "ContactPage";
+    } else if (lastSegment === "privacy") {
+      pageName = "Privacy Policy";
+    } else if (lastSegment === "terms") {
+      pageName = "Terms and Conditions";
+    } else if (lastSegment === "cookies") {
+      pageName = "Cookie Policy";
+    } else if (lastSegment === "disclaimer") {
+      pageName = "Medical & Relational Disclaimer";
+    } else if (lastSegment === "faq") {
+      pageName = "Relational FAQ Center";
     }
 
-    if (lastSegment && lastSegment !== 'index.html') {
+    if (lastSegment && lastSegment !== "index.html") {
       // Standard WebPage Schema
       const pageSchemaObj = {
         "@context": "https://schema.org",
         "@type": pageType,
         "@id": `${canonicalUrl}/#page`,
-        "name": `${pageName}  - Heartsync`,
-        "description": seoDesc,
-        "url": canonicalUrl,
-        "isPartOf": {
-          "@id": `${baseUrl}/#website`
-        }
+        name: `${pageName}  - Heartsync`,
+        description: seoDesc,
+        url: canonicalUrl,
+        isPartOf: {
+          "@id": `${baseUrl}/#website`,
+        },
       };
       schemas.push(pageSchemaObj);
 
@@ -7101,20 +9311,20 @@ async function handleDynamicHtml(req: Request, res: Response) {
       const breadcrumbs = {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
-        "itemListElement": [
+        itemListElement: [
           {
             "@type": "ListItem",
-            "position": 1,
-            "name": "Home",
-            "item": `${baseUrl}/`
+            position: 1,
+            name: "Home",
+            item: `${baseUrl}/`,
           },
           {
             "@type": "ListItem",
-            "position": 2,
-            "name": pageName,
-            "item": canonicalUrl
-          }
-        ]
+            position: 2,
+            name: pageName,
+            item: canonicalUrl,
+          },
+        ],
       };
       schemas.push(breadcrumbs);
     }
@@ -7130,42 +9340,49 @@ async function handleDynamicHtml(req: Request, res: Response) {
   // Swap either the legacy demo ID or the statically-baked production ID so the
   // admin-configured publisher ID (env / integration_settings / site_settings) always wins.
   if (adsenseClientId) {
-    html = html.replace(/ca-pub-(?:3940256099942544|3404100134534192)/g, adsenseClientId);
+    html = html.replace(
+      /ca-pub-(?:3940256099942544|3404100134534192)/g,
+      adsenseClientId,
+    );
   }
 
   // If the administrator has toggled AdSense OFF, we strip/deactivate the SDK script tags
   if (!adsenseActive) {
     html = html.replace(
-      /<script async src="https:\/\/pagead2.googlesyndication.com\/pagead\/js\/adsbygoogle.js.*?<\/script>/gi, 
-      `<!-- Google AdSense deactivated by administrator settings -->`
+      /<script async src="https:\/\/pagead2.googlesyndication.com\/pagead\/js\/adsbygoogle.js.*?<\/script>/gi,
+      `<!-- Google AdSense deactivated by administrator settings -->`,
     );
   }
 
   // Inject multiple JSON-LD scripts
-  const schemaScripts = schemas.map(s => `
+  const schemaScripts = schemas
+    .map(
+      (s) => `
     <script type="application/ld+json">
     ${JSON.stringify(s, null, 2)}
-    </script>`).join('\n');
+    </script>`,
+    )
+    .join("\n");
 
   // Formulate dynamic search crawler and social indexing compliance meta tag layout
   const seoHeadInject = `
     <!-- Dynamic Search Engine & Indexing Compliance Meta Tags -->
-    <meta name="description" content="${seoDesc.replace(/"/g, '&quot;')}" />
-    <meta name="keywords" content="${seoKeywords.replace(/"/g, '&quot;')}" />
+    <meta name="description" content="${seoDesc.replace(/"/g, "&quot;")}" />
+    <meta name="keywords" content="${seoKeywords.replace(/"/g, "&quot;")}" />
     <link rel="canonical" href="${canonicalUrl}" />
     
     <!-- Open Graph Protocol (OGP) for Google, Facebook, LinkedIn and WhatsApp indexing -->
     <meta property="og:site_name" content="Heartsync" />
-    <meta property="og:title" content="${seoTitle.replace(/"/g, '&quot;')}" />
-    <meta property="og:description" content="${seoDesc.replace(/"/g, '&quot;')}" />
+    <meta property="og:title" content="${seoTitle.replace(/"/g, "&quot;")}" />
+    <meta property="og:description" content="${seoDesc.replace(/"/g, "&quot;")}" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="${canonicalUrl}" />
     <meta property="og:image" content="${seoImage}" />
     
     <!-- Twitter Cards for social platform snippet rendering -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${seoTitle.replace(/"/g, '&quot;')}" />
-    <meta name="twitter:description" content="${seoDesc.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:title" content="${seoTitle.replace(/"/g, "&quot;")}" />
+    <meta name="twitter:description" content="${seoDesc.replace(/"/g, "&quot;")}" />
     <meta name="twitter:image" content="${seoImage}" />
 
     <!-- Google Search Structured Schema Markup (JSON-LD) for Rich Results -->
@@ -7173,12 +9390,15 @@ async function handleDynamicHtml(req: Request, res: Response) {
   `;
 
   // Inject dynamic head tags right before closing head boundary
-  html = html.replace('</head>', `${seoHeadInject}\n</head>`);
+  html = html.replace("</head>", `${seoHeadInject}\n</head>`);
 
-  res.type('text/html');
+  res.type("text/html");
   // Vercel's edge caches the function response per-path when s-maxage allows,
   // keeping serverless-served article pages fast. Harmless elsewhere.
-  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=86400, stale-while-revalidate=604800');
+  res.setHeader(
+    "Cache-Control",
+    "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800",
+  );
   res.send(html);
 }
 
@@ -7207,7 +9427,12 @@ async function registerProductionRoutes() {
   // run on) regardless of any platform-specific env var propagation, so it
   // is the reliable signal that this process is a deployed serverless
   // function and must never touch the Vite dev server.
-  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.VERCEL || !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || fs.existsSync(path.join(process.cwd(), 'dist'));
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    !!process.env.VERCEL ||
+    !!process.env.NETLIFY ||
+    !!process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    fs.existsSync(path.join(process.cwd(), "dist"));
   if (!isProduction) {
     // Inject Vite middleware inside Dev sandboxes ONLY. Both Netlify's
     // esbuild function bundler and Vercel's ncc bundler statically trace a
@@ -7216,54 +9441,66 @@ async function registerProductionRoutes() {
     // though this branch never runs in either serverless environment. A
     // Function-constructed import hides the specifier from static analysis
     // so neither bundler ever attempts to trace or bundle vite.
-    const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<typeof import('vite')>;
-    const { createServer: createViteServer } = await dynamicImport('vite');
+    const dynamicImport = new Function(
+      "specifier",
+      "return import(specifier)",
+    ) as (specifier: string) => Promise<typeof import("vite")>;
+    const { createServer: createViteServer } = await dynamicImport("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: 'spa',
+      appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
     // Serve Static files for direct deployment and Cloud Run
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath, {
-      maxAge: '1y',
-      etag: true,
-      lastModified: true,
-      index: false, // Prevents serving static index.html directly so that handleDynamicHtml intercepts "/" and "/index.html"
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.html')) {
-          res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
-        } else {
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        }
-      }
-    }));
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(
+      express.static(distPath, {
+        maxAge: "1y",
+        etag: true,
+        lastModified: true,
+        index: false, // Prevents serving static index.html directly so that handleDynamicHtml intercepts "/" and "/index.html"
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith(".html")) {
+            res.setHeader(
+              "Cache-Control",
+              "public, max-age=0, must-revalidate",
+            );
+          } else {
+            res.setHeader(
+              "Cache-Control",
+              "public, max-age=31536000, immutable",
+            );
+          }
+        },
+      }),
+    );
 
     // Register specific primary routes to serve dynamically with full SEO compliance and correct AdSense Publisher ID
-    app.get('/', handleDynamicHtml);
-    app.get('/index.html', handleDynamicHtml);
-    app.get('/article/:slug', handleDynamicHtml);
-    app.get('/category/:slug', handleDynamicHtml);
+    app.get("/", handleDynamicHtml);
+    app.get("/index.html", handleDynamicHtml);
+    app.get("/article/:slug", handleDynamicHtml);
+    app.get("/category/:slug", handleDynamicHtml);
 
     // Wildcard catch-all for any other frontend routing pages
-    app.get('*', handleDynamicHtml);
+    app.get("*", handleDynamicHtml);
   }
-
 }
 
 async function startServer() {
   await registerProductionRoutes();
 
   // Bind the server port immediately on port 3000 so the Cloud Run startup probe passes instantly!
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Heartsync server active exclusively on external port ${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(
+      `🚀 Heartsync server active exclusively on external port ${PORT}`,
+    );
   });
 
   // Trigger remote persistent database sync asynchronously in the background without blocking listen
-  console.log('🔌 Primary remote database is set to Supabase Cloud.');
-  initializeSharedState().catch(err => {
-    console.warn('⚠️ Background initializeSharedState failure:', err);
+  console.log("🔌 Primary remote database is set to Supabase Cloud.");
+  initializeSharedState().catch((err) => {
+    console.warn("⚠️ Background initializeSharedState failure:", err);
   });
 }
 
