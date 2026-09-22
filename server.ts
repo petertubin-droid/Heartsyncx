@@ -3517,7 +3517,20 @@ async function runAdminOwnershipReset() {
       (serverCacheState.profiles || []).forEach((p: any) => {
         if (p && ADMIN_ROLE_VALUES.includes(p.role)) p.role = 'subscriber';
       });
-      try { await saveServerCacheState(serverCacheState); } catch (_) {}
+      // NEVER persist a degraded snapshot back to the DB. If this cold start
+      // ran while the DB read failed (e.g. lost anon grants on 2026-09-22),
+      // serverCacheState holds defaults and saving it would wipe the real
+      // site_settings (raw_settings ad config was destroyed exactly this
+      // way). Only sync back out when the cache was fully loaded from
+      // Supabase and contains a populated settings object.
+      const cacheHydrated = serverCacheState.isFromSupabase === true
+        && serverCacheState.site_settings
+        && Object.keys((serverCacheState as any).site_settings).length > 10;
+      if (cacheHydrated) {
+        try { await saveServerCacheState(serverCacheState); } catch (_) {}
+      } else {
+        console.warn('[admin-reset] skipping cache mirror-save: server state is not fully hydrated (protecting DB settings from a degraded overwrite).');
+      }
     }
     console.log('[admin-reset] Admin ownership reset applied: all prior admins demoted; the next account to register/login becomes admin.');
   } catch (err: any) {
@@ -3681,12 +3694,30 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (newState.site_settings) {
       try {
+        // raw_settings is where all admin-saved extras live (ad zone ids,
+        // provider keys, per-slot config). MERGE over the stored object
+        // instead of replacing it: a degraded/default snapshot saving over
+        // a rich row previously destroyed the whole ad configuration
+        // (incident 2026-09-22). Merging keeps set keys authoritative while
+        // unknown-keyed extras survive.
+        let mergedRaw: Record<string, unknown> = { ...newState.site_settings };
+        try {
+          const { data: existingSettings } = await supabase.from('site_settings')
+            .select('raw_settings').eq('id', 'singleton').maybeSingle();
+          let existingRaw = existingSettings?.raw_settings;
+          if (typeof existingRaw === 'string') {
+            try { existingRaw = JSON.parse(existingRaw); } catch { existingRaw = null; }
+          }
+          if (existingRaw && typeof existingRaw === 'object' && !Array.isArray(existingRaw)) {
+            mergedRaw = { ...existingRaw, ...newState.site_settings };
+          }
+        } catch { /* merge is best-effort; fall back to plain replace */ }
         await supabase.from('site_settings').upsert({
           id: 'singleton',
           site_name: newState.site_settings.site_name || 'Heartsync',
           ads_enabled: Boolean(newState.site_settings.adsense_active || newState.site_settings.monetag_active || newState.site_settings.adsterra_active),
           adsense_publisher_id: newState.site_settings.adsense_client_id || '',
-          raw_settings: newState.site_settings,
+          raw_settings: mergedRaw,
           ad_slots: {
             adsense: { active: newState.site_settings.adsense_active, client_id: newState.site_settings.adsense_client_id },
             monetag: { active: newState.site_settings.monetag_active, zone_id: newState.site_settings.monetag_zone_id, format: newState.site_settings.monetag_format },
