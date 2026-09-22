@@ -5260,6 +5260,12 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
     return;
   }
 
+  // Cold-instance guard: on a fresh serverless instance the in-memory cache
+  // is null until the first state load. The cache lookups below dereference
+  // it directly, which previously crashed the request (async rejection =
+  // hung request, no response at all).
+  if (!serverCacheState) serverCacheState = {};
+
   // Live verify token against Supabase Auth
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
   if (authError || !authUser) {
@@ -5278,9 +5284,54 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
     a.id === userId || (a.email && a.email.toLowerCase() === cleanEmail)
   );
 
-  const existingProfile = (serverCacheState.profiles || []).find((p: any) => 
+  let existingProfile = (serverCacheState.profiles || []).find((p: any) => 
     p.id === userId || (p.email && p.email.toLowerCase() === cleanEmail)
   );
+
+  // AUTHORITATIVE DB LOOKUP (2026-09-22): the in-memory cache is EMPTY on
+  // every cold serverless instance, and the anon-key state loader can never
+  // populate it (anon grants on profiles are deliberately revoked in
+  // schema.sql). Without this lookup every existing DB admin was seen as a
+  // 'subscriber' and locked out of the admin portal. Order of authority:
+  //   1. service-role read of the profiles row (authoritative truth);
+  //   2. user-scoped read of the own row (RLS own-profile policies);
+  //   3. the in-memory cache (last resort, may be stale/empty).
+  try {
+    const svc = getServiceRoleSupabase();
+    if (svc) {
+      const { data: dbProfile, error: dbErr } = await svc.from('profiles')
+        .select('id,email,full_name,name,role,status,is_suspended,avatar_url,bio,created_at')
+        .eq('id', userId)
+        .maybeSingle();
+      if (!dbErr && dbProfile) {
+        existingProfile = { ...existingProfile, ...dbProfile };
+      } else if (dbErr) {
+        console.warn('sync-profile service-role read failed; trying user-scoped read:', dbErr.message);
+      }
+    }
+  } catch (e: any) {
+    console.warn('sync-profile service-role read threw:', e?.message || e);
+  }
+  if (!existingProfile || !existingProfile.role) {
+    try {
+      const syncUrl = cleanConfigValue(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
+      const syncKey = cleanConfigValue(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY);
+      const userScoped = (syncUrl && syncKey && token)
+        ? createSupabaseClient(syncUrl, syncKey, token)
+        : null;
+      if (userScoped) {
+        const { data: ownProfile, error: ownErr } = await userScoped.from('profiles')
+          .select('id,email,full_name,name,role,status,is_suspended,avatar_url,bio,created_at')
+          .eq('id', userId)
+          .maybeSingle();
+        if (!ownErr && ownProfile) {
+          existingProfile = { ...existingProfile, ...ownProfile };
+        }
+      }
+    } catch (e: any) {
+      console.warn('sync-profile user-scoped read failed:', e?.message || e);
+    }
+  }
 
   // OWNER-DIRECTED RULE (2026-09-21): the FIRST account to register becomes
   // the admin. Election happens only when NO administrator exists anywhere:
