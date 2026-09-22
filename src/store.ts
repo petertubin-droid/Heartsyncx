@@ -291,7 +291,12 @@ const DEFAULT_SETTINGS: SiteSettings = {
   twitter_site: '@heartsync',
 
   // Premium Article Experience Settings Defaults
-  article_hero_style: 'overlay',
+  // NOTE: this is the client's INITIAL render state before /api/state
+  // resolves the real persisted value from site_settings - keep it in sync
+  // with the actual production default ('standard', the clean non-overlay
+  // editorial layout). A mismatch here makes every article page load visibly
+  // flash from this default hero style to the real one once settings arrive.
+  article_hero_style: 'standard',
   article_font_family: 'Inter',
   article_font_size: 'base',
   article_line_height: 'relaxed',
@@ -338,7 +343,9 @@ const DEFAULT_SETTINGS: SiteSettings = {
   article_image_aspect_ratio: 'aspect-video',
   article_image_rounded_corners: 'rounded-2xl',
   article_image_caption_enabled: true,
-  article_image_position: 'below-title',
+  // Frelux-style default: the cover image sits BELOW the bordered meta row
+  // (title → excerpt → meta → image), not between title and meta.
+  article_image_position: 'below-meta',
   article_image_lazy_loading: true,
 
   article_prev_next_nav_enabled: true,

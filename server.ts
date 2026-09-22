@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { getArticleSeoData } from './src/utils/seoArticleData';
 import { HEARTSYNC_ARTICLE_SEO } from './src/utils/data/articles';
-import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig } from './src/lib/supabaseConfig';
+import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig, isServiceRoleKey } from './src/lib/supabaseConfig';
 import { Resend } from 'resend';
 
 // Load environmental parameters (both .env and .env.local)
@@ -4703,6 +4703,17 @@ function getServiceRoleSupabase() {
   const url = cleanConfigValue(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
   const key = cleanConfigValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!url || !key || !isValidSupabaseConfig(url, key)) return null;
+  // Both the anon and service_role keys are well-formed JWTs, so a config
+  // typo (pasting the anon key into SUPABASE_SERVICE_ROLE_KEY) passes the
+  // check above but authenticates as anon at the DB level - anon's grants on
+  // sensitive tables (e.g. profiles) are deliberately revoked in schema.sql,
+  // so every "service role" write then fails with a confusing
+  // "permission denied for table ..." instead of a clear config error. Catch
+  // that here so it fails loudly and specifically instead.
+  if (!isServiceRoleKey(key)) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is set but is NOT a service_role JWT (role claim mismatch). Check Netlify env vars - this must be the "service_role" secret from Supabase Project Settings -> API, not the anon/public key.');
+    return null;
+  }
   return createSupabaseClient(url, key);
 }
 
@@ -4981,7 +4992,11 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
     // 1. Enforce backend security: authoritative DB lookup (never the client-poisonable state cache)
     const svc = getServiceRoleSupabase();
     if (!svc) {
-      res.status(503).json({ error: 'First-admin setup requires SUPABASE_SERVICE_ROLE_KEY on the server. Install it and retry.' });
+      const rawKey = cleanConfigValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const msg = rawKey && !isServiceRoleKey(rawKey)
+        ? 'SUPABASE_SERVICE_ROLE_KEY is set but is not a valid service_role key (it decodes to a different role - likely the anon/public key was pasted in by mistake). Open Supabase -> Project Settings -> API, copy the "service_role" secret, and update it in Netlify env vars, then retry.'
+        : 'First-admin setup requires SUPABASE_SERVICE_ROLE_KEY on the server. Install it and retry.';
+      res.status(503).json({ error: msg });
       return;
     }
     let existingAdmin: any = null;

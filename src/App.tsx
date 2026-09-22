@@ -3321,6 +3321,10 @@ export default function App() {
             {currentTab === 'article' && activeArticle && (() => {
               // Wired article design settings (AdminConsole > Article Design)  - previously dead
               const artLayout = siteSettings.article_layout || 'standard';
+              // Hero style drives both the header design and whether the legacy
+              // social-share row renders (the Frelux-style 'standard' header folds
+              // Like + Share into its meta row instead).
+              const heroStyle = siteSettings.article_hero_style || 'standard';
               const sidebarWidthRaw = siteSettings.article_desktop_sidebar_width || 'w-80';
               const sidebarSpanClass = sidebarWidthRaw === 'w-96' ? 'lg:col-span-5'
                 : (sidebarWidthRaw === 'w-64' || sidebarWidthRaw === 'w-72') ? 'lg:col-span-3'
@@ -3407,6 +3411,7 @@ export default function App() {
                                         'aspect-[16/10] sm:aspect-[21/9] lg:aspect-[2.4]';
                     const roundClass = siteSettings.article_image_rounded_corners === 'none' ? 'rounded-none' :
                                        siteSettings.article_image_rounded_corners === 'xl' ? 'rounded-xl' :
+                                       siteSettings.article_image_rounded_corners === 'rounded-2xl' ? 'rounded-2xl' :
                                        siteSettings.article_image_rounded_corners === '2rem' ? 'rounded-[2rem]' :
                                        'rounded-[2rem] md:rounded-[2.5rem]';
 
@@ -3444,7 +3449,7 @@ export default function App() {
                     // Sub-component: Author Profile & Metadata Box
                     const renderMetadataAndAuthorRow = () => {
                       return (
-                        <div className="flex flex-wrap items-center justify-between gap-4 py-3 border-y border-zinc-200/60 dark:border-zinc-800/60 font-sans">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-zinc-200/70 dark:border-zinc-800/70 pb-5 font-sans">
                           {/* Left cluster: author, read time, date, freshness, category */}
                           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-zinc-500 dark:text-zinc-400 text-xs">
                             {(siteSettings.article_meta_author_enabled !== false) && (
@@ -3487,8 +3492,25 @@ export default function App() {
                             )}
                           </div>
 
-                          {/* Right cluster: compact Listen + Share (small round icon buttons, never touching the body) */}
-                          <div className="flex items-center gap-2 shrink-0">
+                          {/* Right cluster: compact Like + Listen + Share (Frelux-style
+                              trailing actions, never touching the body) */}
+                          <div className="flex items-center gap-2 shrink-0 ml-auto">
+                            {articleHeroStyle === 'standard' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!hasLiked) {
+                                    heartsync.likePost(activeArticle.id);
+                                    setHasLiked(true);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 text-xs font-semibold hover:border-rose-400 dark:hover:border-rose-500/60 hover:text-rose-500 transition-all cursor-pointer shadow-sm"
+                                aria-label="Like this article"
+                              >
+                                <Heart fill={hasLiked ? '#CE2B5E' : 'none'} className={`w-3.5 h-3.5 ${hasLiked ? 'text-rose-600' : ''}`} />
+                                {activeArticle.likes || 0}
+                              </button>
+                            )}
                             <ArticleTTS content={articleBody} compact />
                             <button
                               type="button"
@@ -3648,38 +3670,42 @@ export default function App() {
                       );
                     }
 
-                    // DEFAULT STYLE: 'standard' (Beautiful Video-Aligned Overlaid Layout)
+                    // DEFAULT STYLE: 'standard' — Frelux-inspired premium editorial
+                    // header: refined category pill → display-scale serif title →
+                    // muted excerpt → Frelux-style bordered meta row with trailing
+                    // Like / Listen / Share actions → rounded, shadowed cover image.
+                    // Clean paper-first layout: no text-over-image overlay.
                     // Incorporates Image Positions: top | below-title | below-meta
                     return (
-                      <div className="space-y-5">
+                      <div className="space-y-6">
                         {renderBreadcrumbs()}
 
                         {imgPos === 'top' && renderFeaturedImage()}
 
-                        <div className="space-y-4">
+                        <header className="space-y-4 sm:space-y-5">
                           {/* Category pill badge */}
                           <span
-                            className="inline-flex px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-sans font-bold uppercase tracking-wider"
+                            className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-sans font-semibold uppercase tracking-widest"
                             style={{
                               color: matchedCat?.color || '#e11d48',
-                              backgroundColor: matchedCat?.color ? `${matchedCat.color}1a` : 'rgba(225,29,72,0.1)'
+                              backgroundColor: matchedCat?.color ? `${matchedCat.color}14` : 'rgba(225,29,72,0.08)'
                             }}
                           >
                             {matchedCat ? matchedCat.name : 'Heartsync Journal'}
                           </span>
                           <h1
-                            className="font-serif font-black text-[1.9rem] sm:text-5xl md:text-[3.35rem] leading-[1.1] sm:leading-[1.08] tracking-[-0.015em] text-zinc-900 dark:text-white"
+                            className="font-serif font-bold text-[1.85rem] sm:text-4xl lg:text-[2.6rem] leading-[1.15] sm:leading-[1.12] tracking-[-0.012em] text-zinc-900 dark:text-white"
                             style={{ textWrap: 'balance' }}
                           >
                             {activeArticle.title}
                           </h1>
                           <p
-                            className="text-zinc-500 dark:text-zinc-400 text-sm sm:text-lg leading-relaxed max-w-3xl"
+                            className="text-zinc-500 dark:text-zinc-400 text-[15px] sm:text-lg leading-relaxed max-w-3xl"
                             style={{ textWrap: 'pretty' }}
                           >
                             {activeArticle.excerpt}
                           </p>
-                        </div>
+                        </header>
 
                         {imgPos === 'below-title' && renderFeaturedImage()}
 
@@ -3690,7 +3716,11 @@ export default function App() {
                     );
                   })()}
 
-                  {/* 3. Social Share Actions under the header */}
+                  {/* 3. Social Share Actions under the header.
+                      Only for non-'standard' hero styles: the Frelux-style standard
+                      header folds Like into its bordered meta row and hides this
+                      extra cluster (the sticky rail/dock still covers sharing). */}
+                  {heroStyle !== 'standard' && (
                   <div className="flex flex-wrap items-center gap-3 pb-2 pt-1 border-b border-zinc-150/20 dark:border-zinc-850/20 font-sans">
                     <button 
                       onClick={() => {
@@ -3734,6 +3764,7 @@ export default function App() {
                       <span>Tweet</span>
                     </a>
                   </div>
+                  )}
 
 
 

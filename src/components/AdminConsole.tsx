@@ -9447,7 +9447,7 @@ export default function AdminConsole({
                                 <div className="space-y-1.5">
                                   <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Hero Style Overlay Type</label>
                                   <select 
-                                    value={siteSettings.article_hero_style || 'overlay'}
+                                    value={siteSettings.article_hero_style || 'standard'}
                                     onChange={(e) => setSiteSettings({ ...siteSettings, article_hero_style: e.target.value as any })}
                                     className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 font-bold focus:outline-none focus:ring-1 focus:ring-rose-500"
                                   >
