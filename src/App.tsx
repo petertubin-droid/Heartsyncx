@@ -1063,6 +1063,27 @@ export default function App() {
     }
   }, [authLoading]);
 
+  // Re-resolve a held article route once /api/state hydration settles:
+  // if the slug is valid the article renders now; if it is genuinely
+  // unknown the 404 rewrite fires at that point (and only then).
+  useEffect(() => {
+    if (currentTab === 'article' && !activeArticleState && heartsync.serverStateLoaded) {
+      const match = heartsync.posts.find(p => p.slug === tabArg);
+      if (match) {
+        setActiveArticle(match);
+        heartsync.recordView(match.id);
+        if (!match.content) {
+          heartsync.ensureArticleContent(match).then(enriched => {
+            if (enriched) setActiveArticle(enriched);
+          });
+        }
+      } else {
+        window.history.replaceState(null, '', '/404');
+        setCurrentTab('error');
+      }
+    }
+  }, [posts, currentTab, activeArticleState, tabArg]);
+
   // Sync dynamic CSS variables color overrides based on brand settings fields
   useEffect(() => {
     const primary = siteSettings.primary_color || '#db2777';
@@ -1161,6 +1182,15 @@ export default function App() {
             if (enriched) setActiveArticle(enriched);
           });
         }
+      } else if (!heartsync.serverStateLoaded) {
+        // Hydration race: on a first visit the /api/state fetch has not
+        // settled yet, so posts is empty. HOLD the route (article skeleton)
+        // and re-resolve when the store finishes loading - previously this
+        // rewrote valid article URLs to /404 for fresh visitors and any
+        // external/deep traffic (SEO + referral links broke).
+        setCurrentTab('article');
+        setTabArg(arg);
+        setActiveArticle(null);
       } else {
         window.history.replaceState(null, '', '/404');
         setCurrentTab('error');
@@ -3332,6 +3362,9 @@ export default function App() {
               </div>
             )}
             {/* 3. SINGLE ARTICLE DETAIL PAGE VIEW */}
+            {currentTab === 'article' && !activeArticle && (
+              <HeartsyncSuspense isLoading type="article" />
+            )}
             {currentTab === 'article' && activeArticle && (() => {
               // Wired article design settings (AdminConsole > Article Design)  - previously dead
               const artLayout = siteSettings.article_layout || 'standard';

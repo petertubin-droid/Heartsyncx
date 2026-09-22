@@ -1962,6 +1962,10 @@ export class HeartsyncStore {
     } catch (err) {
       console.warn('Failed to fetch synchronized server state:', err);
     }
+    // Mark hydration as settled either way so route guards can proceed and
+    // pending article lookups (held during hydration) re-resolve now.
+    this.serverStateLoaded = true;
+    this.triggerUpdate();
   }
 
   public scanAndRestoreFromLocalStorage(): { checkedKeys: string[], foundCount: number, restoredCount: number, mergedPosts: any[] } {
