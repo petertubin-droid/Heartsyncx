@@ -20,6 +20,14 @@
   # server.ts: makes sure NODE_ENV=production is also true for the deployed
   # function, not just at build time.
   NODE_ENV = "production"
+  # A plain `npm install` under NODE_ENV=production skips devDependencies
+  # entirely -- and vite + @vitejs/plugin-react are (correctly) classed as
+  # devDependencies since they're build tools, not runtime code. Without
+  # this flag the build fails: "failed to load config from vite.config.ts
+  # ... Cannot find package '@vitejs/plugin-react'". --include=dev forces
+  # npm to install them anyway; the deployed function still runs with
+  # NODE_ENV=production above, so runtime behavior is unaffected.
+  NPM_FLAGS = "--include=dev"
   SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY,VITE_SUPABASE_ANON_KEY,SUPABASE_URL,VITE_SUPABASE_URL"
 
 [functions]
