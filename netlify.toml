@@ -38,6 +38,13 @@
   # vite's own optional deps.
   node_bundler = "esbuild"
   external_node_modules = ["vite"]
+  # REQUIRED: the catch-all redirect routes every non-asset path into the
+  # api function, and handleDynamicHtml in server.ts must serve the SPA shell
+  # (dist/index.html) with injected SEO meta. The function bundle does NOT
+  # include publish-directory files by default -- without this the whole
+  # SPA 500s with "Index HTML not found" (the /admin login page included).
+  # Hashed assets stay served off the CDN; only the shell HTML is needed.
+  included_files = ["dist/index.html"]
 
 [build]
   command = "npm run build"

@@ -291,15 +291,27 @@ export default function App() {
   // opens with a "# <same title>" line, strip it so the body doesn't
   // repeat it as a second, unstyled heading right before the first
   // (dropcap) paragraph.
+  //
+  // BUGFIX (2026-09-22): every article's `content` template literal opens
+  // with a blank line before the "# Title" line (content: `\n# Title...`),
+  // so raw.split('\n')[0] was always "" and this check never matched --
+  // the duplicate title rendered on literally every article page. Now we
+  // skip leading blank lines first, and compare titles with punctuation
+  // normalized (curly vs straight quotes, en-dash vs hyphen) so it also
+  // catches the few articles where the H1 uses different Unicode
+  // punctuation than the `title` field.
   const articleBody = useMemo(() => {
     const raw = activeArticle?.content || '';
     if (!raw) return raw;
     const lines = raw.split('\n');
-    if (lines.length && /^#\s+/.test(lines[0].trim())) {
-      const h1Text = lines[0].replace(/^#\s+/, '').trim().toLowerCase();
-      const titleText = (activeArticle?.title || '').trim().toLowerCase();
-      if (h1Text && h1Text === titleText) {
-        let rest = lines.slice(1);
+    let firstIdx = 0;
+    while (firstIdx < lines.length && lines[firstIdx].trim() === '') firstIdx++;
+    if (firstIdx < lines.length && /^#\s+/.test(lines[firstIdx].trim())) {
+      const normalize = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      const h1Text = lines[firstIdx].replace(/^#\s+/, '').trim();
+      const titleText = (activeArticle?.title || '').trim();
+      if (h1Text && normalize(h1Text) === normalize(titleText)) {
+        let rest = lines.slice(firstIdx + 1);
         while (rest.length && rest[0].trim() === '') rest = rest.slice(1);
         return rest.join('\n');
       }
@@ -3374,7 +3386,7 @@ export default function App() {
                 </div>
 
                 {/* Reading Comfort & Theme Context Outer Wrapper */}
-                <div id="heartsync-premium-article-reading-body" className="space-y-8 bg-transparent text-zinc-850 dark:text-zinc-100">
+                <div id="heartsync-premium-article-reading-body" className="space-y-5 bg-transparent text-zinc-850 dark:text-zinc-100">
                   {/* 2. DYNAMIC HERO DESIGNS & CONTEXT HEADERS */}
                   {(() => {
                     const matchedCat = categories.find(c => c.id === activeArticle.category_id);
@@ -3432,7 +3444,7 @@ export default function App() {
                     // Sub-component: Author Profile & Metadata Box
                     const renderMetadataAndAuthorRow = () => {
                       return (
-                        <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-y border-zinc-200/60 dark:border-zinc-800/60 font-sans">
+                        <div className="flex flex-wrap items-center justify-between gap-4 py-3 border-y border-zinc-200/60 dark:border-zinc-800/60 font-sans">
                           {/* Left cluster: author, read time, date, freshness, category */}
                           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-zinc-500 dark:text-zinc-400 text-xs">
                             {(siteSettings.article_meta_author_enabled !== false) && (
@@ -3639,7 +3651,7 @@ export default function App() {
                     // DEFAULT STYLE: 'standard' (Beautiful Video-Aligned Overlaid Layout)
                     // Incorporates Image Positions: top | below-title | below-meta
                     return (
-                      <div className="space-y-6">
+                      <div className="space-y-5">
                         {renderBreadcrumbs()}
 
                         {imgPos === 'top' && renderFeaturedImage()}
@@ -3740,7 +3752,7 @@ export default function App() {
                     }
 
                     return (
-                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 pt-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                         
                         {/* A. FLOATING SOCIAL SHARE RAIL (DESKTOP STICKY, MOBILE STICKY BOTTOM DOCK) */}
                         {showLeftRail && (
@@ -3842,7 +3854,7 @@ export default function App() {
                         return (
                           <div 
                             id="article-author-profile-strip"
-                            className="border-t border-b border-zinc-200 dark:border-zinc-800 py-3 my-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-sans text-zinc-500 dark:text-zinc-400"
+                            className="border-t border-b border-zinc-200 dark:border-zinc-800 py-3 mt-0 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-sans text-zinc-500 dark:text-zinc-400"
                           >
                             <div className="flex items-center gap-3">
                               <img 
@@ -4044,8 +4056,8 @@ export default function App() {
                                       <div className="grid grid-cols-2 gap-2">
                                         <div className="space-y-1">
                                           <label htmlFor="hs-pay-3" className="text-[9px] uppercase font-mono text-zinc-450 block">Expiry</label>
-                                          id="hs-pay-3"
                                           <input
+                                            id="hs-pay-3"
                                             type="text"
                                             value={payExpiry}
                                             onChange={(e) => setPayExpiry(e.target.value)}
@@ -4054,9 +4066,9 @@ export default function App() {
                                           />
                                         </div>
                                         <div className="space-y-1">
-                                          id="hs-pay-4"
                                           <label htmlFor="hs-pay-4" className="text-[9px] uppercase font-mono text-zinc-450 block">CVV</label>
                                           <input
+                                            id="hs-pay-4"
                                             type="password"
                                             value={payCvc}
                                             onChange={(e) => setPayCvc(e.target.value)}
@@ -4985,9 +4997,9 @@ export default function App() {
 
                               <form onSubmit={handleCatPurchaseSubmit} className="space-y-3">
                                 <div className="space-y-1">
-                                  id="hs-pay-5"
                                   <label htmlFor="hs-pay-5" className="text-[9px] uppercase font-mono text-zinc-450 block">Your Receipt Email</label>
                                   <input
+                                    id="hs-pay-5"
                                     type="email"
                                     required
                                     value={payEmail}
@@ -4997,33 +5009,33 @@ export default function App() {
                                   />
                                 </div>
 
-                                id="hs-pay-6"
                                 <div className="grid grid-cols-2 gap-2">
                                   <div className="col-span-2 space-y-1">
                                     <label htmlFor="hs-pay-6" className="text-[9px] uppercase font-mono text-zinc-450 block">Card Number</label>
                                     <input
+                                      id="hs-pay-6"
                                       type="text"
                                       value={payCardNum}
                                       onChange={(e) => setPayCardNum(e.target.value)}
                                       placeholder="4242 4242 4242 4242"
                                       className="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-[1px] focus:outline-rose-500"
-                                    id="hs-pay-7"
                                     />
                                   </div>
                                   <div className="space-y-1">
                                     <label htmlFor="hs-pay-7" className="text-[9px] uppercase font-mono text-zinc-450 block">Expiry</label>
                                     <input
+                                      id="hs-pay-7"
                                       type="text"
                                       value={payExpiry}
                                       onChange={(e) => setPayExpiry(e.target.value)}
                                       placeholder="MM/YY"
-                                      id="hs-pay-8"
                                       className="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-[1px] focus:outline-rose-500 text-center"
                                     />
                                   </div>
                                   <div className="space-y-1">
                                     <label htmlFor="hs-pay-8" className="text-[9px] uppercase font-mono text-zinc-450 block">CVV</label>
                                     <input
+                                      id="hs-pay-8"
                                       type="password"
                                       value={payCvc}
                                       onChange={(e) => setPayCvc(e.target.value)}
