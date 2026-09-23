@@ -3705,6 +3705,17 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
         // a rich row previously destroyed the whole ad configuration
         // (incident 2026-09-22). Merging keeps set keys authoritative while
         // unknown-keyed extras survive.
+        const upsertAdSlots = {
+            adsense: { active: newState.site_settings.adsense_active, client_id: newState.site_settings.adsense_client_id },
+            monetag: { active: newState.site_settings.monetag_active, zone_id: newState.site_settings.monetag_zone_id, format: newState.site_settings.monetag_format },
+            adsterra: { active: newState.site_settings.adsterra_active, key_id: newState.site_settings.adsterra_key_id, format: newState.site_settings.adsterra_format },
+            banners: {
+              header: newState.site_settings.banner_header_enabled,
+              sidebar: newState.site_settings.banner_sidebar_enabled,
+              footer: newState.site_settings.banner_footer_enabled,
+              in_article: newState.site_settings.banner_in_article_enabled
+            }
+          };
         let mergedRaw: Record<string, unknown> = { ...newState.site_settings };
         try {
           const { data: existingSettings } = await supabase.from('site_settings')
@@ -3717,27 +3728,47 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
             mergedRaw = { ...existingRaw, ...newState.site_settings };
           }
         } catch { /* merge is best-effort; fall back to plain replace */ }
-        await supabase.from('site_settings').upsert({
+        const upsertRes = await supabase.from('site_settings').upsert({
           id: 'singleton',
           site_name: newState.site_settings.site_name || 'Heartsync',
           ads_enabled: Boolean(newState.site_settings.adsense_active || newState.site_settings.monetag_active || newState.site_settings.adsterra_active),
           adsense_publisher_id: newState.site_settings.adsense_client_id || '',
           raw_settings: mergedRaw,
-          ad_slots: {
-            adsense: { active: newState.site_settings.adsense_active, client_id: newState.site_settings.adsense_client_id },
-            monetag: { active: newState.site_settings.monetag_active, zone_id: newState.site_settings.monetag_zone_id, format: newState.site_settings.monetag_format },
-            adsterra: { active: newState.site_settings.adsterra_active, key_id: newState.site_settings.adsterra_key_id, format: newState.site_settings.adsterra_format },
-            banners: {
-              header: newState.site_settings.banner_header_enabled,
-              sidebar: newState.site_settings.banner_sidebar_enabled,
-              footer: newState.site_settings.banner_footer_enabled,
-              in_article: newState.site_settings.banner_in_article_enabled
-            }
-          },
+          ad_slots: upsertAdSlots,
           updated_at: new Date().toISOString()
         });
+        const upsertErr = upsertRes?.error;
+        if (upsertErr) {
+          // The admin-session write (RLS-governed) failed. adminAuthMiddleware
+          // has already verified the caller is a real admin, so a permission
+          // failure here is a grants/policy misconfiguration (e.g. the
+          // 2026-09-22 anon-grant incident restored SELECT only, leaving
+          // `authenticated` without write privileges). Retry once through the
+          // service role when it is configured; otherwise surface the real
+          // error instead of swallowing it - a silent failure here is what
+          // made the admin console claim "saved!" while nothing persisted.
+          const svc = getServiceRoleSupabase();
+          if (svc && svc !== supabase) {
+            const { error: retryErr } = await svc.from('site_settings').upsert({
+              id: 'singleton',
+              site_name: newState.site_settings.site_name || 'Heartsync',
+              ads_enabled: Boolean(newState.site_settings.adsense_active || newState.site_settings.monetag_active || newState.site_settings.adsterra_active),
+              adsense_publisher_id: newState.site_settings.adsense_client_id || '',
+              raw_settings: mergedRaw,
+              ad_slots: upsertAdSlots,
+              updated_at: new Date().toISOString()
+            });
+            if (retryErr) {
+              throw new Error('site_settings write failed (service-role retry): ' + retryErr.message);
+            }
+            console.warn('site_settings admin-session write failed (' + upsertErr.message + '); service-role retry succeeded.');
+          } else {
+            throw new Error('site_settings write failed: ' + upsertErr.message);
+          }
+        }
       } catch (e: any) {
-        console.warn('Supabase site_settings sync warning:', e.message);
+        console.error('Supabase site_settings sync FAILED:', e.message);
+        throw e;
       }
     }
 
