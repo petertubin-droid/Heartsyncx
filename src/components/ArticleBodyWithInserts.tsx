@@ -174,6 +174,30 @@ export default function ArticleBodyWithInserts({
     return { blocks: rawBlocks, insertPositions: posMap };
   }, [content, inserts]);
 
+  // AUTOMATIC IN-ARTICLE AD DENSITY (admin toggle: in_article_ads_auto_enabled).
+  // Word-count-driven, AdSense content-ratio best practice:
+  //   < 2000 words -> 3 units | 2000-4000 -> 4 units | > 4000 -> 5 units
+  // Units are spaced evenly between paragraphs (never the first or last block).
+  // NOTE: this hook MUST run unconditionally, before the empty-content early
+  // return below. It previously sat after that return, so an article that
+  // renders with zero content blocks skipped this useMemo entirely while a
+  // later render (once blocks were non-empty) called it - a hook-count
+  // mismatch between renders, i.e. React error #310 ("Rendered more hooks
+  // than during the previous render"), crashing the whole article page.
+  const adInsertIndices = useMemo(() => {
+    if (!blocks || blocks.length <= 1) return [] as number[];
+    const autoEnabled = (heartsync.site_settings as Record<string, unknown>).in_article_ads_auto_enabled !== false;
+    const words = (content || '').trim().split(/\s+/).filter(Boolean).length;
+    const count = !autoEnabled ? 1 : words > 4000 ? 5 : words >= 2000 ? 4 : 3;
+    const out: number[] = [];
+    for (let i = 1; i <= count; i++) {
+      const idx = Math.floor((blocks.length * i) / (count + 1));
+      const clamped = Math.max(1, Math.min(blocks.length - 2, idx));
+      if (!out.includes(clamped)) out.push(clamped);
+    }
+    return out;
+  }, [blocks, content]);
+
   if (!blocks || blocks.length === 0) {
     return (
       <div className={className}>
@@ -183,24 +207,6 @@ export default function ArticleBodyWithInserts({
       </div>
     );
   }
-
-  // AUTOMATIC IN-ARTICLE AD DENSITY (admin toggle: in_article_ads_auto_enabled).
-  // Word-count-driven, AdSense content-ratio best practice:
-  //   < 2000 words -> 3 units | 2000-4000 -> 4 units | > 4000 -> 5 units
-  // Units are spaced evenly between paragraphs (never the first or last block).
-  const adInsertIndices = useMemo(() => {
-    const autoEnabled = (heartsync.site_settings as Record<string, unknown>).in_article_ads_auto_enabled !== false;
-    const words = (content || '').trim().split(/\s+/).filter(Boolean).length;
-    const count = !autoEnabled ? 1 : words > 4000 ? 5 : words >= 2000 ? 4 : 3;
-    if (blocks.length <= 1) return [] as number[];
-    const out: number[] = [];
-    for (let i = 1; i <= count; i++) {
-      const idx = Math.floor((blocks.length * i) / (count + 1));
-      const clamped = Math.max(1, Math.min(blocks.length - 2, idx));
-      if (!out.includes(clamped)) out.push(clamped);
-    }
-    return out;
-  }, [blocks.length, content]);
 
   return (
     <div className={className}>

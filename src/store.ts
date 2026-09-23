@@ -67,9 +67,9 @@ const DEFAULT_SETTINGS: SiteSettings = {
   homepage_topics: DEFAULT_TOPICS,
   homepage_topics_columns: 3,
   homepage_topics_animations_enabled: true,
-  logo_url: '/logo.svg',
+  logo_url: '/logo.png',
   header_settings: {
-    logo_url: '/logo.svg',
+    logo_url: '/logo.png',
     site_name: 'Heartsync',
     tagline: 'wellness blog',
     menu_items: [
