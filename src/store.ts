@@ -901,6 +901,10 @@ export class HeartsyncStore {
   public subscribers: NewsletterSubscriber[] = [];
   public quizzes: Quiz[] = [];
   public site_settings: SiteSettings = DEFAULT_SETTINGS;
+  // True once the initial Supabase/server hydration pass has settled (success or
+  // failure) - lets consumers distinguish "still loading defaults" from "confirmed
+  // live state", so they don't overwrite real DB values with pre-hydration defaults.
+  public serverStateLoaded: boolean = false;
   public pn_settings: Record<string, string> = {};
   public analytics: AnalyticsSummary = DEFAULT_ANALYTICS;
   public audit_logs: AuditLog[] = [];

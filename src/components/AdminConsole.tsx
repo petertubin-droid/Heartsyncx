@@ -1161,6 +1161,40 @@ export default function AdminConsole({
   // Ad Networks configuration sub-tab inside Monetization pane
   const [adNetworkActiveSubTab, setAdNetworkActiveSubTab] = useState<'adsense' | 'monetag' | 'adsterra' | 'placements'>('adsense');
 
+  // Self-heal the ad-network toggles/fields against the true DB values once
+  // hydration settles. These are all mount-time useState snapshots; if this
+  // panel mounted before heartsync finished fetching site_settings (e.g. an
+  // admin navigating straight to /admin on a fresh load), they freeze on
+  // fallback defaults (monetagActive=true, monetagZoneId='275352', etc.)
+  // that are DIFFERENT from the real row. The "Synchronize All Ad Networks"
+  // button then submits those stale values and silently wipes whatever a
+  // provider actually had configured (this is what zeroed out Monetag's
+  // zone id and turned it off after an unrelated Adsterra save). Runs at
+  // most once - after the first hydration - so it never clobbers an
+  // admin's in-progress unsaved edits later in the session.
+  const hasHydratedAdNetworkSettings = React.useRef(false);
+  useEffect(() => {
+    const resync = () => {
+      if (hasHydratedAdNetworkSettings.current) return;
+      if (!heartsync.serverStateLoaded) return;
+      hasHydratedAdNetworkSettings.current = true;
+      const live = heartsync.site_settings as Record<string, unknown>;
+      setMonetagActive((live.monetag_active as boolean) ?? true);
+      setMonetagZoneId((live.monetag_zone_id as string) ?? '');
+      setMonetagScriptCode((live.monetag_script_code as string) ?? '');
+      setAdsterraActive((live.adsterra_active as boolean) ?? true);
+      setAdsensePubId((live.adsense_client_id as string) ?? '');
+      setAdsenseAutoCode(String((live.adsense_active as boolean) ?? true));
+      setBannerHeaderEnabled((live.banner_header_enabled as boolean) ?? true);
+      setBannerSidebarEnabled((live.banner_sidebar_enabled as boolean) ?? true);
+      setBannerFooterEnabled((live.banner_footer_enabled as boolean) ?? true);
+      setBannerInArticleEnabled((live.banner_in_article_enabled as boolean) ?? true);
+    };
+    resync();
+    const unsub = heartsync.subscribe(resync);
+    return () => unsub();
+  }, []);
+
 
   // NEW: Dynamic Admin & Author Staff Users management representation
   const [staffUsers, setStaffUsers] = useState<{ id: string; name: string; email: string; role: 'Administrator' | 'Editor' | 'Moderator' | 'Relationship Author' | 'Contributor'; bio: string; avatar: string; status: 'Active' | 'Inactive'; }[]>(() => {
