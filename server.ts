@@ -3362,10 +3362,25 @@ async function loadStateFromSupabase(): Promise<any> {
       if (typeof raw === 'string') {
         try { raw = JSON.parse(raw); } catch {}
       }
+      // MERGE-ORDER GUARD (2026-09-24): the row's columns historically win
+      // over raw_settings here ({...raw, ...row}), but the row's simple
+      // columns (logo_url, favicon_url, monetag/adsterra extras, ...) are
+      // only maintained by SOME write paths. A column left NULL (or '')
+      // therefore clobbered the very same value saved into raw_settings by
+      // the admin console - e.g. a fresh logo upload never showed on the
+      // live site because row.logo_url = null overrode raw.logo_url. Drop
+      // null/empty column values before merging so an unmaintained column
+      // can never mask a real value from raw_settings; real non-empty
+      // columns still take precedence as before.
+      const rowOnlyMeaningful: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(settingsRes.data)) {
+        if (v === null || v === undefined || v === '') continue;
+        rowOnlyMeaningful[k] = v;
+      }
       // SECURITY: strip any legacy credential fields before the state is served publicly
       state.site_settings = stripSecretFields({
         ...(typeof raw === 'object' && raw ? raw : {}),
-        ...settingsRes.data
+        ...rowOnlyMeaningful
       });
     }
     if (!plansRes.error && plansRes.data) {
@@ -3728,7 +3743,10 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
             mergedRaw = { ...existingRaw, ...newState.site_settings };
           }
         } catch { /* merge is best-effort; fall back to plain replace */ }
-        const upsertRes = await supabase.from('site_settings').upsert({
+        // Maintain the real logo columns when the save provides them; when
+        // absent from the payload the columns are left untouched (PostgREST
+        // upsert only updates supplied keys).
+        const siteSettingsUpsert: Record<string, unknown> = {
           id: 'singleton',
           site_name: newState.site_settings.site_name || 'Heartsync',
           ads_enabled: Boolean(newState.site_settings.adsense_active || newState.site_settings.monetag_active || newState.site_settings.adsterra_active),
@@ -3736,7 +3754,10 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
           raw_settings: mergedRaw,
           ad_slots: upsertAdSlots,
           updated_at: new Date().toISOString()
-        });
+        };
+        if (newState.site_settings.logo_url) siteSettingsUpsert.logo_url = newState.site_settings.logo_url;
+        if (newState.site_settings.favicon_url) siteSettingsUpsert.favicon_url = newState.site_settings.favicon_url;
+        const upsertRes = await supabase.from('site_settings').upsert(siteSettingsUpsert);
         const upsertErr = upsertRes?.error;
         if (upsertErr) {
           // The admin-session write (RLS-governed) failed. adminAuthMiddleware
@@ -3749,15 +3770,7 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
           // made the admin console claim "saved!" while nothing persisted.
           const svc = getServiceRoleSupabase();
           if (svc && svc !== supabase) {
-            const { error: retryErr } = await svc.from('site_settings').upsert({
-              id: 'singleton',
-              site_name: newState.site_settings.site_name || 'Heartsync',
-              ads_enabled: Boolean(newState.site_settings.adsense_active || newState.site_settings.monetag_active || newState.site_settings.adsterra_active),
-              adsense_publisher_id: newState.site_settings.adsense_client_id || '',
-              raw_settings: mergedRaw,
-              ad_slots: upsertAdSlots,
-              updated_at: new Date().toISOString()
-            });
+            const { error: retryErr } = await svc.from('site_settings').upsert(siteSettingsUpsert);
             if (retryErr) {
               throw new Error('site_settings write failed (service-role retry): ' + retryErr.message);
             }
@@ -5644,7 +5657,7 @@ app.post('/api/admin/settings', adminAuthMiddleware, async (req: Request, res: R
       serverCacheState = { site_settings: merged };
     }
     if (dbClient) {
-      const { error: settingsErr } = await dbClient.from('site_settings').upsert({
+      const settingsUpsert: Record<string, unknown> = {
         id: 'singleton',
         site_name: merged.site_name || 'Heartsync',
         ads_enabled: Boolean(merged.adsense_active || merged.monetag_active || merged.adsterra_active),
@@ -5662,7 +5675,10 @@ app.post('/api/admin/settings', adminAuthMiddleware, async (req: Request, res: R
           }
         },
         updated_at: new Date().toISOString()
-      });
+      };
+      if (merged.logo_url) settingsUpsert.logo_url = merged.logo_url;
+      if (merged.favicon_url) settingsUpsert.favicon_url = merged.favicon_url;
+      const { error: settingsErr } = await dbClient.from('site_settings').upsert(settingsUpsert);
       if (settingsErr) throw new Error(settingsErr.message);
       res.json({ success: true, message: 'Homepage settings saved and synchronized to the database.' });
     } else {

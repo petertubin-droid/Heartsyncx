@@ -1064,13 +1064,21 @@ export class HeartsyncStore {
           })
         });
 
-        if (!syncRes.ok) {
+        if (!syncRes.ok && (syncRes.status === 401 || syncRes.status === 403)) {
+          // Only a real auth rejection (invalid/expired token, suspended
+          // account) ends the session. Transient failures - a cold serverless
+          // start (500), a network blip, a Supabase hiccup - previously
+          // signed the admin out on every refresh; keep the session and
+          // carry on with the stored identity instead.
           const errData = await this.safeJson(syncRes);
-          console.error('❌ Session restore: Profile self-healing failed:', errData.error);
+          console.error('❌ Session restore: auth rejected:', errData.error);
           await this.supabase.auth.signOut();
           this.current_user = null;
           this.triggerUpdate();
           return;
+        }
+        if (!syncRes.ok) {
+          console.warn('⚡ Session restore: profile sync unavailable (status ' + syncRes.status + '); keeping the session.');
         }
 
         const syncData = await this.safeJson(syncRes);
@@ -1120,13 +1128,16 @@ export class HeartsyncStore {
                 })
               });
 
-              if (!syncRes.ok) {
+              if (!syncRes.ok && (syncRes.status === 401 || syncRes.status === 403)) {
                 const errData = await this.safeJson(syncRes);
-                console.error('❌ Auth state change: Profile self-healing failed:', errData.error);
+                console.error('❌ Auth state change: auth rejected:', errData.error);
                 await this.supabase.auth.signOut();
                 this.current_user = null;
                 this.triggerUpdate();
                 return;
+              }
+              if (!syncRes.ok) {
+                console.warn('⚡ Auth state change: profile sync unavailable (status ' + syncRes.status + '); keeping the session.');
               }
 
               const syncData = await this.safeJson(syncRes);
@@ -3286,146 +3297,12 @@ export class HeartsyncStore {
       this.initSupabaseConnection();
     }
 
-    if (this.supabase) {
-      // Pack nested JSONB configs to ensure absolute persistence on the live Supabase
-      if (!this.site_settings.header_settings) this.site_settings.header_settings = {} as any;
-      if (!this.site_settings.hero_settings) this.site_settings.hero_settings = {} as any;
-
-      const headerAsAny = this.site_settings.header_settings as any;
-      const heroAsAny = this.site_settings.hero_settings as any;
-
-      // Pack all site settings into extra_settings_blob for complete database serialization
-      headerAsAny.extra_settings_blob = {
-        ...headerAsAny.extra_settings_blob,
-        ...Object.keys(this.site_settings)
-          .filter(key => key !== 'header_settings' && key !== 'hero_settings' && key !== 'audit_logs' && key !== 'posts' && key !== 'categories' && key !== 'comments' && key !== 'subscribers')
-          .reduce((acc, key) => {
-            acc[key] = (this.site_settings as any)[key];
-            return acc;
-          }, {} as Record<string, any>)
-      };
-
-      headerAsAny.footer_config = {
-        style: this.site_settings.footer_style || headerAsAny.footer_config?.style || 'luxury',
-        copyright: this.site_settings.site_copyright_text || headerAsAny.footer_config?.copyright || '',
-        compliance_badges_enabled: this.site_settings.footer_compliance_badges_enabled ?? headerAsAny.footer_config?.compliance_badges_enabled ?? true
-      };
-
-      heroAsAny.categories_config = {
-        title: this.site_settings.homepage_categories_title || heroAsAny.categories_config?.title || "Relational Connection Categories",
-        subtitle: this.site_settings.homepage_categories_subtitle || heroAsAny.categories_config?.subtitle || "DISCOVER DEPTHS",
-        enabled: this.site_settings.homepage_categories_enabled ?? heroAsAny.categories_config?.enabled ?? true,
-        order: this.site_settings.homepage_categories_order ?? heroAsAny.categories_config?.order ?? 1,
-        custom_categories: this.site_settings.homepage_custom_categories || heroAsAny.categories_config?.custom_categories || []
-      };
-
-      heroAsAny.featured_config = {
-        title: this.site_settings.homepage_featured_title || heroAsAny.featured_config?.title || "Featured Stories",
-        enabled: this.site_settings.homepage_featured_enabled ?? heroAsAny.featured_config?.enabled ?? true,
-        order: this.site_settings.homepage_featured_order ?? heroAsAny.featured_config?.order ?? 2,
-        posts: this.site_settings.homepage_featured_posts || heroAsAny.featured_config?.posts || []
-      };
-
-      heroAsAny.trending_config = {
-        title: this.site_settings.homepage_trending_title || heroAsAny.trending_config?.title || "Trending Now",
-        enabled: this.site_settings.homepage_trending_enabled ?? heroAsAny.trending_config?.enabled ?? true,
-        order: this.site_settings.homepage_trending_order ?? heroAsAny.trending_config?.order ?? 3,
-        posts: this.site_settings.homepage_trending_posts || heroAsAny.trending_config?.posts || []
-      };
-
-      const dbPayload = {
-        id: 'singleton',
-        site_name: this.site_settings.site_name || 'Heartsync',
-        site_description: this.site_settings.site_description || '',
-        logo_url: this.site_settings.logo_url || '',
-        primary_color: this.site_settings.primary_color || '#f43f5e',
-        secondary_color: this.site_settings.secondary_color || '#71717a',
-        accent_color: this.site_settings.accent_color || '#f59e0b',
-        adsense_client_id: this.site_settings.adsense_client_id || '',
-        adsense_slot_header: this.site_settings.adsense_slot_header || '',
-        adsense_slot_sidebar: this.site_settings.adsense_slot_sidebar || '',
-        adsense_slot_in_article: this.site_settings.adsense_slot_in_article || '',
-        adsense_slot_footer: this.site_settings.adsense_slot_footer || '',
-        adsense_slot_homepage: this.site_settings.adsense_slot_homepage || '',
-        adsense_slot_article_bottom: this.site_settings.adsense_slot_article_bottom || '',
-        monetag_active: this.site_settings.monetag_active || false,
-        monetag_zone_id: this.site_settings.monetag_zone_id || '',
-        monetag_script_code: this.site_settings.monetag_script_code || '',
-        adsterra_active: this.site_settings.adsterra_active || false,
-        adsterra_key_id: this.site_settings.adsterra_key_id || '',
-        adsterra_key_header: this.site_settings.adsterra_key_header || '',
-        adsterra_key_sidebar: this.site_settings.adsterra_key_sidebar || '',
-        adsterra_key_in_article: this.site_settings.adsterra_key_in_article || '',
-        adsterra_key_footer: this.site_settings.adsterra_key_footer || '',
-        adsterra_key_homepage: this.site_settings.adsterra_key_homepage || '',
-        adsterra_key_article_bottom: this.site_settings.adsterra_key_article_bottom || '',
-        adsterra_url_header: this.site_settings.adsterra_url_header || '',
-        adsterra_url_sidebar: this.site_settings.adsterra_url_sidebar || '',
-        adsterra_url_in_article: this.site_settings.adsterra_url_in_article || '',
-        adsterra_url_footer: this.site_settings.adsterra_url_footer || '',
-        adsterra_url_homepage: this.site_settings.adsterra_url_homepage || '',
-        adsterra_url_article_bottom: this.site_settings.adsterra_url_article_bottom || '',
-        adsterra_popunder_url: this.site_settings.adsterra_popunder_url || '',
-        adsterra_popunder_script: this.site_settings.adsterra_popunder_script || '',
-        monetag_loader_url: this.site_settings.monetag_loader_url || '',
-        adsterra_social_bar_script: this.site_settings.adsterra_social_bar_script || '',
-        adsterra_interstitial_script: this.site_settings.adsterra_interstitial_script || '',
-        adsterra_inpage_push_script: this.site_settings.adsterra_inpage_push_script || '',
-        adsense_active: this.site_settings.adsense_active || false,
-        newsletter_welcome_msg: this.site_settings.newsletter_welcome_msg || '',
-        ai_assistant_enabled: this.site_settings.ai_assistant_enabled ?? true,
-        recaptcha_enabled: this.site_settings.recaptcha_enabled || false,
-        brand_font: this.site_settings.brand_font || 'Space Grotesk',
-        brand_theme: this.site_settings.brand_theme || 'Warm Pink (Heartsync Classic)',
-        brand_animation: this.site_settings.brand_animation || 'fade',
-        sidebar_widgets: this.site_settings.sidebar_widgets || [],
-        footer_sections: this.site_settings.footer_sections || [],
-        social_links: this.site_settings.social_links || {},
-        related_block_enabled: this.site_settings.related_block_enabled ?? true,
-        related_block_title: this.site_settings.related_block_title || 'You may also like',
-        related_block_count: this.site_settings.related_block_count || 3,
-        related_block_style: this.site_settings.related_block_style || 'grid',
-        tts_global_enabled: this.site_settings.tts_global_enabled ?? true,
-        tts_default_voice: this.site_settings.tts_default_voice || 'female',
-        tts_default_speed: this.site_settings.tts_default_speed || 1.0,
-        tts_player_position: this.site_settings.tts_player_position || 'top',
-        tts_player_style: this.site_settings.tts_player_style || 'button',
-        tts_voice_gender: this.site_settings.tts_voice_gender || 'female',
-        tts_selected_voice: this.site_settings.tts_selected_voice || 'samantha',
-        tts_provider: 'elevenlabs',
-        elevenlabs_api_key: this.site_settings.elevenlabs_api_key || '',
-        tts_selected_voice_id: this.site_settings.tts_selected_voice_id || '',
-        tts_voice_cache: typeof this.site_settings.tts_voice_cache === 'string'
-          ? JSON.parse(this.site_settings.tts_voice_cache)
-          : (this.site_settings.tts_voice_cache || []),
-        tts_stability: this.site_settings.tts_stability !== undefined ? this.site_settings.tts_stability : 0.55,
-        tts_similarity_boost: this.site_settings.tts_similarity_boost !== undefined ? this.site_settings.tts_similarity_boost : 0.75,
-        tts_style: this.site_settings.tts_style !== undefined ? this.site_settings.tts_style : 0.0,
-        tts_last_voice_sync: this.site_settings.tts_last_voice_sync || '',
-        gemini_api_key: this.site_settings.gemini_api_key || '',
-        supabase_url: this.site_settings.supabase_url || '',
-        supabase_key: this.site_settings.supabase_key || '',
-        recaptcha_site_key: this.site_settings.recaptcha_site_key || '',
-        extra_api_keys: this.site_settings.extra_api_keys || [],
-        header_settings: this.site_settings.header_settings || {},
-        hero_settings: this.site_settings.hero_settings || {},
-        homepage_insights_title: this.site_settings.homepage_insights_title || '',
-        homepage_insights_desc: this.site_settings.homepage_insights_desc || '',
-        homepage_insights_icon: this.site_settings.homepage_insights_icon || 'Heart',
-        homepage_insights_enabled: this.site_settings.homepage_insights_enabled ?? true,
-        homepage_insights_order: this.site_settings.homepage_insights_order ?? 4,
-        homepage_premium_title: this.site_settings.homepage_premium_title || '',
-        homepage_premium_desc: this.site_settings.homepage_premium_desc || '',
-        homepage_premium_cta_text: this.site_settings.homepage_premium_cta_text || 'START FREE TRIAL',
-        homepage_premium_enabled: this.site_settings.homepage_premium_enabled ?? true,
-        homepage_premium_order: this.site_settings.homepage_premium_order ?? 5,
-        updated_at: new Date().toISOString()
-      };
-      const { error } = await this.supabase.from('site_settings').upsert([dbPayload]);
-      if (error) {
-        console.error('Supabase site_settings upsert failed:', error);
-      }
-    }
+    // (2026-09-24) All admin-settings persistence flows exclusively through
+    // saveState() -> POST /api/state -> server-side raw_settings merge. The
+    // old direct-to-Supabase upsert here (and its extra_settings_blob packing)
+    // was removed: it targeted 16 columns missing from the live
+    // site_settings table, so PostgREST rejected every write (PGRST204)
+    // while the admin UI still reported success.
   }
 
   // AUTHORS CRUD
