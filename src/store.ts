@@ -2199,10 +2199,53 @@ export class HeartsyncStore {
     this.saveState();
 
     if (this.supabase) {
-      this.supabase.from('audit_logs').insert([newLog]).then(({ error }) => {
+      // Live audit_logs columns: id, action, user_id, details (JSONB),
+      // ip_address, created_at. The old shape (user_name/target/timestamp
+      // as top-level columns) failed silently on EVERY insert, which is
+      // why the admin audit log was always empty after a reload.
+      this.supabase.from('audit_logs').insert([{
+        id: newLog.id,
+        action: newLog.action,
+        user_id: this.current_user?.id || null,
+        details: { target: newLog.target, user_name: newLog.user_name, timestamp: newLog.timestamp },
+        created_at: newLog.timestamp
+      }]).then(({ error }) => {
         if (error) console.warn('Supabase logging failed:', error);
       });
     }
+  }
+
+  // Schema-resilient Supabase write: on a missing-column error (the live
+  // tables drifted from the repo schema), strips that key and retries, so a
+  // single missing column can no longer fail the whole write. Mirrors
+  // upsertResilient in server.ts.
+  private async supabaseWriteResilient(
+    op: 'insert' | 'upsert' | 'update',
+    table: string,
+    payload: any,
+    eq?: { column: string; value: string }
+  ): Promise<{ error: null | any }> {
+    if (!this.supabase) return { error: new Error('no supabase client') };
+    let rows: any[] = Array.isArray(payload) ? payload : [payload];
+    for (let attempt = 0; attempt < 12; attempt++) {
+      let q = this.supabase.from(table)[op]!(rows as any);
+      if (eq) q = (q as any).eq(eq.column, eq.value);
+      const { error } = await q;
+      if (!error) return { error: null };
+      const m = String(error.message || '').match(/column [a-zA-Z0-9_]+\.([a-zA-Z0-9_]+) does not exist|could not find the "([a-zA-Z0-9_]+)" column/i);
+      const missing = m ? (m[1] || m[2]) : null;
+      if (!missing) return { error };
+      console.warn(`${table}: live table lacks column "${missing}" - stripping and retrying`);
+      rows = rows.map(r => {
+        if (r && typeof r === 'object' && missing in r) {
+          const c = { ...r };
+          delete c[missing];
+          return c;
+        }
+        return r;
+      });
+    }
+    return { error: new Error(`${table} write: too many schema mismatches`) };
   }
 
   // SUPABASE COMPLIANT AUTHENTICATION
@@ -2796,7 +2839,7 @@ export class HeartsyncStore {
     if (updates.price !== undefined) dbUpdates.price = updates.price;
 
     if (this.supabase && Object.keys(dbUpdates).length > 0) {
-      const { error } = await this.supabase.from('categories').update(dbUpdates).eq('id', id);
+      const { error } = await this.supabaseWriteResilient('update', 'categories', dbUpdates, { column: 'id', value: id });
       if (error) {
         console.error('Supabase category update failed:', error);
         throw new Error(`Failed to update category in database: ${error.message}`);

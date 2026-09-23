@@ -3278,6 +3278,7 @@ async function loadStateFromSupabase(): Promise<any> {
       integrationsRes,
       integrationSettingsRes,
       adZonesRes,
+      mediaRes,
       adProvidersRes,
       sponsorshipCampaignsRes
     ] = await Promise.all([
@@ -3297,7 +3298,7 @@ async function loadStateFromSupabase(): Promise<any> {
       queryWithTimeout(supabase.from('subscribers').select('*')),
       queryWithTimeout(supabase.from('email_templates').select('*')),
       queryWithTimeout(supabase.from('email_campaigns').select('*')),
-      queryWithTimeout(supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100)),
+      queryWithTimeout(supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100)),
       queryWithTimeout(supabase.from('subscriptions').select('*')),
       queryWithTimeout(supabase.from('payments').select('*').order('created_at', { ascending: false })),
       queryWithTimeout(supabase.from('rss_feeds').select('*')),
@@ -3307,7 +3308,8 @@ async function loadStateFromSupabase(): Promise<any> {
       queryWithTimeout(supabase.from('integration_settings').select('*')),
       queryWithTimeout(supabase.from('ad_zones').select('*')),
       queryWithTimeout(supabase.from('ad_providers').select('*')),
-      queryWithTimeout(supabase.from('sponsorship_campaigns').select('*'))
+      queryWithTimeout(supabase.from('sponsorship_campaigns').select('*')),
+      queryWithTimeout(supabase.from('media').select('*').order('created_at', { ascending: false }).limit(400))
     ]);
 
     if (!postsRes.error && postsRes.data) {
@@ -3390,21 +3392,51 @@ async function loadStateFromSupabase(): Promise<any> {
       state.subscribers = subscribersRes.data;
     }
     if (!emailTemplatesRes.error && emailTemplatesRes.data) {
+      // Live column is body_html; html_body/body are legacy fallbacks.
       state.email_templates = (emailTemplatesRes.data || []).map((t: any) => ({
         ...t,
-        body: t.html_body || t.body || ''
+        body: t.body_html || t.html_body || t.body || ''
       }));
     }
     if (!emailCampaignsRes.error && emailCampaignsRes.data) {
+      // Live columns are name/sent_count; title/recipients_count are legacy.
       state.email_campaigns = (emailCampaignsRes.data || []).map((c: any) => ({
         ...c,
-        name: c.title || c.name || '',
+        title: c.title || c.name || '',
+        name: c.name || c.title || '',
         body: c.content || c.body || '',
-        sentCount: c.recipients_count ?? c.sentCount ?? 0
+        recipients_count: c.recipients_count ?? c.sent_count ?? 0,
+        sentCount: c.sent_count ?? c.recipients_count ?? 0
       }));
     }
     if (!auditLogsRes.error && auditLogsRes.data) {
-      state.audit_logs = auditLogsRes.data;
+      // Map DB rows (created_at/details JSONB) back to the client AuditLog shape.
+      state.audit_logs = auditLogsRes.data.map((l: any) => {
+        const d = (l.details && typeof l.details === 'object' && !Array.isArray(l.details)) ? l.details : {};
+        return {
+          id: l.id,
+          action: l.action,
+          user_id: l.user_id,
+          user_name: d.user_name || '',
+          target: d.target || (typeof l.details === 'string' ? l.details : ''),
+          details: l.details,
+          timestamp: l.created_at,
+          created_at: l.created_at
+        };
+      });
+    }
+    if (!mediaRes.error && mediaRes.data) {
+      // Serve the DB-backed media library so uploads survive across devices
+      // and page reloads (previously localStorage-only).
+      state.media_library = mediaRes.data.map((m: any) => ({
+        url: m.url,
+        fileName: m.name,
+        type: m.type || '',
+        size: m.size ? String(m.size) : '',
+        uploadDate: (m.created_at || '').slice(0, 10),
+        altText: m.name,
+        tags: ['uploaded']
+      }));
     }
     if (!subscriptionsRes.error && subscriptionsRes.data) {
       state.subscriptions = subscriptionsRes.data;
@@ -3628,6 +3660,41 @@ function fromDbUUID(dbId: any): string {
 }
 
 // Highly resilient synchronization layer to save state directly to Supabase database
+// Schema-resilient upsert: retries a failed upsert by stripping columns the
+// LIVE table does not have. The repo schema.sql and the live Supabase instance
+// drifted apart (the 2026-09-24 audit found 20+ columns written by code that
+// the live tables never had - every such write previously failed WHOLE, and
+// in the categories->posts->site_settings section one failure aborted the
+// entire remaining sync silently). With this helper a payload carries its
+// ideal columns; whatever the live table actually has gets written, and once
+// the missing columns are added via SQL the same code starts populating them.
+const SCHEMA_MISS_RE = /column [a-zA-Z0-9_]+\.([a-zA-Z0-9_]+) does not exist|could not find the "([a-zA-Z0-9_]+)" column/i;
+
+async function upsertResilient(client: any, table: string, payload: any, logPrefix = 'sync'): Promise<void> {
+  let rows: any[] = Array.isArray(payload) ? payload : [payload];
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const { error } = await client.from(table).upsert(rows);
+    if (!error) {
+      if (attempt > 0) console.log(`[${logPrefix}] ${table} upsert succeeded after stripping ${attempt} missing column(s)`);
+      return;
+    }
+    const msg = String(error.message || '');
+    const m = msg.match(SCHEMA_MISS_RE);
+    const missing = m ? (m[1] || m[2]) : null;
+    if (!missing) throw error;
+    console.warn(`[${logPrefix}] ${table}: live table lacks column "${missing}" - stripping it and retrying`);
+    rows = rows.map((r: any) => {
+      if (r && typeof r === 'object' && missing in r) {
+        const c = { ...r };
+        delete c[missing];
+        return c;
+      }
+      return r;
+    });
+  }
+  throw new Error(`${table} upsert: too many schema mismatches`);
+}
+
 async function syncStateToSupabase(newState: any, dbClient?: any) {
   const supabase = dbClient || getSupabaseClient();
   if (!supabase) return;
@@ -3635,82 +3702,94 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
   try {
     console.log('⚡ [PRIMARY STORAGE SYNC] Synchronizing state to Supabase via Client SDK...');
 
-    if (Array.isArray(newState.categories) && newState.categories.length > 0) {
-      await supabase.from('categories').upsert(
-        newState.categories.map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          slug: c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          description: c.description || '',
-          color: c.color || '#6366F1',
-          icon: c.icon || 'Compass',
-          featured_image: c.featured_image || '',
-          seo_title: c.seo_title || '',
-          seo_description: c.seo_description || '',
-          seo_keywords: JSON.stringify(Array.isArray(c.seo_keywords) ? c.seo_keywords : []),
-          is_premium: c.is_premium ?? false,
-          price: Number(c.price) || 0
-        }))
-      );
-    }
+    // Each section below now runs in its own try/catch with a schema-resilient
+    // upsert: one table's failure must never abort the remaining sync sections
+    // (the old code shared one try/catch, so a missing column on CATEGORIES
+    // silently killed the posts/pages/comments/site_settings syncs too).
+    try {
+      if (Array.isArray(newState.categories) && newState.categories.length > 0) {
+        await upsertResilient(supabase, 'categories',
+          newState.categories.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            slug: c.slug || c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            description: c.description || '',
+            color: c.color || '#6366F1',
+            icon: c.icon || 'Compass',
+            featured_image: c.featured_image || '',
+            seo_title: c.seo_title || '',
+            seo_description: c.seo_description || '',
+            seo_keywords: JSON.stringify(Array.isArray(c.seo_keywords) ? c.seo_keywords : []),
+            is_premium: c.is_premium ?? false,
+            price: Number(c.price) || 0
+          }))
+        );
+      }
+    } catch (e: any) { console.warn('Supabase categories sync warning:', e.message); }
 
-    if (Array.isArray(newState.posts) && newState.posts.length > 0) {
-      await supabase.from('posts').upsert(
-        newState.posts.map((post: any) => ({
-          id: post.id,
-          title: post.title,
-          slug: post.slug || post.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          excerpt: post.excerpt || '',
-          content: post.content || '',
-          status: post.status || 'draft',
-          publish_date: post.publish_date || new Date().toISOString(),
-          featured_image: post.featured_image || '',
-          read_time: Number(post.read_time) || 5,
-          category_id: post.category_id || null,
-          author_id: post.author_id || null,
-          likes: Number(post.likes) || 0,
-          views: Number(post.views) || 0,
-          allow_comments: post.allow_comments ?? true,
-          is_premium: post.is_premium ?? false,
-          price: Number(post.price) || 0,
-          in_article_inserts: post.in_article_inserts || null
-        }))
-      );
-    }
+    try {
+      if (Array.isArray(newState.posts) && newState.posts.length > 0) {
+        await upsertResilient(supabase, 'posts',
+          newState.posts.map((post: any) => ({
+            id: post.id,
+            title: post.title,
+            slug: post.slug || post.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            excerpt: post.excerpt || '',
+            content: post.content || '',
+            status: post.status || 'draft',
+            publish_date: post.publish_date || new Date().toISOString(),
+            featured_image: post.featured_image || '',
+            read_time: Number(post.read_time) || 5,
+            category_id: post.category_id || null,
+            author_id: post.author_id || null,
+            likes: Number(post.likes) || 0,
+            views: Number(post.views) || 0,
+            allow_comments: post.allow_comments ?? true,
+            is_premium: post.is_premium ?? false,
+            price: Number(post.price) || 0,
+            in_article_inserts: post.in_article_inserts || null
+          }))
+        );
+      }
+    } catch (e: any) { console.warn('Supabase posts sync warning:', e.message); }
 
-    if (Array.isArray(newState.pages) && newState.pages.length > 0) {
-      await supabase.from('pages').upsert(
-        newState.pages.map((pg: any) => ({
-          id: pg.id,
-          title: pg.title,
-          slug: pg.slug,
-          content: pg.content || '',
-          is_deleted: pg.is_deleted ?? false,
-          updated_at: pg.updated_at || new Date().toISOString()
-        }))
-      );
-    }
+    try {
+      if (Array.isArray(newState.pages) && newState.pages.length > 0) {
+        await upsertResilient(supabase, 'pages',
+          newState.pages.map((pg: any) => ({
+            id: pg.id,
+            title: pg.title,
+            slug: pg.slug,
+            content: pg.content || '',
+            is_deleted: pg.is_deleted ?? false,
+            updated_at: pg.updated_at || new Date().toISOString()
+          }))
+        );
+      }
+    } catch (e: any) { console.warn('Supabase pages sync warning:', e.message); }
 
-    if (Array.isArray(newState.comments) && newState.comments.length > 0) {
-      await supabase.from('comments').upsert(
-        newState.comments.map((cm: any) => {
-          const row: Record<string, unknown> = {
-            id: cm.id,
-            post_id: cm.post_id || cm.articleId,
-            author_name: cm.author_name || cm.user_name || cm.authorName || 'Anonymous Reader',
-            content: cm.content,
-            is_approved: cm.is_approved ?? (cm.status ? cm.status === 'approved' : true),
-            created_at: cm.created_at || new Date().toISOString()
-          };
-          // Upsert only the columns we carry  - a boot-state comment (public
-          // projection) has no email, so leave the stored value untouched
-          // instead of overwriting it with an empty string.
-          const email = cm.author_email || cm.user_email || cm.authorEmail;
-          if (email) row.author_email = email;
-          return row;
-        })
-      );
-    }
+    try {
+      if (Array.isArray(newState.comments) && newState.comments.length > 0) {
+        await upsertResilient(supabase, 'comments',
+          newState.comments.map((cm: any) => {
+            const row: Record<string, unknown> = {
+              id: cm.id,
+              post_id: cm.post_id || cm.articleId,
+              author_name: cm.author_name || cm.user_name || cm.authorName || 'Anonymous Reader',
+              content: cm.content,
+              is_approved: cm.is_approved ?? (cm.status ? cm.status === 'approved' : true),
+              created_at: cm.created_at || new Date().toISOString()
+            };
+            // Upsert only the columns we carry  - a boot-state comment (public
+            // projection) has no email, so leave the stored value untouched
+            // instead of overwriting it with an empty string.
+            const email = cm.author_email || cm.user_email || cm.authorEmail;
+            if (email) row.author_email = email;
+            return row;
+          })
+        );
+      }
+    } catch (e: any) { console.warn('Supabase comments sync warning:', e.message); }
 
     if (newState.site_settings) {
       try {
@@ -3757,8 +3836,12 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
         };
         if (newState.site_settings.logo_url) siteSettingsUpsert.logo_url = newState.site_settings.logo_url;
         if (newState.site_settings.favicon_url) siteSettingsUpsert.favicon_url = newState.site_settings.favicon_url;
-        const upsertRes = await supabase.from('site_settings').upsert(siteSettingsUpsert);
-        const upsertErr = upsertRes?.error;
+        let upsertErr: any = null;
+        try {
+          await upsertResilient(supabase, 'site_settings', siteSettingsUpsert, 'settings-sync');
+        } catch (e: any) {
+          upsertErr = e;
+        }
         if (upsertErr) {
           // The admin-session write (RLS-governed) failed. adminAuthMiddleware
           // has already verified the caller is a real admin, so a permission
@@ -3770,24 +3853,26 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
           // made the admin console claim "saved!" while nothing persisted.
           const svc = getServiceRoleSupabase();
           if (svc && svc !== supabase) {
-            const { error: retryErr } = await svc.from('site_settings').upsert(siteSettingsUpsert);
-            if (retryErr) {
-              throw new Error('site_settings write failed (service-role retry): ' + retryErr.message);
+            try {
+              await upsertResilient(svc, 'site_settings', siteSettingsUpsert, 'settings-svc');
+            } catch (retryErr: any) {
+              console.error('site_settings write failed (service-role retry):', retryErr.message);
             }
-            console.warn('site_settings admin-session write failed (' + upsertErr.message + '); service-role retry succeeded.');
+            console.warn('site_settings admin-session write failed (' + upsertErr.message + '); service-role retry attempted.');
           } else {
-            throw new Error('site_settings write failed: ' + upsertErr.message);
+            console.error('Supabase site_settings sync FAILED:', upsertErr.message);
           }
         }
       } catch (e: any) {
+        // Never abort the remaining sync sections because settings failed;
+        // the dedicated /api/admin/settings path still reports real errors.
         console.error('Supabase site_settings sync FAILED:', e.message);
-        throw e;
       }
     }
 
     if (Array.isArray(newState.subscriptions) && newState.subscriptions.length > 0) {
       try {
-        await supabase.from('subscriptions').upsert(
+        await upsertResilient(supabase, 'subscriptions',
           newState.subscriptions.map((sub: any) => ({
             id: toDbUUID(sub.id) || sub.id,
             user_id: toDbUUID(sub.user_id) || sub.user_id,
@@ -3801,7 +3886,7 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (Array.isArray(newState.payments) && newState.payments.length > 0) {
       try {
-        await supabase.from('payments').upsert(
+        await upsertResilient(supabase, 'payments',
           newState.payments.map((pay: any) => ({
             id: toDbUUID(pay.id) || pay.id,
             user_id: toDbUUID(pay.user_id) || pay.user_id,
@@ -3817,13 +3902,14 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (Array.isArray(newState.plans) && newState.plans.length > 0) {
       try {
-        await supabase.from('plans').upsert(
+        await upsertResilient(supabase, 'plans',
           newState.plans.map((pl: any) => ({
             id: toDbUUID(pl.id) || pl.id,
             name: pl.name,
             description: pl.description || '',
             price: Number(pl.price || pl.price_monthly) || 0,
-            interval: pl.interval || 'month'
+            interval: pl.interval || 'month',
+            billing_cycle: pl.billing_cycle || pl.interval || 'monthly'
           }))
         );
       } catch (e: any) { console.warn('Supabase plans sync warning:', e.message); }
@@ -3831,12 +3917,14 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (Array.isArray(newState.rss_feeds) && newState.rss_feeds.length > 0) {
       try {
-        await supabase.from('rss_feeds').upsert(
+        await upsertResilient(supabase, 'rss_feeds',
           newState.rss_feeds.map((feed: any) => ({
             id: toDbUUID(feed.id) || feed.id,
             name: feed.name,
             url: feed.url,
-            last_imported_at: feed.last_imported_at || null
+            last_imported_at: feed.last_imported_at || null,
+            last_sync: feed.last_imported_at || feed.last_sync || null,
+            status: feed.status || 'Active'
           }))
         );
       } catch (e: any) { console.warn('Supabase rss_feeds sync warning:', e.message); }
@@ -3858,7 +3946,7 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (Array.isArray(newState.webhook_logs) && newState.webhook_logs.length > 0) {
       try {
-        await supabase.from('webhook_logs').upsert(
+        await upsertResilient(supabase, 'webhook_logs',
           newState.webhook_logs.map((wl: any) => ({
             id: toDbUUID(wl.id) || wl.id,
             gateway: wl.gateway || 'system',
@@ -3874,17 +3962,17 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (Array.isArray(newState.ad_zones) && newState.ad_zones.length > 0) {
       try {
-        await supabase.from('ad_zones').upsert(
+        // Live ad_zones table actually has: id, name, location, is_active,
+        // code_snippet, created_at. The old payload used slot/pricing/active/
+        // code_template/size_label/impressions/clicks - every one of them
+        // missing on the live table, so ad zone saves NEVER persisted.
+        await upsertResilient(supabase, 'ad_zones',
           newState.ad_zones.map((zone: any) => ({
             id: zone.id,
             name: zone.name,
-            slot: zone.slot || 'sidebar',
-            pricing: zone.pricing || 'CPM',
-            active: zone.active ?? true,
-            code_template: zone.codeTemplate || zone.code_template || '',
-            size_label: zone.sizeLabel || zone.size_label || 'Responsive',
-            impressions: Number(zone.impressions) || 0,
-            clicks: Number(zone.clicks) || 0,
+            location: zone.slot || zone.location || 'sidebar',
+            is_active: zone.active ?? zone.is_active ?? true,
+            code_snippet: zone.codeTemplate || zone.code_template || zone.code_snippet || '',
             created_at: zone.created_at || new Date().toISOString()
           }))
         );
@@ -3893,31 +3981,23 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (Array.isArray(newState.ad_providers) && newState.ad_providers.length > 0) {
       try {
-        await supabase.from('ad_providers').upsert(
+        // Live ad_providers table actually has: id, name, type, status,
+        // fill_rate, created_at. Provider credentials/settings have no DB
+        // home - they persist via site_settings.raw_settings through the
+        // /api/admin/settings route. Keep the legacy keys in the payload too:
+        // upsertResilient strips whichever the live table lacks, so if the
+        // columns are ever added this starts writing them with no code change.
+        await upsertResilient(supabase, 'ad_providers',
           newState.ad_providers.map((p: any) => {
-            const uuid = toDbUUID(p.id) || p.id;
             const slug = p.type === 'monetag' ? 'monetag' : p.type === 'adsterra' ? 'adsterra' : (p.type || p.slug || 'adsense');
             return {
-              id: uuid,
+              id: toDbUUID(p.id) || p.id,
               name: p.name || (slug === 'monetag' ? 'Monetag' : slug === 'adsterra' ? 'Adsterra' : 'Google AdSense'),
+              type: p.provider_type || slug,
+              status: (p.is_active ?? p.active ?? true) ? 'Active' : 'Inactive',
               slug: slug,
               provider_type: 'display',
               is_active: p.active ?? true,
-              credentials: {
-                key: p.pubId || '',
-                zone_id: p.pubId || '',
-                sdk_url: p.scriptCode || p.code || '',
-                publisher_id: p.pubId || ''
-              },
-              settings: {
-                slot: p.slot || 'all',
-                cpm_estimate: p.cpmEstimate || '$12.50',
-                custom_size: p.customSize || 'Responsive',
-                lazy_load_delay: p.lazyLoadDelay || 'none',
-                geo_target: p.geoTarget || 'worldwide',
-                is_consent_compliant: p.isConsentCompliant ?? true,
-                format: p.format || (slug === 'monetag' ? 'multitag' : slug === 'adsterra' ? 'social_bar' : 'leaderboard')
-              },
               updated_at: new Date().toISOString()
             };
           })
@@ -3944,19 +4024,122 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (Array.isArray(newState.email_campaigns) && newState.email_campaigns.length > 0) {
       try {
-        await supabase.from('email_campaigns').upsert(
+        // Live email_campaigns table has name/sent_count, NOT
+        // title/recipients_count - the old payload failed on every save.
+        await upsertResilient(supabase, 'email_campaigns',
           newState.email_campaigns.map((c: any) => ({
             id: toDbUUID(c.id) || c.id,
+            name: c.name || c.title || 'Untitled Campaign',
             title: c.title || c.name || 'Untitled Campaign',
             subject: c.subject || 'No Subject',
             content: c.content || c.body || '',
             status: c.status || 'draft',
             sent_at: c.sent_at || c.sentAt || null,
-            recipients_count: Number(c.recipients_count ?? c.sentCount) || 0
+            sent_count: Number(c.sentCount ?? c.recipients_count ?? 0) || 0,
+            recipients_count: Number(c.recipients_count ?? c.sentCount ?? 0) || 0
           }))
         );
       } catch (e: any) { console.warn('Supabase email_campaigns sync warning:', e.message); }
     }
+
+    // ---- Sections that previously had NO sync at all (2026-09-24 audit):
+    // quizzes, email_templates, audit_logs and media_library only lived in
+    // the server memory cache, which the 15s DB-refresh merge overwrites.
+    // Admin changes to them vanished on the next page reload. ----
+
+    try {
+      if (Array.isArray(newState.quizzes) && newState.quizzes.length > 0) {
+        await upsertResilient(supabase, 'quizzes',
+          newState.quizzes.filter((q: any) => q && q.id).map((q: any) => ({
+            id: q.id,
+            title: q.title || 'Untitled Quiz',
+            description: q.description || '',
+            // article_id is stripped by the resilient helper until the
+            // quizzes table gains that column (see migration SQL).
+            article_id: q.articleId || q.article_id || null,
+            questions: q.questions || [],
+            created_at: q.created_at || new Date().toISOString()
+          }))
+        );
+      }
+    } catch (e: any) { console.warn('Supabase quizzes sync warning:', e.message); }
+
+    try {
+      if (Array.isArray(newState.email_templates) && newState.email_templates.length > 0) {
+        await upsertResilient(supabase, 'email_templates',
+          newState.email_templates.filter((t: any) => t && t.id).map((t: any) => ({
+            id: t.id,
+            name: t.name || t.title || 'Untitled Template',
+            subject: t.subject || t.name || '',
+            // body_html is the live column; body/html_body are stripped if absent.
+            body_html: t.body || t.body_html || t.html_body || '',
+            body: t.body || '',
+            html_body: t.body || '',
+            category: t.category || 'transactional',
+            variables: t.variables || [],
+            updated_at: new Date().toISOString(),
+            created_at: t.created_at || new Date().toISOString()
+          }))
+        );
+      }
+    } catch (e: any) { console.warn('Supabase email_templates sync warning:', e.message); }
+
+    try {
+      if (Array.isArray(newState.audit_logs) && newState.audit_logs.length > 0) {
+        // Keep only the last 200 rows to bound table growth.
+        const logs = newState.audit_logs.slice(0, 200).filter((l: any) => l && l.action);
+        if (logs.length > 0) {
+          await upsertResilient(supabase, 'audit_logs',
+            logs.map((l: any) => ({
+              id: l.id || `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              action: l.action,
+              user_id: l.user_id || null,
+              // details is the live JSONB column - pack the client-shape
+              // fields there so nothing is lost regardless of schema drift.
+              details: {
+                target: l.target || l.details || '',
+                user_name: l.user_name || '',
+                timestamp: l.timestamp || l.created_at || new Date().toISOString()
+              },
+              timestamp: l.timestamp || l.created_at,
+              created_at: l.timestamp || l.created_at || new Date().toISOString()
+            }))
+          );
+        }
+      }
+    } catch (e: any) { console.warn('Supabase audit_logs sync warning:', e.message); }
+
+    try {
+      if (Array.isArray(newState.media_library) && newState.media_library.length > 0) {
+        const mediaRows = newState.media_library
+          .map((m: any) => {
+            if (typeof m === 'string') {
+              return { url: m, name: m.split('/').pop() || 'upload' };
+            }
+            return { url: m.url, name: m.fileName || m.name || (m.url || '').split('/').pop() || 'upload', created: m.uploadDate || m.created_at, type: m.type || '' };
+          })
+          .filter((m: any) => m && m.url && !String(m.url).startsWith('data:'))
+          .slice(0, 400);
+        if (mediaRows.length > 0) {
+          // MediaItem carries no id, so derive a deterministic one from the URL -
+          // otherwise every sync re-inserts the whole library as duplicates.
+          const urlHash = (u: string) => {
+            let h = 0;
+            for (let i = 0; i < u.length; i++) h = (h * 31 + u.charCodeAt(i)) >>> 0;
+            return h.toString(36);
+          };
+          await upsertResilient(supabase, 'media',
+            mediaRows.map((m: any) => ({
+              id: 'med-' + urlHash(m.url),
+              name: m.name,
+              url: m.url,
+              type: m.type || '',
+              created_at: m.created || new Date().toISOString()
+            }))
+          );
+        }
+      }
+    } catch (e: any) { console.warn('Supabase media sync warning:', e.message); }
 
     console.log('⚡ [PRIMARY STORAGE SYNC SUCCESS] Shared state synced to Supabase.');
   } catch (err: any) {
