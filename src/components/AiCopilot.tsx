@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Heart, Send, Sparkles, ShieldCheck, TriangleAlert, RefreshCw } from 'lucide-react';
+import { Heart, Send, ShieldCheck, TriangleAlert, RefreshCw } from 'lucide-react';
 import { heartsync } from '../store';
 
 interface ChatMessage {
@@ -84,7 +84,7 @@ export default function AiCopilot({ onNavigate }: { onNavigate: (tab: string, ar
         <div className="h-[52vh] min-h-[320px] overflow-y-auto p-4 sm:p-6 space-y-4">
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center px-4">
-              <Sparkles className="w-6 h-6 text-rose-400 mb-3" />
+              <Heart className="w-6 h-6 text-rose-400 mb-3" fill="currentColor" />
               <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm leading-relaxed">
                 Start with one of these, or type your own situation below.
               </p>

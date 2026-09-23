@@ -72,8 +72,17 @@ function resolvePublisherId(): string | null {
 }
 
 function ensureAdsenseLibrary(publisherId: string): void {
-  if (document.querySelector('script[data-adsense="true"]')) return;
+  // The canonical loader lives in index.html (id="heartsync-adsense-script",
+  // data-adsense="true"). Detect it by EITHER marker or by its adsbygoogle.js
+  // src so a second copy of the library can never load regardless of which
+  // component asks first.
+  const existing =
+    document.querySelector('script[data-adsense="true"]') ||
+    document.querySelector('script#heartsync-adsense-script') ||
+    [...document.querySelectorAll('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]')][0];
+  if (existing) return;
   const s = document.createElement('script');
+  s.id = 'heartsync-adsense-script';
   s.async = true;
   s.crossOrigin = 'anonymous';
   s.setAttribute('data-adsense', 'true');

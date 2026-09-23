@@ -1,1 +1,6 @@
 google.com, pub-3404100134534192, DIRECT, f08c47fec0942fa0
+
+# Monetag (zone 284167): add the ads.txt line from the Monetag publisher
+# dashboard (Monetag -> Sites -> ads.txt) below this comment. Monetag
+# reporting attributes demand to this site only once its line is present:
+#   <monetag-authorized-sellers-domain>, <your-monetag-publisher-id>, DIRECT, <network-hash>

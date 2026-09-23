@@ -53,13 +53,18 @@ export const logger = {
 // Content-Security-Policy applied to every function-served response (client
 // routes, /api/*). script-src MUST include the ACTIVE ad providers' loader
 // domains, or the browser silently blocks every ad call: Monetag MultiTag
-// loader (alwingulla.com) plus its service-worker domain (3nbf4.com),
-// Adsterra banner/popunder domains (highperformanceformat.com,
-// highrevenueformat.com, profitableratecpmnetwork.com), Google AdSense
+// loader (alwingulla.com), its second-hop loader domain for zone 284167
+// (a11ybar.com - verified live: tag.min.js injects a11ybar.com/ok6.js which
+// injects a11ybar.com/stat.js; omitting it kills the whole chain at hop 2)
+// and its service-worker domain (3nbf4.com), Adsterra banner/popunder domains
+// (highperformanceformat.com, highrevenueformat.com,
+// profitableratecpmnetwork.com), Google AdSense
 // (pagead2.googlesyndication.com, tpc.googlesyndication.com,
 // *.doubleclick.net) and the Meta pixel (connect.facebook.net). Ad creatives
-// render inside iframes, which frame-src https: already permits.
-const CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://*.doubleclick.net https://connect.facebook.net https://alwingulla.com https://3nbf4.com https://*.highperformanceformat.com https://*.highrevenueformat.com https://*.profitableratecpmnetwork.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; frame-src 'self' https:;";
+// render inside iframes, which frame-src https: already permits. When a
+// provider's zone or account changes, re-verify its loader chain with the
+// production network tab before shipping.
+const CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://*.doubleclick.net https://connect.facebook.net https://alwingulla.com https://a11ybar.com https://3nbf4.com https://*.highperformanceformat.com https://*.highrevenueformat.com https://*.profitableratecpmnetwork.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; frame-src 'self' https:;";
 
 // 1. Security Headers Middlewares (Phase 4: Security Hardening)
 app.use((req, res, next) => {

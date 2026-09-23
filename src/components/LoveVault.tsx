@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Lock, Plus, Trash2, Sparkles, Copy, BookHeart, HeartHandshake, ScrollText } from 'lucide-react';
+import { Lock, Plus, Trash2, Heart, Copy, BookHeart, HeartHandshake, ScrollText } from 'lucide-react';
 import { heartsync } from '../store';
 import { BOUNDARIES_TEMPLATES } from '../utils/data/boundariesTemplates';
 
@@ -287,7 +287,7 @@ export default function LoveVault() {
                 disabled={jInspireBusy}
                 className="inline-flex items-center gap-1 text-xs text-rose-500 hover:text-rose-600 disabled:opacity-50"
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Heart className="w-3.5 h-3.5" fill="currentColor" />
                 {jInspireBusy ? 'Thinking…' : 'Inspire me'}
               </button>
             </div>

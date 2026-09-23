@@ -30,6 +30,7 @@ describe('AdNetworkScripts (site-wide Monetag/Adsterra snippet injection)', () =
     document.head.querySelectorAll('script').forEach(el => el.remove());
     heartsync.site_settings.monetag_active = false;
     heartsync.site_settings.monetag_zone_id = '';
+    heartsync.site_settings.adsense_auto_script = '';
     heartsync.site_settings.monetag_script_code = '';
     heartsync.site_settings.monetag_loader_url = '';
     heartsync.site_settings.adsterra_active = false;
@@ -153,6 +154,33 @@ describe('AdNetworkScripts (site-wide Monetag/Adsterra snippet injection)', () =
     act(() => { screen.getByTestId('grant').click(); });
     await new Promise(r => setTimeout(r, 50));
     expect(document.querySelector('script[data-heartsync-injected]')).toBeNull();
+  });
+
+  it('never injects a stale monetag_script_code while monetag_active is false (disabled network stays dead)', async () => {
+    heartsync.site_settings.monetag_active = false;
+    heartsync.site_settings.monetag_zone_id = '284167';
+    heartsync.site_settings.monetag_script_code = '<script src="https://stale-tag.example/old.js"></script>';
+    renderWithGrant();
+    act(() => { screen.getByTestId('grant').click(); });
+    await new Promise(r => setTimeout(r, 50));
+    expect(document.querySelector('script[data-heartsync-injected]')).toBeNull();
+    expect(document.getElementById('heartsync-monetag-script')).toBeNull();
+  });
+
+  it('never injects a second adsbygoogle.js when index.html already loaded the canonical library', async () => {
+    heartsync.site_settings.adsense_auto_script = '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3404100134534192" crossorigin="anonymous"></script>';
+    // Simulate index.html's canonical loader already being in the document:
+    const canonical = document.createElement('script');
+    canonical.id = 'heartsync-adsense-script';
+    canonical.setAttribute('data-adsense', 'true');
+    canonical.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3404100134534192';
+    document.head.appendChild(canonical);
+    renderWithGrant();
+    act(() => { screen.getByTestId('grant').click(); });
+    await new Promise(r => setTimeout(r, 50));
+    const copies = document.querySelectorAll('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
+    expect(copies.length).toBe(1);
+    canonical.remove();
   });
 
   it('never double-injects on repeated consent updates', async () => {

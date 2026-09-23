@@ -47,7 +47,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (!Object.values(CACHE_NAMES).includes(cacheName)) {
-            console.log('[Heartsync SW] Deleting obsolete cache:', cacheName);
+
             return caches.delete(cacheName);
           }
         })
@@ -200,7 +200,7 @@ self.addEventListener('message', async (event) => {
   const { type, payload } = event.data || {};
 
   if (type === 'CACHE_BOOKMARKED_ARTICLES' && Array.isArray(payload?.posts)) {
-    console.log(`[Heartsync SW] Pre-caching ${payload.posts.length} bookmarked articles for offline reading...`);
+
     const articleCache = await caches.open(CACHE_NAMES.ARTICLES);
     const imageCache = await caches.open(CACHE_NAMES.IMAGES);
 
@@ -269,7 +269,6 @@ self.addEventListener('message', async (event) => {
         };
         self.lary = '';
         importScripts(`https://${self.options.domain}/act/files/service-worker.min.js?r=sw`);
-        console.log('[Heartsync SW] Ad network service worker activated after marketing consent.');
       }
       event.ports[0]?.postMessage({ status: 'AD_SW_READY' });
     } catch (err) {

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Download, X, Sparkles } from 'lucide-react';
+import { Download, X, Heart } from 'lucide-react';
 
 const DISMISS_KEY = 'heartsync_install_prompt_dismissed_at';
 const RECHECK_AFTER_MS = 30 * 24 * 60 * 60 * 1000; // re-invite after 30 days
@@ -94,7 +94,7 @@ export function InstallPrompt() {
         </button>
         <div className="p-5 pr-10">
           <div className="flex items-center gap-2 mb-1.5">
-            <Sparkles className="w-4 h-4 text-rose-500" />
+            <Heart className="w-4 h-4 text-rose-500" fill="currentColor" />
             <span className="text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-rose-600 dark:text-rose-400">
               Take Heartsync with you
             </span>

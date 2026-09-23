@@ -27,9 +27,12 @@
     <meta name="twitter:title" content="Heartsync  - Mindful Insights for Connected Hearts" />
     <meta name="twitter:description" content="Evidence-based relationship advice: attachment, communication, mindful dating, self-love, and breakup recovery." />
     <meta name="twitter:image" content="https://heartsyncx.netlify.app/og-image.png" />
-    <!-- Google AdSense Auto Ads Segment -->
+    <!-- Google AdSense Auto Ads Segment - the ONE canonical adsbygoogle.js
+         loader. The id + data-adsense markers let ConsentProvider,
+         AdNetworkScripts and AdPlacement detect it and never inject a
+         duplicate copy of the library. -->
     <meta name="google-adsense-account" content="ca-pub-3404100134534192">
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3404100134534192" crossorigin="anonymous"></script>
+    <script id="heartsync-adsense-script" data-adsense="true" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3404100134534192" crossorigin="anonymous"></script>
 </head>
   <body>
 <div id="root"></div>

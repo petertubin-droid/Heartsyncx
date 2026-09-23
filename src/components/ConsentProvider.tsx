@@ -198,23 +198,11 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // hijack clicks with redirects and must never run while the admin
       // panel is open. injectProductionScripts fires on mount, on consent
       // and on preference changes, so this guard covers every call site.
-      // 1. Google AdSense
-      const adsenseActive = heartsync?.site_settings?.adsense_active ?? true;
-      const clientPubId = 
-        import.meta.env.VITE_ADSENSE_PUBLISHER_ID || 
-        import.meta.env.VITE_PUBLIC_ADSENSE_CLIENT || 
-        import.meta.env.VITE_ADSENSE_CLIENT ||
-        heartsync?.site_settings?.adsense_client_id ||
-        '';
-
-      if (adsenseActive && clientPubId && !document.getElementById('heartsync-adsense-script')) {
-        const adSenseScript = document.createElement('script');
-        adSenseScript.id = 'heartsync-adsense-script';
-        adSenseScript.async = true;
-        adSenseScript.crossOrigin = 'anonymous';
-        adSenseScript.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientPubId}`;
-        document.head.appendChild(adSenseScript);
-      }
+      // 1. Google AdSense: the library loads ONCE, from index.html's
+      // canonical <script id="heartsync-adsense-script">. It used to be
+      // re-injected here with the same client id - a silent duplicate
+      // load on every page. Ad units (AdPlacement) detect that same script
+      // and never re-add the library. Nothing to do in this provider.
 
       // 2. Monetag MultiTag & Ad Network Integration
       const monetagActive = heartsync?.site_settings?.monetag_active === true;

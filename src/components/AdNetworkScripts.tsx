@@ -88,8 +88,13 @@ export const AdNetworkScripts: React.FC = () => {
   // Monetag dashboard). When empty, the canonical MultiTag loader is derived
   // from the zone id: https://alwingulla.com/<zone>/tag.min.js
   const monetagLoaderUrl = str(s.monetag_loader_url);
-  const monetagSnippet =
-    monetagActive && (monetagLoaderUrl || monetagZone)
+  // A zone id (or explicit loader url) is the source of truth; a raw
+  // monetag_script_code is honored ONLY when the provider is active and no
+  // zone/loader is configured (a stale snippet must never override a zone,
+  // and a disabled network must never inject at all).
+  const monetagSnippet = !monetagActive
+    ? ''
+    : monetagLoaderUrl || monetagZone
       ? `<script id="heartsync-monetag-script" src="${monetagLoaderUrl || `https://alwingulla.com/${monetagZone}/tag.min.js`}" data-zone="${monetagZone}" async data-cfasync="false"></script>`
       : str(s.monetag_script_code);
 
@@ -120,7 +125,12 @@ export const AdNetworkScripts: React.FC = () => {
   useEffect(() => {
     const code = str((heartsync.site_settings as Record<string, unknown>).adsense_auto_script);
     const marker = 'script[data-heartsync-injected="adsense-auto"]';
-    if (adsSuspended || !code || document.querySelector(marker)) return;
+    // index.html already loads the canonical adsbygoogle.js - never add a
+    // second copy of the library, whatever the pasted snippet contains.
+    const adsenseLibraryPresent =
+      document.getElementById('heartsync-adsense-script') ||
+      [...document.querySelectorAll('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]')][0];
+    if (adsSuspended || !code || document.querySelector(marker) || adsenseLibraryPresent) return;
     try {
       const doc = new DOMParser().parseFromString(code, 'text/html');
       const targets = [...doc.head.querySelectorAll('script'), ...doc.body.querySelectorAll('script')];

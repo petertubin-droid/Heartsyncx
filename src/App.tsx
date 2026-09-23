@@ -2197,10 +2197,48 @@ export default function App() {
                         : (heartsync.site_settings.homepage_topics || []);
 
                       // Filter to only display Published topics
-                      const rawPublishedTopics = (rawTopics && rawTopics.length > 0 ? rawTopics : [])
+                      const adminPublishedTopics = (rawTopics && rawTopics.length > 0 ? rawTopics : [])
                         .filter((t: any) => t.status === 'Published');
 
                       const exploreTopicsLimit = siteSettings?.explore_topics_display_limit ?? 6;
+
+                      // No admin-authored topics yet: derive real topic cards from the
+                      // site's actual categories + published article counts (never
+                      // fabricated copy). Ranked by real published-article volume so the
+                      // most substantial topics surface first. Disappears automatically
+                      // the moment an admin publishes topics in Settings > Homepage > Categories.
+                      // NOTE: plain computation, not useMemo - this branch runs inside
+                      // a .map()/switch callback (not a component top level), so hooks
+                      // are not valid here. The inputs are small (<=13 categories, <=72
+                      // articles) so recomputing per render is cheap.
+                      const autoTopicsFromCategories = (() => {
+                        if (adminPublishedTopics.length > 0) return [] as any[];
+                        const countsByCategory = new Map<string, number>();
+                        publishedArticles.forEach((a: any) => {
+                          countsByCategory.set(a.category_id, (countsByCategory.get(a.category_id) || 0) + 1);
+                        });
+                        return [...categoriesState]
+                          .filter((c) => (countsByCategory.get(c.id) || 0) > 0)
+                          .sort((a, b) => (countsByCategory.get(b.id) || 0) - (countsByCategory.get(a.id) || 0))
+                          .slice(0, exploreTopicsLimit)
+                          .map((c) => {
+                            const articleCount = countsByCategory.get(c.id) || 0;
+                            return {
+                              id: `auto-${c.id}`,
+                              title: c.name,
+                              description: c.description || `${articleCount} article${articleCount === 1 ? '' : 's'} exploring ${c.name.toLowerCase()}.`,
+                              image: c.featured_image,
+                              button_text: 'Explore',
+                              destination_url: `category/${c.slug}`,
+                              display_order: 0,
+                              status: 'Published',
+                              created_at: '',
+                              updated_at: ''
+                            };
+                          });
+                      })();
+
+                      const rawPublishedTopics = adminPublishedTopics.length > 0 ? adminPublishedTopics : autoTopicsFromCategories;
                       let publishedTopics = [...rawPublishedTopics];
 
                       if (publishedTopics.length > 0 && publishedTopics.length < exploreTopicsLimit) {
