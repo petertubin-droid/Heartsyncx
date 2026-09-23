@@ -6741,28 +6741,41 @@ export default function AdminConsole({
 
                       <button
                         type="button"
-                        onClick={() => {
-                          heartsync.updateSettings({
-                            adsterra_active: adsterraActive,
-                            adsterra_key_header: siteSettings.adsterra_key_header,
-                            adsterra_key_sidebar: siteSettings.adsterra_key_sidebar,
-                            adsterra_key_in_article: siteSettings.adsterra_key_in_article,
-                            adsterra_key_footer: siteSettings.adsterra_key_footer,
-                            adsterra_key_homepage: siteSettings.adsterra_key_homepage,
-                            adsterra_key_article_bottom: siteSettings.adsterra_key_article_bottom,
-                            adsterra_url_header: siteSettings.adsterra_url_header,
-                            adsterra_url_sidebar: siteSettings.adsterra_url_sidebar,
-                            adsterra_url_in_article: siteSettings.adsterra_url_in_article,
-                            adsterra_url_footer: siteSettings.adsterra_url_footer,
-                            adsterra_url_homepage: siteSettings.adsterra_url_homepage,
-                            adsterra_url_article_bottom: siteSettings.adsterra_url_article_bottom,
-                            adsterra_popunder_url: siteSettings.adsterra_popunder_url,
-                            adsterra_popunder_script: siteSettings.adsterra_popunder_script,
-                            adsterra_social_bar_script: siteSettings.adsterra_social_bar_script,
-                            adsterra_interstitial_script: siteSettings.adsterra_interstitial_script,
-                            adsterra_inpage_push_script: siteSettings.adsterra_inpage_push_script
-                          });
-                          triggerToast('Adsterra settings saved!');
+                        onClick={async () => {
+                          triggerToast('Saving Adsterra settings\u2026');
+                          try {
+                            await heartsync.updateSettings({
+                              adsterra_active: adsterraActive,
+                              adsterra_key_header: siteSettings.adsterra_key_header,
+                              adsterra_key_sidebar: siteSettings.adsterra_key_sidebar,
+                              adsterra_key_in_article: siteSettings.adsterra_key_in_article,
+                              adsterra_key_footer: siteSettings.adsterra_key_footer,
+                              adsterra_key_homepage: siteSettings.adsterra_key_homepage,
+                              adsterra_key_article_bottom: siteSettings.adsterra_key_article_bottom,
+                              adsterra_url_header: siteSettings.adsterra_url_header,
+                              adsterra_url_sidebar: siteSettings.adsterra_url_sidebar,
+                              adsterra_url_in_article: siteSettings.adsterra_url_in_article,
+                              adsterra_url_footer: siteSettings.adsterra_url_footer,
+                              adsterra_url_homepage: siteSettings.adsterra_url_homepage,
+                              adsterra_url_article_bottom: siteSettings.adsterra_url_article_bottom,
+                              adsterra_popunder_url: siteSettings.adsterra_popunder_url,
+                              adsterra_popunder_script: siteSettings.adsterra_popunder_script,
+                              adsterra_social_bar_script: siteSettings.adsterra_social_bar_script,
+                              adsterra_interstitial_script: siteSettings.adsterra_interstitial_script,
+                              adsterra_inpage_push_script: siteSettings.adsterra_inpage_push_script
+                            });
+                            // updateSettings() only throws on client-side validation; a
+                            // rejected/expired admin session resolves quietly (see
+                            // store.ts saveState -> "sync skipped"). Check syncError so a
+                            // dead session can't masquerade as a successful save.
+                            if (heartsync.syncError) {
+                              triggerToast('Adsterra settings NOT saved: ' + heartsync.syncError);
+                            } else {
+                              triggerToast('Adsterra settings saved!');
+                            }
+                          } catch (err: any) {
+                            triggerToast('Adsterra settings NOT saved: ' + (err?.message || 'Unknown error'));
+                          }
                         }}
                         className="px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600 transition-all"
                       >

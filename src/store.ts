@@ -2049,10 +2049,14 @@ export class HeartsyncStore {
 
         if (!response.ok) {
           if (response.status === 401) {
-            // Server state sync requires an administrator session. Readers keep
-            // full local persistence; this is not an error condition.
+            // Server state sync requires an administrator session. For a plain
+            // reader (no admin session was ever expected) this is not an error;
+            // but if an admin console call landed here it means the session
+            // expired mid-edit, so surface it via syncError rather than letting
+            // the caller believe the write reached the database.
             console.info('State sync skipped: server requires an administrator session.');
             this.isSaving = false;
+            this.syncError = this.current_user ? 'Your admin session has expired. Please sign in again and re-save.' : null;
             this.onStateChangeCallbacks.forEach(cb => cb());
             return null;
           }
