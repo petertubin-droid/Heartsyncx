@@ -84,7 +84,9 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
 
   return (
     <footer className={footerBgClass}>
-      
+      {/* Editorial hairline divider: quiet gradient edge, both themes */}
+      <div aria-hidden="true" className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-rose-500/40 dark:via-rose-400/30 to-transparent pointer-events-none" />
+
       {/* Absolute decorative glow background */}
       <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-gradient-to-tr from-rose-900/10 to-fuchsia-950/15 blur-[40px] rounded-full pointer-events-none opacity-40" />
 

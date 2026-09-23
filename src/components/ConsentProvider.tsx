@@ -87,6 +87,7 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // If already accepted/configured, update consent mode v2
       updateConsentMode(activePrefs);
       injectProductionScripts(activePrefs);
+      notifyServiceWorkerOfConsent(activePrefs);
     } else {
       // Otherwise, set strict denial defaults (Consent Mode v2)
       if (window.gtag) {
@@ -113,6 +114,7 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const unsub = heartsync.subscribe(() => {
       if (attempts++ >= 10) return; // bounded; every branch inside is idempotent
       injectProductionScripts(preferences);
+    notifyServiceWorkerOfConsent(preferences);
     });
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,6 +129,37 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ad_personalization: prefs.marketing ? 'granted' : 'denied'
       });
     }
+  };
+
+  // Monetag's service worker (same values as public/sw2.js) must live at
+  // the '/' scope, which our offline-reader SW already owns. Tell the
+  // active SW when marketing consent is granted; it imports Monetag's SW
+  // code itself (see public/sw.js). No consent, no import - ever.
+  const notifyServiceWorkerOfConsent = (prefs: CookiePreferences) => {
+    try {
+      if (!prefs.marketing) return;
+      const s = heartsync.site_settings as unknown as Record<string, unknown>;
+      if (s.monetag_active !== true) return;
+      const send = (controller: ServiceWorker | null) => {
+        if (!controller) return;
+        controller.postMessage({
+          type: 'HEARTSYNC_AD_SW_CONSENT',
+          payload: {
+            granted: true,
+            domain: String(s.monetag_sw_domain || '3nbf4.com'),
+            zoneId: Number(s.monetag_sw_zone_id || 11858017)
+          }
+        });
+      };
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then((reg) => {
+          send(reg.active || navigator.serviceWorker.controller);
+          // The offline SW can activate slightly later on a first visit;
+          // retry once so consent still reaches it.
+          setTimeout(() => send(reg.active || navigator.serviceWorker.controller), 3000);
+        });
+      }
+    } catch { /* non-fatal */ }
   };
 
   const injectProductionScripts = (prefs: CookiePreferences) => {
@@ -246,6 +279,7 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     updateConsentMode(fullPrefs);
     injectProductionScripts(fullPrefs);
+    notifyServiceWorkerOfConsent(fullPrefs);
   };
 
   const rejectAll = () => {
@@ -277,6 +311,7 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     updateConsentMode(prefs);
     injectProductionScripts(prefs);
+    notifyServiceWorkerOfConsent(prefs);
   };
 
   const resetConsent = () => {

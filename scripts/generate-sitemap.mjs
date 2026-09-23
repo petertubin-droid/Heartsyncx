@@ -77,7 +77,35 @@ const moreArticleSlugs = (() => {
   return slugs;
 })();
 
-const allSlugs = [...new Set([...articleSlugs, ...moreArticleSlugs])].sort();
+// Live database articles: the DB is the runtime source of truth (admin-created
+// and restored posts never exist in code). Fetch published slugs with the
+// public anon key (read is allowed by RLS policy + grants). On any failure we
+// fall back to code slugs alone so a DB hiccup can never break the build.
+async function fetchDatabaseSlugs() {
+  const url = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+  const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+  if (!url || !key) {
+    console.warn('generate-sitemap: no Supabase env vars; using code slugs only');
+    return [];
+  }
+  try {
+    const res = await fetch(`${url}/rest/v1/posts?select=slug,status&status=eq.published&limit=1000`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = await res.json();
+    console.log(`generate-sitemap: fetched ${rows.length} published slugs from database`);
+    return rows.map((r) => r.slug).filter(Boolean);
+  } catch (err) {
+    console.warn(`generate-sitemap: database fetch failed (${err.message}); using code slugs only`);
+    return [];
+  }
+}
+
+const dbSlugs = await fetchDatabaseSlugs();
+
+const allSlugs = [...new Set([...articleSlugs, ...moreArticleSlugs, ...dbSlugs])].sort();
 console.log(`generate-sitemap: ${allSlugs.length} article URLs, ${STATIC_PAGES.length} static pages, base ${BASE_URL}`);
 
 const urls = [];

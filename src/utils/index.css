@@ -666,3 +666,196 @@ html.dark, html.dark body {
 /* Admin: Disable All Reader Border Edges (article_borderless_mode) */
 .article-borderless-mode #heartsync-premium-article-reading-body,
 .article-borderless-mode #heartsync-premium-article-reading-body * { border-color: transparent !important; }
+
+/* ============================================================
+   Premium editorial polish — public site refinement layer.
+   Scoped to content surfaces; admin console uses its own scoped
+   theme and is not affected by these rules.
+   ============================================================ */
+
+/* Refined text selection + focus states */
+::selection {
+  background: rgba(244, 63, 94, 0.18);
+  color: inherit;
+}
+html.dark ::selection {
+  background: rgba(244, 63, 94, 0.35);
+}
+
+/* Article prose: editorial serif headings, wider leading, better rhythm */
+.markdown-body h1, .prose h1 {
+  font-family: "Playfair Display", Georgia, serif !important;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.15 !important;
+}
+.markdown-body h2, .prose h2 {
+  font-family: "Playfair Display", Georgia, serif !important;
+  font-weight: 700;
+  font-size: 1.375rem !important;
+  letter-spacing: -0.01em;
+  line-height: 1.2 !important;
+}
+.markdown-body h3, .prose h3 {
+  font-family: "Playfair Display", Georgia, serif !important;
+  font-weight: 700;
+}
+.markdown-body p, .prose p {
+  line-height: 1.85 !important;
+  letter-spacing: 0.005em;
+}
+.markdown-body li, .prose li {
+  line-height: 1.75;
+}
+.markdown-body blockquote, .prose blockquote {
+  font-family: "Playfair Display", Georgia, serif !important;
+  font-style: italic !important;
+  border-left-width: 2px !important;
+  padding: 0.25rem 0 0.25rem 1.25rem !important;
+  color: inherit;
+  opacity: 1;
+}
+.markdown-body blockquote p, .prose blockquote p {
+  font-size: 1.05em;
+}
+
+/* Card image hover: slow, subtle editorial zoom (works for any card layout) */
+.group:hover .card-img-frame img {
+  transform: scale(1.035);
+}
+.group .card-img-frame img {
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* Elegant hairline dividers for meta rows */
+.premium-meta {
+  letter-spacing: 0.02em;
+}
+
+/* Uppercase kicker labels: editorial letter-spacing */
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  font-size: 0.6875rem;
+}
+
+/* Smooth underline reveal for inline links inside prose */
+.markdown-body a, .prose a {
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  padding-bottom: 1px;
+}
+.markdown-body a:hover, .prose a:hover {
+  background-size: 100% 1px;
+}
+
+/* Refined focus-visible ring sitewide */
+a:focus-visible, button:focus-visible {
+  outline: 2px solid rgba(244, 63, 94, 0.55);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+html.dark a:focus-visible, html.dark button:focus-visible {
+  outline-color: rgba(244, 63, 94, 0.8);
+}
+
+/* Image rendering polish */
+img {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   PREMIUM EDITORIAL LAYER (2026-09-23)
+   Global legibility + article-page refinements that work with
+   (not against) the admin typography settings:
+   - antialiased text everywhere, optical kerning for headings
+   - larger, airier markdown heading scale (family still follows
+     the article_headings_styles setting)
+   - drop cap on the first paragraph of the reading body only
+   - editorial pull-quote blockquotes and quiet underlined links
+   ============================================================ */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3, h4, h5, h6 {
+  font-optical-sizing: auto;
+}
+
+/* Airier heading scale for long-form prose (size/spacing only) */
+.markdown-body h2, .prose h2 {
+  font-size: 1.625rem !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.01em;
+  margin-top: 2.25rem !important;
+  margin-bottom: 0.875rem !important;
+}
+.markdown-body h3, .prose h3 {
+  font-size: 1.3125rem !important;
+  line-height: 1.3 !important;
+  letter-spacing: -0.005em;
+  margin-top: 1.875rem !important;
+}
+
+/* Drop cap: reading body only, never inserts/comments/cards */
+#heartsync-premium-article-reading-body .markdown-body > p:first-child::first-letter,
+#heartsync-premium-article-reading-body .prose > p:first-child::first-letter {
+  float: left;
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 700;
+  font-size: 3.25em;
+  line-height: 0.78;
+  padding-right: 0.12em;
+  margin-top: 0.08em;
+  color: #e11d48;
+}
+.dark #heartsync-premium-article-reading-body .markdown-body > p:first-child::first-letter,
+.dark #heartsync-premium-article-reading-body .prose > p:first-child::first-letter {
+  color: #fb7185;
+}
+@media (max-width: 640px) {
+  #heartsync-premium-article-reading-body .markdown-body > p:first-child::first-letter,
+  #heartsync-premium-article-reading-body .prose > p:first-child::first-letter {
+    font-size: 2.75em;
+  }
+}
+
+/* Pull-quote blockquotes inside the reading body only */
+#heartsync-premium-article-reading-body .markdown-body blockquote,
+#heartsync-premium-article-reading-body .prose blockquote {
+  border-left: 3px solid #e11d48 !important;
+  background: linear-gradient(90deg, rgba(244, 63, 94, 0.06), transparent 80%);
+  padding: 1rem 1.25rem !important;
+  border-radius: 0 0.75rem 0.75rem 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.0625rem;
+}
+.dark #heartsync-premium-article-reading-body .markdown-body blockquote,
+.dark #heartsync-premium-article-reading-body .prose blockquote {
+  background: linear-gradient(90deg, rgba(244, 63, 94, 0.1), transparent 80%);
+}
+
+/* Quiet editorial links inside articles: rose, subtle underline on hover */
+#heartsync-premium-article-reading-body .markdown-body a,
+#heartsync-premium-article-reading-body .prose a {
+  color: #e11d48;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(225, 29, 72, 0.35);
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.dark #heartsync-premium-article-reading-body .markdown-body a,
+.dark #heartsync-premium-article-reading-body .prose a {
+  color: #fb7185;
+  border-bottom-color: rgba(251, 113, 133, 0.4);
+}
+#heartsync-premium-article-reading-body .markdown-body a:hover,
+#heartsync-premium-article-reading-body .prose a:hover {
+  border-bottom-color: rgba(225, 29, 72, 0.9);
+}

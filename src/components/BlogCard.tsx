@@ -48,7 +48,7 @@ export default function BlogCard({ post, onClick, onNavigate, layout = 'vertical
   const cardStyleSetting = heartsync.site_settings.card_style || 'standard';
 
   const styleClasses = {
-    standard: "bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 hover:border-rose-200 dark:hover:border-rose-500/40 dark:hover:shadow-[0_0_30px_-8px_rgba(244,63,94,0.35)] hover:shadow-lg transition-all duration-300",
+    standard: "bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 shadow-[0_1px_2px_rgba(24,24,27,0.04)] hover:border-rose-200/80 dark:hover:border-rose-500/40 hover:shadow-[0_18px_40px_-18px_rgba(24,24,27,0.18)] dark:hover:shadow-[0_0_30px_-8px_rgba(244,63,94,0.35)] transition-all duration-500 ease-out",
     minimal: "bg-zinc-50/50 dark:bg-zinc-900/40 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 hover:bg-white dark:hover:bg-zinc-900 dark:hover:border-rose-500/25 transition-all duration-300",
     glass: "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-2xl border border-zinc-200/50 dark:border-zinc-800/80 dark:hover:border-rose-500/35 dark:hover:shadow-[0_0_30px_-8px_rgba(244,63,94,0.35)] shadow-sm transition-all duration-300",
     borderless: "bg-transparent rounded-none border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50/20 dark:hover:bg-zinc-900/10 transition-all duration-300"
@@ -130,7 +130,7 @@ export default function BlogCard({ post, onClick, onNavigate, layout = 'vertical
         </div>
 
         {/* Image Frame on the right, top on mobile */}
-        <div className="relative w-full md:w-[150px] lg:w-[180px] shrink-0 aspect-video md:aspect-auto bg-zinc-100 dark:bg-zinc-800 overflow-hidden order-1 md:order-2">
+        <div className="card-img-frame relative w-full md:w-[150px] lg:w-[180px] shrink-0 aspect-video md:aspect-auto bg-zinc-100 dark:bg-zinc-800 overflow-hidden order-1 md:order-2">
           <HeartsyncImage 
             src={post.featured_image || 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=600'} 
             alt={post.title}
@@ -180,7 +180,7 @@ export default function BlogCard({ post, onClick, onNavigate, layout = 'vertical
       className={`group flex flex-col h-full overflow-hidden cursor-pointer transition-all duration-300 ${activeCardClass}`}
     >
       {/* Featured Image Frame */}
-      <div className="relative aspect-video w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+      <div className="card-img-frame relative aspect-video w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
         <HeartsyncImage 
           src={post.featured_image || 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=600'} 
           alt={post.title}

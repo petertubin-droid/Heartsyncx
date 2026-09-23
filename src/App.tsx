@@ -17,6 +17,7 @@ import AiCopilot from './components/AiCopilot';
 import LoveVault from './components/LoveVault';
 import ImageLightbox from './components/ImageLightbox';
 import { CookieBanner } from './components/CookieBanner';
+import { InstallPrompt } from './components/InstallPrompt';
 import { useCookieConsent } from './components/useCookieConsent';
 import LiveChatWidget from './components/LiveChatWidget';
 import SubscriptionPage from './components/SubscriptionPage';
@@ -1064,8 +1065,11 @@ export default function App() {
   }, [authLoading]);
 
   // Re-resolve a held article route once /api/state hydration settles:
-  // if the slug is valid the article renders now; if it is genuinely
-  // unknown the 404 rewrite fires at that point (and only then).
+  // if the slug is valid the article renders now. Unknown slugs first get a
+  // direct database rescue (fresh or slow-syncing articles still render);
+  // only when the article genuinely does not exist do we soft-land the
+  // reader on the articles library - a bare 404 page is never shown for
+  // article routes again.
   useEffect(() => {
     if (currentTab === 'article' && !activeArticleState && heartsync.serverStateLoaded) {
       const match = heartsync.posts.find(p => p.slug === tabArg);
@@ -1078,8 +1082,25 @@ export default function App() {
           });
         }
       } else {
-        window.history.replaceState(null, '', '/404');
-        setCurrentTab('error');
+        let cancelled = false;
+        heartsync.resolveArticleBySlugDirect(tabArg).then(rescued => {
+          if (cancelled) return;
+          if (rescued) {
+            setActiveArticle(rescued);
+            heartsync.recordView(rescued.id);
+            if (!rescued.content) {
+              heartsync.ensureArticleContent(rescued).then(enriched => {
+                if (enriched && !cancelled) setActiveArticle(enriched);
+              });
+            }
+          } else {
+            window.history.replaceState(null, '', '/articles');
+            setCurrentTab('articles');
+            setTabArg('');
+            setActiveArticle(null);
+          }
+        });
+        return () => { cancelled = true; };
       }
     }
   }, [posts, currentTab, activeArticleState, tabArg]);
@@ -1192,8 +1213,27 @@ export default function App() {
         setTabArg(arg);
         setActiveArticle(null);
       } else {
-        window.history.replaceState(null, '', '/404');
-        setCurrentTab('error');
+        // Direct database rescue before giving up: covers articles the boot
+        // state fetch missed. If the article truly does not exist, land on
+        // the articles library - never the bare 404 page.
+        setActiveArticle(null);
+        setCurrentTab('article');
+        setTabArg(arg);
+        heartsync.resolveArticleBySlugDirect(arg).then(rescued => {
+          if (rescued && tabArg === arg) {
+            setActiveArticle(rescued);
+            heartsync.recordView(rescued.id);
+            if (!rescued.content) {
+              heartsync.ensureArticleContent(rescued).then(enriched => {
+                if (enriched) setActiveArticle(enriched);
+              });
+            }
+          } else if (!rescued && tabArg === arg) {
+            window.history.replaceState(null, '', '/articles');
+            setCurrentTab('articles');
+            setTabArg('');
+          }
+        });
       }
     }
   };
@@ -1883,10 +1923,12 @@ export default function App() {
                                         referrerPolicy="no-referrer"
                                         wrapperClassName="w-full h-full"
                                       />
-                                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent pointer-events-none" />
                                       <div className="absolute bottom-6 left-6 right-6 text-white p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                                        <p className="text-[10px] font-mono uppercase tracking-widest text-[#FFF0F2] font-bold">Spotlight Display</p>
-                                        <h4 className="text-xs sm:text-sm font-sans font-extrabold leading-snug truncate mt-0.5">Spotlight Graphic Active</h4>
+                                        <p className="text-[10px] font-sans uppercase tracking-[0.22em] text-[#FFF0F2] font-bold">The Essay Library</p>
+                                        <h4 className="text-xs sm:text-sm font-serif font-bold leading-snug mt-0.5">
+                                          {publishedArticles.length} curated essays on love, dating &amp; emotional wellness
+                                        </h4>
                                       </div>
                                     </div>
                                   </div>
@@ -5678,6 +5720,7 @@ export default function App() {
         <>
           <CookieBanner onLearnMore={() => navigateTo('cookies')} />
           <LiveChatWidget />
+          <InstallPrompt />
         </>
       )}
 

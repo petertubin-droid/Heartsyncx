@@ -253,4 +253,27 @@ self.addEventListener('message', async (event) => {
 
     event.ports[0]?.postMessage({ cachedIds });
   }
+
+  // CONSENT-GATED AD NETWORK SERVICE WORKER (Monetag push/SW zone).
+  // Monetag's service worker can only exist at the '/' scope, which this
+  // offline-reader SW already owns. The page confirms EXPLICIT marketing
+  // consent first; only then is Monetag's SW code imported (same options
+  // shape as public/sw2.js). Without consent this never runs.
+  if (type === 'HEARTSYNC_AD_SW_CONSENT' && payload?.granted === true) {
+    try {
+      if (self.__heartsyncAdSWLoaded !== true) {
+        self.__heartsyncAdSWLoaded = true;
+        self.options = {
+          domain: String(payload.domain || '3nbf4.com'),
+          zoneId: Number(payload.zoneId || 11858017)
+        };
+        self.lary = '';
+        importScripts(`https://${self.options.domain}/act/files/service-worker.min.js?r=sw`);
+        console.log('[Heartsync SW] Ad network service worker activated after marketing consent.');
+      }
+      event.ports[0]?.postMessage({ status: 'AD_SW_READY' });
+    } catch (err) {
+      console.warn('[Heartsync SW] Ad network SW import failed:', err);
+    }
+  }
 });

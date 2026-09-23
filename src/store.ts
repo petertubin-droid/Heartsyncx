@@ -2565,6 +2565,55 @@ export class HeartsyncStore {
    *  state carry list columns only; content is fetched once per article from
    *  GET /api/posts/:slug and cached on the in-memory object. Returns the
    *  enriched post, or null on fetch failure (honest absence). */
+  /**
+   * Article 404 rescue: when a deep-link slug is missing from the loaded
+   * posts list (hydration gap, cache miss, or an article the boot state fetch
+   * has not caught up with yet), query the posts table directly by slug
+   * (id fallback) and merge the row into the live posts list so the article
+   * renders instead of a 404 page.
+   */
+  public async resolveArticleBySlugDirect(slug: string): Promise<any | null> {
+    if (!slug || !this.supabase) return null;
+    try {
+      const select = 'id,title,slug,excerpt,status,publish_date,featured_image,read_time,category_id,author_id,tags,likes,reactions,views,seo_title,seo_description,seo_keywords,is_premium,created_at,updated_at,is_featured,reading_time';
+      let { data, error } = await this.supabase.from('posts').select(select).eq('slug', slug).limit(1);
+      if ((!data || (data as any[]).length === 0) && !error) {
+        const byId = await this.supabase.from('posts').select(select).eq('id', slug).limit(1);
+        data = byId.data; error = byId.error;
+      }
+      if (error || !data || (data as any[]).length === 0) return null;
+      const p: any = (data as any[])[0];
+      const mapped: any = {
+        id: p.id,
+        title: p.title,
+        slug: p.slug || slug,
+        excerpt: p.excerpt || '',
+        content: p.content || '',
+        status: p.status || 'published',
+        publish_date: p.publish_date,
+        featured_image: p.featured_image || '',
+        read_time: p.read_time || 5,
+        category_id: p.category_id,
+        author_id: p.author_id,
+        tags: p.tags || [],
+        likes: p.likes || 0,
+        reactions: p.reactions || { love: 0, insightful: 0, support: 0, warmth: 0 },
+        views: p.views || 0,
+        seo_title: p.seo_title || p.title,
+        seo_description: p.seo_description || p.excerpt,
+        keywords: p.seo_keywords || []
+      };
+      const idx = this.posts.findIndex(x => x.id === mapped.id || x.slug === mapped.slug);
+      if (idx !== -1) this.posts[idx] = { ...this.posts[idx], ...mapped };
+      else this.posts.unshift(mapped);
+      this.saveState();
+      this.triggerUpdate();
+      return this.posts.find(x => x.slug === mapped.slug) || mapped;
+    } catch {
+      return null;
+    }
+  }
+
   public async ensureArticleContent(post: { id: string; slug: string; content?: string }): Promise<any | null> {
     if (post.content && String(post.content).trim().length > 0) return post;
     try {
