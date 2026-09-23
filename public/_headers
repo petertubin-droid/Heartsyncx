@@ -1,0 +1,11 @@
+# Security + CSP headers for files served straight off Netlify's CDN
+# (the SPA shell at "/" and any future prerendered static routes).
+# Function-served routes (client routes, /api/*) get the identical policy
+# from CONTENT_SECURITY_POLICY in server.ts - keep the two lists in sync
+# or ads silently break on one half of the site.
+/*
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://*.doubleclick.net https://connect.facebook.net https://alwingulla.com https://a11ybar.com https://3nbf4.com https://*.highperformanceformat.com https://*.highrevenueformat.com https://*.profitableratecpmnetwork.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; frame-src 'self' https:;
