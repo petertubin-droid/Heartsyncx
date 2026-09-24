@@ -9,6 +9,7 @@ import BlogCard from './BlogCard';
 import { AdPlacement, AdsterraDirectLink } from './AdPlacement';
 import { heartsync, getAuthors } from '../store';
 import { Post, Author, Topic, Category } from '../types';
+import { getTranslation, Language } from '../utils/i18n';
 import { getCategoryIcon } from '../utils/categoryIcons';
 import ReactMarkdown from 'react-markdown';
 import { preprocessMarkdownImages, MarkdownImageElement } from '../utils/markdownImage';
@@ -30,6 +31,7 @@ import {
 export interface ContentPagesProps {
   currentTab: any;
   tabArg: string;
+  lang: string;
   categories: any[];
   posts: Post[];
   publishedArticles: Post[];
@@ -61,7 +63,7 @@ export interface ContentPagesProps {
 }
 
 export default function ContentPages({
-  currentTab, tabArg, categories, posts, publishedArticles, navigateTo, showToast,
+  currentTab, tabArg, lang, categories, posts, publishedArticles, navigateTo, showToast,
   renderSidebar, searchQuery, submittingContact, setSubmittingContact, contactSuccess,
   setContactSuccess, checkIsCategoryLocked, unlockCategoryInState, articlePaymentPortal,
   setArticlePaymentPortal, isPayingArticle, setIsPayingArticle, payCardNum, setPayCardNum,
@@ -465,7 +467,7 @@ export default function ContentPages({
                       <div className="lg:col-span-3 space-y-6">
                         <div className="pb-3 border-b border-zinc-100 dark:border-zinc-850">
                           <h3 className="font-serif font-bold text-xl text-zinc-850 dark:text-zinc-100">Articles Authored by {auth.name}</h3>
-                          <p className="text-xs text-zinc-400 mt-0.5">Explore relationship tips, emotional wellness guides, and expert dating advice compiled by this author.</p>
+                          <p className="text-xs text-zinc-400 mt-0.5">{getTranslation('authorPageIntro', lang as Language)}</p>
                         </div>
 
                         {authPosts.length === 0 ? (
@@ -498,7 +500,7 @@ export default function ContentPages({
               <div className="space-y-8">
                 <div className="pb-4 border-b border-zinc-150 dark:border-zinc-800">
                   <span className="text-[10px] font-mono tracking-widest text-rose-500 block uppercase font-bold">System Database Query</span>
-                  <h1 className="font-serif font-bold text-3xl text-zinc-900 dark:text-white mt-1">Search Results</h1>
+                  <h1 className="font-serif font-bold text-3xl text-zinc-900 dark:text-white mt-1">{getTranslation('searchResultsTitle', lang as Language)}</h1>
                   <p className="text-xs text-zinc-400 dark:text-zinc-500 font-sans mt-0.5">Query matched against keywords, abstracts, or markdown contents.</p>
                 </div>
 
@@ -546,7 +548,7 @@ export default function ContentPages({
             {currentTab === 'trending' && (
               <div className="space-y-8">
                 <div className="pb-4 border-b border-zinc-150 dark:border-zinc-800">
-                  <span className="text-[10px] font-mono tracking-widest text-rose-500 block uppercase font-bold">Trending Connections</span>
+                  <span className="text-[10px] font-mono tracking-widest text-rose-500 block uppercase font-bold">{getTranslation('trendingConnections', lang as Language)}</span>
                   <h1 className="font-serif font-bold text-3xl text-zinc-900 dark:text-white mt-1">Highly Resonating Insights</h1>
                   <p className="text-xs text-zinc-400 dark:text-zinc-500 font-sans mt-0.5">Ranking computed on absolute view records combined with heart likes.</p>
                 </div>

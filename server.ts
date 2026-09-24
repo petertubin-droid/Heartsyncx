@@ -2427,7 +2427,7 @@ const TRANSLATION_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12h: titles/categories 
 const MAX_LIST_TRANSLATION_POSTS = 80; // cap Gemini payload + cost for very large catalogs
 const TRANSLATABLE_SETTINGS_KEYS = [
   'site_description', 'newsletter_welcome_msg', 'related_block_title',
-  'homepage_topics_heading', 'homepage_topics_subheading', 'homepage_trending_title'
+  'homepage_topics_title', 'homepage_topics_subheading', 'homepage_trending_title'
 ];
 
 const siteContentTranslationCache = new Map<string, { expires: number, data: any }>();

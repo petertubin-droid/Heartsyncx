@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { heartsync } from '../../store';
 import {
+  formatTranslation,
   getTranslation,
   getSavedLanguage,
   saveLanguage,
@@ -87,6 +88,17 @@ describe('i18n translation engine (international edition)', () => {
     expect(getEnabledLanguages()).toEqual(['en', 'fr', 'de']); // invalid save ignored
     setEnabledLanguages([]);
     expect(getEnabledLanguages()).toEqual(['en', 'fr', 'de']); // empty save ignored
+  });
+
+  it('fills runtime placeholders in translated strings', () => {
+    // English defaults
+    expect(formatTranslation('articlesExploringMany', 'en', { count: 5, topic: 'trust' }))
+      .toBe('5 articles exploring trust.');
+    expect(formatTranslation('articlesExploringOne', 'es', { count: 1, topic: 'confianza' }))
+      .toBe('1 artículo explorando confianza.');
+    // missing params render as empty string, never a raw {token}
+    expect(formatTranslation('articlesExploringMany', 'en', { topic: 'trust' }))
+      .toBe(' articles exploring trust.');
   });
 
   it('registers all languages with native names', () => {

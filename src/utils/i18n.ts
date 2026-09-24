@@ -94,6 +94,11 @@ const dictionaries: Partial<Record<Language, Record<string, string>>> = {
 /** Kept as a named export for tooling/tests: per-language dictionaries. */
 export const translations = dictionaries;
 
+/** getTranslation + runtime placeholder fill ({count}, {topic}, ...). */
+export function formatTranslation(key: string, lang: Language, params: Record<string, string | number>): string {
+  return getTranslation(key, lang).replace(/\{(\w+)\}/g, (_, p) => String(params[p] ?? ''));
+}
+
 export function getTranslation(key: string, lang: Language = 'en'): string {
   if (!key) return '';
   const entry = dictionaries[lang];

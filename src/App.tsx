@@ -1688,6 +1688,7 @@ export default function App() {
               <HomePage
                 currentTab={currentTab}
                 theme={frontendTheme}
+                lang={lang}
                 siteSettings={siteSettings}
                 categories={categories}
                 categoriesState={categoriesState}
@@ -1716,6 +1717,7 @@ export default function App() {
             <ContentPages
               currentTab={currentTab}
               tabArg={tabArg}
+              lang={lang}
               categories={categories}
               posts={posts}
               publishedArticles={publishedArticles}

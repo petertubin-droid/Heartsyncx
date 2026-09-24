@@ -8,6 +8,7 @@ import RelatedContentBlock from './RelatedContentBlock';
 import { AdPlacement, AdsterraDirectLink } from './AdPlacement';
 import { heartsync, getAuthors } from '../store';
 import { Post, Author, Topic, Category } from '../types';
+import { getTranslation, formatTranslation, Language } from '../utils/i18n';
 import { HeartsyncImage } from './LoadingSystem';
 import { motion } from 'motion/react';
 import {
@@ -17,6 +18,7 @@ import {
 export interface HomePageProps {
   currentTab: string;
   theme: 'light' | 'dark';
+  lang: string;
   siteSettings: any;
   categories: any[];
   categoriesState: Category[];
@@ -37,7 +39,8 @@ export interface HomePageProps {
 
 export default function HomePage({
   currentTab,
-  theme, siteSettings, categories, categoriesState, publishedArticles, navigateTo, showToast,
+  theme,
+  lang, siteSettings, categories, categoriesState, publishedArticles, navigateTo, showToast,
   homeNewsletterEmail, setHomeNewsletterEmail, homeNewsletterSubscribed, setHomeNewsletterSubscribed,
   quizStep, setQuizStep, quizAnswers, setQuizAnswers, quizOutcome, setQuizOutcome
 }: HomePageProps) {
@@ -85,7 +88,7 @@ export default function HomePage({
 
               // Redesign requirements: Inject Latest Articles and Premium Articles sections if not already present
               if (!seenTypes.has('latest_articles')) {
-                homeSectionsList.push({ id: 'sec-latest-articles', type: 'latest_articles', title: "Latest Publications", is_active: true });
+                homeSectionsList.push({ id: 'sec-latest-articles', type: 'latest_articles', title: getTranslation('latestPublications', lang as Language), is_active: true });
                 seenTypes.add('latest_articles');
               }
               if (!seenTypes.has('premium_articles')) {
@@ -645,8 +648,8 @@ export default function HomePage({
                     }
 
                     case 'categories': {
-                      const finalTopicsTitle = siteSettings?.homepage_topics_title || "EXPLORE BY TOPIC";
-                      const finalTopicsSubheading = siteSettings?.homepage_topics_subheading || "Explore expert insights, practical guidance, and inspiring stories across topics that matter most. Discover trusted resources designed to inform, support, and empower every step of your journey.";
+                      const finalTopicsTitle = siteSettings?.homepage_topics_title || getTranslation('exploreByTopic', lang as Language).toUpperCase();
+                      const finalTopicsSubheading = siteSettings?.homepage_topics_subheading || getTranslation('exploreByTopicSubtitle', lang as Language);
                       const animationsEnabled = siteSettings?.homepage_topics_animations_enabled !== false;
                       const columnsDesktop = siteSettings?.homepage_topics_columns ?? 3;
 
@@ -684,9 +687,9 @@ export default function HomePage({
                             return {
                               id: `auto-${c.id}`,
                               title: c.name,
-                              description: c.description || `${articleCount} article${articleCount === 1 ? '' : 's'} exploring ${c.name.toLowerCase()}.`,
+                              description: c.description || formatTranslation(articleCount === 1 ? 'articlesExploringOne' : 'articlesExploringMany', lang as Language, { count: articleCount, topic: c.name.toLowerCase() }),
                               image: c.featured_image,
-                              button_text: 'Explore',
+                              button_text: getTranslation('exploreBtn', lang as Language),
                               destination_url: `category/${c.slug}`,
                               display_order: 0,
                               status: 'Published',
@@ -1129,7 +1132,7 @@ export default function HomePage({
                     }
 
                     case 'latest_articles': {
-                      const finalLatestTitle = "Latest Publications";
+                      const finalLatestTitle = getTranslation('latestPublications', lang as Language);
                       const latestList = publishedArticles.slice(0, 6);
 
                       return (
@@ -1250,7 +1253,7 @@ export default function HomePage({
                               onClick={() => navigateTo('articles')}
                               className="w-full h-11 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold font-sans tracking-wide uppercase text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                             >
-                              <span>Browse All Publications</span>
+                              <span>{getTranslation('browseAllPublications', lang as Language)}</span>
                               <ChevronRight className="w-4 h-4 text-zinc-400" />
                             </button>
                           </div>
@@ -1621,7 +1624,7 @@ export default function HomePage({
                                     }}
                                     className="w-full sm:w-auto px-6 py-2.5 bg-white text-zinc-950 text-xs font-extrabold rounded-lg cursor-pointer hover:bg-rose-50 hover:text-rose-600 transition-colors border-none"
                                   >
-                                    Explore Custom Guides
+                                    {getTranslation('exploreCustomGuides', lang as Language)}
                                   </button>
                                   <button
                                     type="button"
@@ -1642,7 +1645,7 @@ export default function HomePage({
                       );
 
                     case 'trending': {
-                      const finalTrendingTitle = siteSettings?.homepage_trending_title || sec.title || "Trending Now";
+                      const finalTrendingTitle = siteSettings?.homepage_trending_title || sec.title || getTranslation('trendingNow', lang as Language);
                       const resolvedTrendingPosts: any[] = [];
                       const selectedTrendingIds = siteSettings?.homepage_trending_posts || sec.selectedPostIds || [];
                       
