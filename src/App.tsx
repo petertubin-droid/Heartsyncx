@@ -1292,6 +1292,18 @@ export default function App() {
       const knownTabs = ['home', 'articles', 'article', 'categories', 'category', 'author', 'search', 'trending', 'faq', 'about', 'contact', 'privacy', 'disclaimer', 'terms', 'cookies', 'advertise', 'newsletter', 'error', 'admin', 'login', 'access-denied', 'subscription'];
       if (knownTabs.includes(firstSegment)) {
         verifyAndSetTab(firstSegment as any, parts[1] || '');
+      } else if (parts.length === 1 && firstSegment) {
+        // Bare-slug article URL (no /article/ prefix)  - legacy indexed
+        // links, external shares, or any backlink missing the prefix used
+        // to bounce straight to the homepage here, silently killing the
+        // article (and its in-article ad) for that visitor. verifyAndSetTab
+        // ('article', slug) already resolves this robustly on its own: it
+        // holds the route through the /api/state hydration race, does a
+        // direct DB rescue for slugs the boot payload missed, and only
+        // soft-lands on the articles library if the slug truly doesn't
+        // exist  - so trying it here can only recover real article URLs,
+        // never regress a genuinely unknown path.
+        verifyAndSetTab('article', firstSegment);
       } else {
         verifyAndSetTab('home');
       }

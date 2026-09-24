@@ -120,6 +120,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // B0. Every other /api/* call (site_settings, ads config, auth, admin,
+  // analytics, etc.)  - network only, no SW cache involved at all. This SW
+  // used to fall through these to the generic "Other Static Assets" bucket
+  // below (case D), which is cache-FIRST: any visitor who loaded the site
+  // once while ad settings were broken got that broken /api/state response
+  // served back to them from the cache forever afterwards, even though
+  // the server always sends Cache-Control: no-cache on this route (a
+  // service worker's own cache.match() ignores that header entirely, so the
+  // fix has to live here). Confirmed live 2026-09-24 while debugging why
+  // Monetag/Adsterra settings restored server-side never reached returning
+  // visitors. /api/posts and /api/article keep their own offline-friendly
+  // handling in case B below; everything else just passes straight through.
+  if (url.pathname.startsWith('/api/') && !url.pathname.includes('/api/posts') && !url.pathname.includes('/api/article')) {
+    return;
+  }
+
   // B. Article API Requests (/api/posts, /api/articles, etc.)  - Network First with Article Cache Fallback
   if (url.pathname.includes('/api/posts') || url.pathname.includes('/api/article')) {
     event.respondWith(

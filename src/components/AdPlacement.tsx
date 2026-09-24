@@ -111,12 +111,29 @@ const ADSTERRA_BANNER_DOMAINS = /(highperformanceformat|highrevenueformat)\.[a-z
  * (https://<domain>/<key>/invoke.js) or just the serving domain
  * (e.g. www.highperformanceformat.com). Resolve it to a domain; null when
  * the field is empty or malformed (the key's own snippet domain is then used).
+ *
+ * BUG FIX (verified live 2026-09-24): this used to unconditionally force a
+ * "www." prefix onto whatever hostname it found. That is correct for
+ * highperformanceformat.com/highrevenueformat.com (they really do serve
+ * under www), but Adsterra's per-account banner subdomains  - e.g.
+ * pl31453269.profitableratecpmnetwork.com, the exact live in-article unit
+ * here  - have NO www record at all; forcing it produced
+ * www.pl31453269.profitableratecpmnetwork.com, which does not resolve
+ * (confirmed via a live DNS/HTTP check), silently killing the ad. Now the
+ * hostname is returned exactly as it appears in the URL  - www. only when
+ * the admin's own pasted URL actually had it.
  */
 function adsterraDomainFromUrlField(raw: string): string | null {
   const v = raw.trim().replace(/\s+/g, '');
   if (!v) return null;
-  const full = v.match(/^https?:\/\/(?:www\.)?([a-z0-9.-]+\.[a-z]+)\/[a-f0-9]{20,}\/invoke\.js/i);
-  if (full) return `www.${full[1].toLowerCase().replace(/^www\./, '')}`;
+  // A full invoke.js URL names its own host explicitly  - honor it exactly
+  // as given, www. or not (see bug-fix note above).
+  const full = v.match(/^https?:\/\/((?:www\.)?[a-z0-9.-]+\.[a-z]+)\/[a-f0-9]{20,}\/invoke\.js/i);
+  if (full) return full[1].toLowerCase();
+  // A bare domain (no path) is only ever used for Adsterra's two known
+  // static formats (highperformanceformat.com / highrevenueformat.com),
+  // which really are served under www  - keep defaulting to www. here,
+  // where it's actually correct, for typing convenience.
   const bare = v.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/.*$/, '');
   if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(bare)) return null;
   return `www.${bare.toLowerCase()}`;
