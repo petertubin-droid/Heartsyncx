@@ -21,6 +21,7 @@ import ArticleBodyWithInserts from './components/ArticleBodyWithInserts';
 import HomePage from './components/HomePage';
 import { HeartsyncLoader, LoadingProgressBar, HeartsyncSuspense } from './components/LoadingSystem';
 import ContentPages from './components/ContentPages';
+import StorePage from './components/StorePage';
 import { MarkdownImageElement } from './utils/markdownImage';
 import ArticlePage from './components/ArticlePage';
 import OfflineReaderBanner from './components/OfflineReaderBanner';
@@ -52,7 +53,7 @@ export default function App() {
   // Navigation loading state for premium progressive transitions
   const [isNavigating, setIsNavigating] = useState(false);
   // Navigation State with full routing support
-  const [currentTab, setCurrentTab] = useState<'home' | 'articles' | 'article' | 'categories' | 'category' | 'author' | 'search' | 'trending' | 'faq' | 'about' | 'contact' | 'privacy' | 'disclaimer' | 'terms' | 'cookies' | 'advertise' | 'newsletter' | 'error' | 'admin' | 'login' | 'access-denied' | 'subscription' | 'ai_copilot' | 'lovevault'>('home');
+  const [currentTab, setCurrentTab] = useState<'home' | 'articles' | 'article' | 'categories' | 'category' | 'author' | 'search' | 'trending' | 'faq' | 'about' | 'contact' | 'privacy' | 'disclaimer' | 'terms' | 'cookies' | 'advertise' | 'store' | 'newsletter' | 'error' | 'admin' | 'login' | 'access-denied' | 'subscription' | 'ai_copilot' | 'lovevault'>('home');
   const [tabArg, setTabArg] = useState<string>(''); // Holds slugs/ID arguments
   const [frontendTheme, setFrontendTheme] = useState<'light' | 'dark'>(() => {
     try {
@@ -261,6 +262,8 @@ export default function App() {
   const [translatedPosts, setTranslatedPosts] = useState<Post[]>([]);
   const [translatedCategories, setTranslatedCategories] = useState<Category[]>([]);
   const [translatedSiteSettings, setTranslatedSiteSettings] = useState<typeof heartsync.site_settings | null>(null);
+  const [translatedDigitalProductFields, setTranslatedDigitalProductFields] = useState<Record<string, any>>({});
+  const [storeRedeemToken, setStoreRedeemToken] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
 
   // 1. Serialization of translatable content to avoid translation re-triggers on engagement metrics (likes, views, bookmarks)
@@ -305,6 +308,7 @@ export default function App() {
       setTranslatedPosts([]);
       setTranslatedCategories([]);
       setTranslatedSiteSettings(null);
+      setTranslatedDigitalProductFields({});
       setIsTranslating(false);
       return;
     }
@@ -332,6 +336,7 @@ export default function App() {
         setTranslatedCategories(categoriesState.map((c: any) => ({ ...c, ...(catFields[c.id] || {}) })));
         const settingsFields = (data.settings && Object.keys(data.settings).length > 0) ? data.settings : null;
         setTranslatedSiteSettings(settingsFields ? { ...siteSettingsState, ...settingsFields } : null);
+        setTranslatedDigitalProductFields(data.digitalProducts || {});
 
         // 2. Full body of the open article, if one is being read.
         if (activeArticleId) {
@@ -1221,11 +1226,78 @@ export default function App() {
     }
   }, [posts, currentTab, activeArticleState, tabArg]);
 
-  // Sync dynamic CSS variables color overrides based on brand settings fields
+  // BRAND THEME ENGINE: admin Brand settings (colors, fonts, radii, hover,
+  // glow) are compiled into CSS variables + data attributes on <html>.
+  // index.css consumes them, scoped to the reader via [data-hs-view='reader']
+  // so the admin panel keeps its own chrome. This is the honest wiring the
+  // brand_* settings always promised: every value set in the admin Brand
+  // panel now visibly changes the public site.
   useEffect(() => {
     const primary = siteSettings.primary_color || '#db2777';
     const secondary = siteSettings.secondary_color || '#be185d';
     const accent = siteSettings.accent_color || '#fda4af';
+
+    // Tailwind class tokens -> real CSS values
+    const radiusMap: Record<string, string> = {
+      'rounded-none': '0px', 'rounded-sm': '0.125rem', 'rounded-md': '0.375rem',
+      'rounded-lg': '0.5rem', 'rounded-xl': '0.75rem', 'rounded-2xl': '1rem',
+      'rounded-3xl': '1.5rem', 'rounded-full': '9999px'
+    };
+    const weightMap: Record<string, string> = {
+      'font-normal': '400', 'font-medium': '500', 'font-semibold': '600',
+      'font-bold': '700', 'font-extrabold': '800', 'font-black': '900'
+    };
+    const trackingMap: Record<string, string> = {
+      'tracking-tighter': '-0.05em', 'tracking-tight': '-0.025em',
+      'tracking-normal': '0em', 'tracking-wide': '0.025em',
+      'tracking-wider': '0.05em', 'tracking-widest': '0.1em'
+    };
+    const leadingMap: Record<string, string> = {
+      'leading-none': '1', 'leading-tight': '1.25', 'leading-snug': '1.375',
+      'leading-normal': '1.5', 'leading-relaxed': '1.625', 'leading-loose': '2'
+    };
+    const fontMap: Record<string, string> = {
+      'Inter': '"Inter", ui-sans-serif, system-ui, sans-serif',
+      'Space Grotesk': '"Space Grotesk", "Inter", sans-serif',
+      'Playfair Display': '"Playfair Display", Georgia, serif',
+      'Outfit': '"Outfit", "Inter", sans-serif',
+      'JetBrains Mono': '"JetBrains Mono", ui-monospace, monospace',
+      'Cormorant Garamond': '"Cormorant Garamond", Georgia, serif',
+      'Plus Jakarta Sans': '"Plus Jakarta Sans", "Inter", sans-serif',
+      'DM Sans': '"DM Sans", "Inter", sans-serif'
+    };
+    const brandFont = siteSettings.brand_font || 'Playfair Display';
+    // Outfit & Cormorant are not in the base @import; lazy-load only when chosen
+    if (brandFont === 'Outfit' || brandFont === 'Cormorant Garamond') {
+      let link = document.getElementById('hs-brand-font-loader') as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement('link');
+        link.id = 'hs-brand-font-loader';
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+      }
+      link.href = brandFont === 'Outfit'
+        ? 'https://fonts.googleapis.com/css2?family=Outfit:wght@300..900&display=swap'
+        : 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&display=swap';
+    }
+
+    const radiusChosen = !!siteSettings.brand_button_radius;
+    const radius = radiusMap[siteSettings.brand_button_radius || 'rounded-xl'] || radiusMap['rounded-xl'];
+    const hWeight = weightMap[siteSettings.brand_heading_weight || 'font-bold'] || '700';
+    const hTracking = trackingMap[siteSettings.brand_heading_tracking || 'tracking-tight'] || '-0.025em';
+    const hLeading = leadingMap[siteSettings.brand_heading_leading || 'leading-tight'] || '1.25';
+    const hTransform = siteSettings.brand_heading_transform === 'uppercase'
+      || siteSettings.brand_heading_transform === 'lowercase'
+      || siteSettings.brand_heading_transform === 'capitalize'
+      ? siteSettings.brand_heading_transform : 'none';
+    const hFont = fontMap[brandFont] || fontMap['Playfair Display'];
+    // Heading vars only bind when the admin actually configured the brand
+    // heading theme; untouched defaults keep each heading's own classes.
+    const headingChosen = !!(siteSettings.brand_font || siteSettings.brand_heading_weight
+      || siteSettings.brand_heading_transform || siteSettings.brand_heading_tracking
+      || siteSettings.brand_heading_leading);
+    const glowOn = siteSettings.brand_glow_accent === true;
+    const hover = siteSettings.brand_hover_animation || 'none';
 
     let style = document.getElementById('dynamic-branding-vars') as HTMLStyleElement;
     if (!style) {
@@ -1239,9 +1311,29 @@ export default function App() {
         --color-rose-700: ${secondary} !important;
         --color-rose-100: ${accent} !important;
         --color-rose-500: ${primary} !important;
+        --hs-btn-radius: ${radius};
+        --hs-heading-font: ${hFont};
+        --hs-heading-weight: ${hWeight};
+        --hs-heading-tracking: ${hTracking};
+        --hs-heading-leading: ${hLeading};
+        --hs-heading-transform: ${hTransform};
+        --hs-glow: ${glowOn ? `0 0 14px ${primary}44` : 'none'};
+        --hs-primary: ${primary};
       }
     `;
+    const rootEl = window.document.documentElement;
+    if (hover === 'scale' || hover === 'lift' || hover === 'fade-shift' || hover === 'bounce-micro') {
+      rootEl.dataset.hsHover = hover;
+    } else {
+      delete rootEl.dataset.hsHover;
+    }
+    // Opt-in gates: radius + heading overrides engage only when configured
+    if (radiusChosen) rootEl.dataset.hsBtnRadius = '1';
+    else delete rootEl.dataset.hsBtnRadius;
+    if (headingChosen) rootEl.dataset.hsHeadingTheme = '1';
+    else delete rootEl.dataset.hsHeadingTheme;
   }, [siteSettings]);
+
 
   // Theme isolation: the admin panel lives in the same SPA document as the
   // public site. Toggling the admin theme used to flip the shared
@@ -1250,6 +1342,13 @@ export default function App() {
   // frontend theme; the admin area carries its own scoped `.dark` wrapper,
   // so the two themes are fully independent.
   const isAdminArea = currentTab === 'admin' || currentTab === 'login' || currentTab === 'access-denied';
+
+  // Scope marker for the brand theme CSS in index.css: the reader follows
+  // the brand theme, the admin console keeps its own fixed chrome.
+  useEffect(() => {
+    const rootEl = window.document.documentElement;
+    rootEl.dataset.hsView = isAdminArea ? 'admin' : 'reader';
+  }, [isAdminArea]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -1391,6 +1490,8 @@ export default function App() {
       verifyAndSetTab('cookies');
     } else if (firstSegment === 'advertise') {
       verifyAndSetTab('advertise');
+    } else if (firstSegment === 'store') {
+      verifyAndSetTab('store');
     } else if (firstSegment === 'newsletter') {
       verifyAndSetTab('newsletter');
     } else if (firstSegment === 'subscription' || firstSegment === 'premium') {
@@ -1405,7 +1506,7 @@ export default function App() {
       verifyAndSetTab('error');
     } else {
       // Fallback for custom tab queries
-      const knownTabs = ['home', 'articles', 'article', 'categories', 'category', 'author', 'search', 'trending', 'faq', 'about', 'contact', 'privacy', 'disclaimer', 'terms', 'cookies', 'advertise', 'newsletter', 'error', 'admin', 'login', 'access-denied', 'subscription'];
+      const knownTabs = ['home', 'articles', 'article', 'categories', 'category', 'author', 'search', 'trending', 'faq', 'about', 'contact', 'privacy', 'disclaimer', 'terms', 'cookies', 'advertise', 'store', 'newsletter', 'error', 'admin', 'login', 'access-denied', 'subscription'];
       if (knownTabs.includes(firstSegment)) {
         verifyAndSetTab(firstSegment as any, parts[1] || '');
       } else if (parts.length === 1 && firstSegment) {
@@ -1525,6 +1626,7 @@ export default function App() {
     else if (tab === 'terms') path = '/terms';
     else if (tab === 'cookies') path = '/cookies';
     else if (tab === 'advertise') path = '/advertise';
+    else if (tab === 'store') path = '/store';
     else if (tab === 'newsletter') path = '/newsletter';
     else if (tab === 'subscription') path = '/subscription';
     else if (tab === 'ai_copilot') path = '/ai-copilot';
@@ -1548,6 +1650,29 @@ export default function App() {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
   };
+
+  // DIGITAL STORE ENTRY POINTS: payment gateways redirect back with
+  // ?checkout=success (show a friendly note + land on the store), and the
+  // delivery email deep-links with ?store=redeem&token=... (open the store
+  // with the token pre-loaded and auto-redeemed). Strips the query after
+  // consuming it so a refresh doesn't repeat the redirect.
+  const storeEntryConsumedRef = useRef(false);
+  useEffect(() => {
+    if (storeEntryConsumedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      storeEntryConsumedRef.current = true;
+      window.history.replaceState(null, '', window.location.pathname);
+      setCurrentTab('store');
+      showToast(getTranslation('checkoutSuccess', lang));
+    } else if (params.get('store') === 'redeem' && params.get('token')) {
+      storeEntryConsumedRef.current = true;
+      const tok = params.get('token') || '';
+      window.history.replaceState(null, '', window.location.pathname);
+      setStoreRedeemToken(tok);
+      setCurrentTab('store');
+    }
+  }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleReaction = (postId: string, reactType: 'love' | 'insightful' | 'support' | 'warmth') => {
     heartsync.reactToPost(postId, reactType);
@@ -1748,6 +1873,18 @@ export default function App() {
                 setQuizAnswers={setQuizAnswers}
                 quizOutcome={quizOutcome}
                 setQuizOutcome={setQuizOutcome}
+              />
+            )}
+
+            {/* 1b. DIGITAL STORE - public storefront backed by the real
+                digital_products table. Checkout redirects to the gateway;
+                redemption is token-guarded server-side. */}
+            {currentTab === 'store' && (
+              <StorePage
+                lang={lang}
+                showToast={showToast}
+                translatedDigitalProductFields={translatedDigitalProductFields}
+                initialToken={storeRedeemToken}
               />
             )}
 

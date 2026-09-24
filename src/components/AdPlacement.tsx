@@ -230,6 +230,39 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
+interface SponsorCampaign {
+  id: string;
+  name: string;
+  url: string;
+  status?: string;
+}
+
+/**
+ * Direct-sold sponsor campaigns (Ads Manager pane -> Direct Campaigns).
+ * Persisted in the sponsorship_campaigns table and synced to the client
+ * store. Rendered as clearly labelled sponsored links in the footer slot -
+ * exactly what the Ads Manager UI promises. Clicks are tracked server-side
+ * via POST /api/sponsor/click so the admin's click-rate column reflects
+ * real traffic.
+ */
+function activeSponsorCampaigns(): SponsorCampaign[] {
+  const list = heartsync.sponsorship_campaigns;
+  if (!Array.isArray(list)) return [];
+  return list.filter(
+    (c: any) => c && typeof c.url === 'string' && /^https?:\/\//i.test(c.url) && (c.status || 'Active') === 'Active'
+  );
+}
+
+function trackSponsorClick(campaignId: string): void {
+  try {
+    fetch('/api/sponsor/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignId })
+    }).catch(() => { /* tracking is best-effort; never block the click */ });
+  } catch { /* ignore */ }
+}
+
 function resolvePublisherId(): string | null {
   const candidate = str(settings().adsense_client_id) || (import.meta.env.VITE_ADSENSE_PUBLISHER_ID as string) || '';
   if (!/^ca-pub-\d{10,}$/.test(candidate)) return null; // honest absence until a real publisher id exists
@@ -623,6 +656,37 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
   }, [inView, publisherId, marketingConsent, hasConsented, slotHiddenByToggle, adsenseConfigured]);
 
   if (slotHiddenByToggle) return null;
+
+  // Footer slot: direct-sold sponsor campaigns render as labelled
+  // sponsored links (the Ads Manager promise), before any ad network.
+  if (slot === 'footer') {
+    const sponsors = activeSponsorCampaigns();
+    if (sponsors.length > 0) {
+      return (
+        <div
+          ref={ref}
+          className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 ${className}`}
+          style={{ minHeight: SLOT_DIMENSIONS.footer.minHeight }}
+          data-ad-slot-family={slot}
+          aria-label="Sponsored links"
+        >
+          <span className="text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-600 select-none">Sponsored</span>
+          {sponsors.map((c) => (
+            <a
+              key={c.id}
+              href={c.url}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              onClick={() => trackSponsorClick(c.id)}
+              className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 hover:text-rose-500 underline-offset-2 hover:underline transition-colors"
+            >
+              {c.name || c.url}
+            </a>
+          ))}
+        </div>
+      );
+    }
+  }
   // NOTE: the slot container + <ins> markup ALWAYS render (except when the
   // admin toggle hides the slot) so Google's review crawler can see every ad
   // slot. Consent only gates the adsbygoogle *activation push*, not the markup;

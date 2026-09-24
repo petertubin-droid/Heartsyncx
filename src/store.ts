@@ -919,6 +919,8 @@ export class HeartsyncStore {
   public subscribers: NewsletterSubscriber[] = [];
   public quizzes: Quiz[] = [];
   public site_settings: SiteSettings = DEFAULT_SETTINGS;
+  /** Admin-authored translation overrides keyed by `${language_code}::${string_key}` (lowercased). */
+  public translation_overrides: Record<string, string> = {};
   // True once the initial Supabase/server hydration pass has settled (success or
   // failure) - lets consumers distinguish "still loading defaults" from "confirmed
   // live state", so they don't overwrite real DB values with pre-hydration defaults.
@@ -1990,6 +1992,9 @@ export class HeartsyncStore {
           if (data.tags) this.tags = data.tags;
           if (data.podcasts) this.podcasts = data.podcasts;
           if (data.rss_feeds) this.rss_feeds = data.rss_feeds;
+          if (Array.isArray(data.translation_overrides)) {
+            this.applyTranslationOverrides(data.translation_overrides);
+          }
           if (data.sponsorship_campaigns || data.campaigns) {
             this.sponsorship_campaigns = data.sponsorship_campaigns || data.campaigns;
             this.campaigns = this.sponsorship_campaigns;
@@ -3437,6 +3442,19 @@ export class HeartsyncStore {
     }
     this.triggerUpdate();
     return true;
+  }
+
+  /** Replace the active translation override map (called after admin CRUD
+   *  and during /api/state hydration). Keys: `${language_code}::${string_key}` lowercased. */
+  applyTranslationOverrides(rows: any[]): void {
+    const map: Record<string, string> = {};
+    for (const row of Array.isArray(rows) ? rows : []) {
+      if (row && row.language_code && row.string_key && typeof row.custom_text === 'string') {
+        map[`${row.language_code}::${row.string_key}`.toLowerCase()] = row.custom_text;
+      }
+    }
+    this.translation_overrides = map;
+    this.onStateChangeCallbacks.forEach(cb => cb());
   }
 
   public async updateSettings(newSettings: Partial<SiteSettings>) {

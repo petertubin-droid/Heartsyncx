@@ -200,6 +200,39 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.translation_overrides (
+  id TEXT PRIMARY KEY,
+  language_code TEXT NOT NULL,
+  string_key TEXT NOT NULL,
+  custom_text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (language_code, string_key)
+);
+
+-- Admin-managed registry of accepted tenant domains. DNS must also point
+-- at the deployment; this table is the server's source of truth.
+CREATE TABLE IF NOT EXISTS public.tenant_domains (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  domain TEXT NOT NULL UNIQUE,
+  site_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'active',
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Output of the AI Sentiment Guard scanner (posts & comments tone/risk).
+CREATE TABLE IF NOT EXISTS public.sentiment_scans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  target_type TEXT NOT NULL,
+  target_id TEXT,
+  target_title TEXT DEFAULT '',
+  sentiment TEXT NOT NULL DEFAULT 'neutral',
+  risk_level TEXT NOT NULL DEFAULT 'low',
+  summary TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ----------------------------------------------------------------------------
 -- 5. CONTENT MANAGEMENT & BLOG
 -- ----------------------------------------------------------------------------

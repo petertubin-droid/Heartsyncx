@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Heart, BookOpen, Folder, TrendingUp, HelpCircle, 
-  Users, Mail, Shield, Scroll, ChevronDown, Bookmark 
+  Users, Mail, Shield, Scroll, ChevronDown, Bookmark, ShoppingBag 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { heartsync } from '../store';
@@ -49,6 +49,7 @@ export default function NavigationLinks({
   const mainLinks = [
     { label: getTranslation('home', lang), tab: 'home', icon: Heart },
     { label: getTranslation('articles', lang), tab: 'articles', icon: BookOpen },
+    { label: getTranslation('store', lang), tab: 'store', icon: ShoppingBag },
     { label: getTranslation('trendingTitle', lang), tab: 'trending', icon: TrendingUp },
     { label: getTranslation('faq', lang), tab: 'faq', icon: HelpCircle },
     { label: getTranslation('about', lang), tab: 'about', icon: Users },

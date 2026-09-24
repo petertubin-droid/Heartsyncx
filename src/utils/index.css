@@ -859,3 +859,52 @@ h1, h2, h3, h4, h5, h6 {
 #heartsync-premium-article-reading-body .prose a:hover {
   border-bottom-color: rgba(225, 29, 72, 0.9);
 }
+
+/* =========================================================================
+   BRAND THEME ENGINE (2026-09-24): the admin Brand panel compiles real
+   values into --hs-* CSS variables (see the dynamic-branding-vars effect
+   in App.tsx). These rules apply them to the public reader ONLY -
+   [data-hs-view='reader'] is set on <html> whenever the admin console is
+   not on screen, so admin chrome keeps its own fixed styling.
+   ========================================================================= */
+
+/* Admin-chosen button corner radius: every reader button takes the
+   configured radius, overriding any per-component rounded-* class. */
+html[data-hs-view='reader'][data-hs-btn-radius='1'] button {
+  border-radius: var(--hs-btn-radius, 0.75rem) !important;
+}
+
+/* Headings: the reader uses .font-serif for display headings, so the
+   brand heading font/weight/tracking/leading/casing bind there. */
+html[data-hs-view='reader'][data-hs-heading-theme='1'] .font-serif {
+  font-family: var(--hs-heading-font, "Playfair Display"), Georgia, serif;
+  font-weight: var(--hs-heading-weight, 700);
+  letter-spacing: var(--hs-heading-tracking, -0.025em);
+  line-height: var(--hs-heading-leading, 1.25);
+  text-transform: var(--hs-heading-transform, none);
+}
+
+/* Ambient glow: rose-tinted primary buttons get the brand glow when the
+   admin enabled it (--hs-glow is 'none' otherwise). */
+html[data-hs-view='reader'] button[class*='bg-rose-'] {
+  box-shadow: var(--hs-glow, none);
+}
+
+/* Hover interaction feedback: independent `scale`/`translate` properties
+   compose with (never clobber) existing transform-based hovers. */
+html[data-hs-view='reader'][data-hs-hover='scale'] button:not(:disabled):hover {
+  scale: 1.03;
+}
+html[data-hs-view='reader'][data-hs-hover='lift'] button:not(:disabled):hover {
+  translate: 0 -2px;
+}
+html[data-hs-view='reader'][data-hs-hover='fade-shift'] button:not(:disabled):hover {
+  translate: 2px 0;
+}
+html[data-hs-view='reader'][data-hs-hover='bounce-micro'] button:not(:disabled):hover {
+  animation: hs-bounce-micro 0.7s ease-in-out infinite;
+}
+@keyframes hs-bounce-micro {
+  0%, 100% { scale: 1; }
+  50% { scale: 1.04; }
+}

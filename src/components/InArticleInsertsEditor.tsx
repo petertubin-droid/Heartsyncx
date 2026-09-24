@@ -77,6 +77,7 @@ export default function InArticleInsertsEditor({
   tags = []
 }: InArticleInsertsEditorProps) {
   const [generatingType, setGeneratingType] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState('');
   const [previewMap, setPreviewMap] = useState<Record<string, boolean>>({
     insight: true,
     reflection: true,
@@ -155,6 +156,11 @@ export default function InArticleInsertsEditor({
       });
 
       const data = await response.json();
+      if (!response.ok) {
+        setGenerationError(data.error || 'AI insert generation failed. Check the Gemini key in Integrations.');
+        return;
+      }
+      setGenerationError('');
       if (data && data.inserts) {
         const nextInserts = { ...inserts };
 
@@ -202,6 +208,7 @@ export default function InArticleInsertsEditor({
       }
     } catch (err) {
       console.error('Failed to generate AI inserts:', err);
+      setGenerationError('Could not reach the AI insert generator. Verify the server is running.');
     } finally {
       setGeneratingType(null);
     }
@@ -281,6 +288,10 @@ export default function InArticleInsertsEditor({
           )}
         </button>
       </div>
+
+      {generationError && (
+        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400">{generationError}</p>
+      )}
 
       {/* Word Count Scaling Indicator */}
       <div className="p-4 bg-zinc-50 dark:bg-zinc-850 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">

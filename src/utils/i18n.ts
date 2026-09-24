@@ -101,6 +101,12 @@ export function formatTranslation(key: string, lang: Language, params: Record<st
 
 export function getTranslation(key: string, lang: Language = 'en'): string {
   if (!key) return '';
+  // Admin-authored overrides (Localization pane) win over the built-in
+  // dictionaries for that language and key.
+  const override = heartsync.translation_overrides?.[`${lang}::${key}`.toLowerCase()];
+  if (typeof override === 'string' && override.length > 0) {
+    return override;
+  }
   const entry = dictionaries[lang];
   if (entry && typeof entry[key] === 'string' && entry[key].length > 0) {
     return entry[key];

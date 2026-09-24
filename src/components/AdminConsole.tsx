@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { heartsync } from '../store';
 import { LOADER_STYLE_OPTIONS, LoaderVariantStyle } from './LoadingSystem';
 
@@ -41,6 +41,8 @@ import { moduleRegistry } from '../modules/ModuleRegistry';
 import { auditLocalStorage, clearUnauthorizedStorageKeys, StorageAuditReport } from '../utils/storageAudit';
 
 import { Language, getEnabledLanguages, setEnabledLanguages, getSiteDefaultLanguage, setSiteDefaultLanguage } from '../utils/i18n';
+
+import { LocalizationPane, PageBuilderPane, MultiSitePane, SentimentGuardPane, AcousticPulsePane, AiFeaturesPane, PaneProps } from './BlankPanes';
 
 const PREMIUM_WELLNESS_LIBRARY = [
   { name: "Sage Serenity", url: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=1200" },
@@ -606,17 +608,6 @@ export default function AdminConsole({
 
   // PHASE 4: Accounts, Monetization & System Infrastructure States
   const [billingSubTab, setBillingSubTab] = useState<'plans' | 'digital_products' | 'transactions' | 'gateways'>('plans');
-  const [digitalProducts, setDigitalProducts] = useState<any[]>(() => {
-    if (heartsync.site_settings?.digital_products && Array.isArray(heartsync.site_settings.digital_products)) {
-      return heartsync.site_settings.digital_products;
-    }
-    return [
-      { id: 'dp-1', title: 'The Anxious-Avoidant Playbook', type: 'E-Book (PDF)', price: 19.99, sales: 0, totalRevenue: 0, status: 'Active', downloadUrl: 'https://heartsync.app/downloads/playbook.pdf', image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=400' },
-      { id: 'dp-2', title: '30-Day Somatic Intimacy Journal', type: 'Worksheet Bundle', price: 14.99, sales: 0, totalRevenue: 0, status: 'Active', downloadUrl: 'https://heartsync.app/downloads/journal.pdf', image: 'https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&q=80&w=400' },
-      { id: 'dp-3', title: 'Couples Co-Regulation Cards Pack', type: 'Printable Cards', price: 12.50, sales: 0, totalRevenue: 0, status: 'Active', downloadUrl: 'https://heartsync.app/downloads/cards.pdf', image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=400' }
-    ];
-  });
-
   const [rewardedAdConfig, setRewardedAdConfig] = useState(() => {
     if (heartsync.site_settings?.rewarded_ad_config) {
       return heartsync.site_settings.rewarded_ad_config;
@@ -1838,7 +1829,8 @@ export default function AdminConsole({
   // editor states
   const [isEditing, setIsEditing] = useState(false);
   const [editPost, setEditPost] = useState<Post | undefined>(undefined);
-  const [showAICopilot, setShowAICopilot] = useState(false);
+  // (showAICopilot toggle removed: it opened nothing. The real AI article
+  // writer lives inside the post editor.)
 
   // Bulk options
   const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
@@ -1867,12 +1859,182 @@ export default function AdminConsole({
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  /** Persist site settings (from the activated panes) to the server DB.
+   *  Accepts the next settings object so callers avoid stale-closure state. */
+  const persistSiteSettings = async (next?: any): Promise<boolean> => {
+    const payload = next ?? siteSettings;
+    if (!payload || typeof payload !== 'object') return false;
+    heartsync.updateSettings(payload);
+    try {
+      const res = await adminFetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return res.ok;
+    } catch (_) {
+      return false;
+    }
+  };
+
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
     }, 3000);
   };
+  // Digital products now come from the REAL digital_products DB table via
+  // /api/digital-products/all (admin). The legacy siteSettings.digital_products
+  // JSON blob was a fake catalog that never reached the storefront.
+  const [digitalProducts, setDigitalProducts] = useState<any[]>([]);
+  const [digitalProductsLoading, setDigitalProductsLoading] = useState(false);
+  const [digitalOrders, setDigitalOrders] = useState<any[]>([]);
+  const [dpFormOpen, setDpFormOpen] = useState(false);
+  const [dpEditingId, setDpEditingId] = useState<string | null>(null);
+  const [dpSaving, setDpSaving] = useState(false);
+  const [dpForm, setDpForm] = useState({
+    title: '', subtitle: '', description: '', price: '', salePrice: '',
+    coverImage: '', fileUrl: '', fileType: 'pdf', category: 'E-Books & Workbooks',
+    tags: '', isFeatured: false
+  });
+
+  const loadDigitalProducts = useCallback(async () => {
+    setDigitalProductsLoading(true);
+    try {
+      let token = '';
+      try {
+        const { data: { session } } = await heartsync.supabase.auth.getSession();
+        token = session?.access_token || '';
+      } catch (_) {}
+      const [prodRes, orderRes] = await Promise.all([
+        fetch('/api/digital-products/all', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/digital-products/orders', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      const prodData = await prodRes.json();
+      if (prodRes.ok && prodData.success) setDigitalProducts(prodData.products || []);
+      else if (!prodRes.ok) triggerToast(prodData.error || 'Failed to load digital products.');
+      if (orderRes.ok) {
+        const orderData = await orderRes.json();
+        if (orderData.success) setDigitalOrders(orderData.orders || []);
+      }
+    } catch (err: any) {
+      triggerToast('Digital store sync failed: ' + (err?.message || 'network error'));
+    } finally {
+      setDigitalProductsLoading(false);
+    }
+  }, [triggerToast]);
+
+  useEffect(() => {
+    if (billingSubTab === 'digital_products') loadDigitalProducts();
+  }, [billingSubTab, loadDigitalProducts]);
+
+  const openDpForm = (product?: any) => {
+    if (product) {
+      setDpEditingId(product.id);
+      setDpForm({
+        title: product.title || '', subtitle: product.subtitle || '',
+        description: product.description || '',
+        price: String(product.price ?? ''), salePrice: product.sale_price === null || product.sale_price === undefined ? '' : String(product.sale_price),
+        coverImage: product.cover_image || '', fileUrl: product.file_url || '',
+        fileType: product.file_type || 'pdf', category: product.category || 'E-Books & Workbooks',
+        tags: Array.isArray(product.tags) ? product.tags.join(', ') : '',
+        isFeatured: !!product.is_featured
+      });
+    } else {
+      setDpEditingId(null);
+      setDpForm({ title: '', subtitle: '', description: '', price: '', salePrice: '', coverImage: '', fileUrl: '', fileType: 'pdf', category: 'E-Books & Workbooks', tags: '', isFeatured: false });
+    }
+    setDpFormOpen(true);
+  };
+
+  const saveDpForm = async () => {
+    if (!dpForm.title.trim() || dpForm.price === '' || isNaN(Number(dpForm.price))) {
+      triggerToast('A title and a valid base price are required.');
+      return;
+    }
+    setDpSaving(true);
+    try {
+      let token = '';
+      try {
+        const { data: { session } } = await heartsync.supabase.auth.getSession();
+        token = session?.access_token || '';
+      } catch (_) {}
+      const payload: any = {
+        title: dpForm.title.trim(),
+        subtitle: dpForm.subtitle.trim(),
+        description: dpForm.description.trim(),
+        price: Number(dpForm.price),
+        salePrice: dpForm.salePrice === '' ? null : Number(dpForm.salePrice),
+        coverImage: dpForm.coverImage.trim(),
+        fileUrl: dpForm.fileUrl.trim(),
+        fileType: dpForm.fileType,
+        category: dpForm.category,
+        tags: dpForm.tags.split(',').map((t: string) => t.trim()).filter(Boolean),
+        isFeatured: dpForm.isFeatured
+      };
+      const res = await fetch(dpEditingId ? `/api/digital-products/${dpEditingId}` : '/api/digital-products', {
+        method: dpEditingId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        triggerToast(data.error || 'Save failed.');
+        return;
+      }
+      triggerToast(dpEditingId ? 'Digital product updated.' : `Published '${payload.title}' to the digital store.`);
+      setDpFormOpen(false);
+      setDpEditingId(null);
+      loadDigitalProducts();
+    } catch (err: any) {
+      triggerToast('Save failed: ' + (err?.message || 'network error'));
+    } finally {
+      setDpSaving(false);
+    }
+  };
+
+  const toggleDpActive = async (product: any) => {
+    try {
+      let token = '';
+      try {
+        const { data: { session } } = await heartsync.supabase.auth.getSession();
+        token = session?.access_token || '';
+      } catch (_) {}
+      const res = await fetch(`/api/digital-products/${product.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ isActive: !product.is_active })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { triggerToast(data.error || 'Toggle failed.'); return; }
+      triggerToast(`'${product.title}' is now ${!product.is_active ? 'live' : 'hidden'} on the storefront.`);
+      loadDigitalProducts();
+    } catch (err: any) {
+      triggerToast('Toggle failed: ' + (err?.message || 'network error'));
+    }
+  };
+
+  const deleteDp = async (product: any) => {
+    if (!window.confirm(`Delete '${product.title}' permanently? This cannot be undone.`)) return;
+    try {
+      let token = '';
+      try {
+        const { data: { session } } = await heartsync.supabase.auth.getSession();
+        token = session?.access_token || '';
+      } catch (_) {}
+      const res = await fetch(`/api/digital-products/${product.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { triggerToast(data.error || 'Delete failed.'); return; }
+      triggerToast(`Deleted '${product.title}'.`);
+      loadDigitalProducts();
+    } catch (err: any) {
+      triggerToast('Delete failed: ' + (err?.message || 'network error'));
+    }
+  };
+
 
   useEffect(() => {
     const unsub = heartsync.subscribe(() => {
@@ -2427,7 +2589,13 @@ export default function AdminConsole({
     { id: 'webhooks', label: 'Webhooks & Dispatcher', icon: Radio },
     { id: 'security', label: 'Security & Audit Desk', icon: Shield },
     { id: 'settings', label: 'Global Site Settings', icon: Settings },
-    { id: 'site_branding', label: 'Theme & Design Studio', icon: Palette }
+    { id: 'site_branding', label: 'Theme & Design Studio', icon: Palette },
+    { id: 'page_builder', label: 'Layout Staging & Drafts', icon: Layers, badge: 'STAGING' },
+    { id: 'localization', label: 'Translation Center', icon: Globe, badge: 'I18N' },
+    { id: 'multi_site', label: 'Tenant Domains', icon: Database, badge: 'DNS' },
+    { id: 'sentiment_guard', label: 'Sentiment Guard', icon: Shield, badge: 'AI SAFETY' },
+    { id: 'ai_features', label: 'AI Intelligence Suite', icon: Cpu, badge: 'AI' },
+    { id: 'acoustic_pulse', label: 'Focus Soundscape', icon: Volume2 }
   ];
 
   // Dynamically register navigation items from active modules
@@ -2445,13 +2613,15 @@ export default function AdminConsole({
 
   const groups = [
     { title: 'ANALYTICS & OVERVIEW', itemIds: ['dashboard'] },
-    { title: 'EDITORIAL CONTENT', itemIds: ['posts', 'categories', 'pages', 'homepage_content'] },
+    { title: 'EDITORIAL CONTENT', itemIds: ['posts', 'categories', 'pages', 'homepage_content', 'page_builder'] },
     { title: 'MEDIA HUB', itemIds: ['media', 'upload_manager'] },
     { title: 'ENGAGEMENT & MODERATION', itemIds: ['comments', 'live_chat', 'quiz_manager'] },
     { title: 'SUBSCRIBERS & COMMUNICATIONS', itemIds: ['newsletter', 'subscribers', 'email_marketing'] },
     { title: 'ACCOUNTS & PERMISSIONS', itemIds: ['users', 'roles_permissions'] },
     { title: 'MONETIZATION & ADS', itemIds: ['billing', 'rewarded_access', 'adsense_settings'] },
-    { title: 'SYSTEM INFRASTRUCTURE', itemIds: ['feature_manager', 'cicd', 'integrations', 'webhooks', 'security', 'settings', 'site_branding'] }
+    { title: 'SYSTEM INFRASTRUCTURE', itemIds: ['feature_manager', 'cicd', 'integrations', 'webhooks', 'security', 'settings', 'site_branding', 'multi_site'] },
+    { title: 'AI & LOCALIZATION', itemIds: ['ai_features', 'sentiment_guard', 'localization'] },
+    { title: 'EDITOR WELLBEING', itemIds: ['acoustic_pulse'] }
   ];
 
   if (installedNavItems.length > 0) {
@@ -3253,7 +3423,7 @@ export default function AdminConsole({
                     {activePane === 'upload_manager' && 'Asset Upload Hub'}
                     {activePane === 'moderation' && 'Anti-Spam Comments Filter'}
                     {activePane === 'ads_manager' && 'Sponsorships & Ads Leaderboard'}
-                    {activePane === 'adsense_settings' && 'Google AdSense Portal'}
+                    {(activePane === 'adsense_settings' || activePane === 'ads') && 'Google AdSense Portal'}
                     {activePane === 'banner_slots' && 'Frontend Banner Slots'}
                     {activePane === 'roles_permissions' && 'Administrative Permission Matrix'}
                     {activePane === 'newsletter' && 'Newsletter Design Lab'}
@@ -3267,7 +3437,7 @@ export default function AdminConsole({
                     {activePane === 'acoustic_pulse' && 'Heartsync Clinical Sensory Focus Synth'}
                     {activePane === 'webhooks' && 'Webhook Outreach & Analytics Console'}
                     {activePane === 'localization' && 'Translation & Multilingual Center'}
-                    {activePane === 'ai_features' && 'AI Intelligence Suite (111 Tools)'}
+                    {activePane === 'ai_features' && 'AI Intelligence Suite'}
                     {activePane === 'feature_manager' && 'Feature Manager & Module System'}
                     {activePane === 'cicd' && 'CI/CD Pipeline & DevOps Quality Desk'}
                   </h1>
@@ -3286,9 +3456,9 @@ export default function AdminConsole({
                     {activePane === 'email_marketing' && 'Dispatch custom campaigns, filter active newsletter directories, configure Resend webhooks.'}
                     {activePane === 'billing' && 'Configure SaaS membership tier pricing, publish digital e-books & worksheets, track order fulfillment, and synchronize payment gateways.'}
                     {activePane === 'rewarded_access' && 'Manage programmatic ad unlock rules, customize durations, monitor active readers, and track CPM earnings.'}
-                    {activePane === 'page_builder' && 'Assemble components visually on preview frames, reorder blocks, mapping custom text layers.'}
+                    {activePane === 'page_builder' && 'Stage homepage layouts in a draft, preview safely at ?draft=true, then publish to live — synced to the database.'}
                     {activePane === 'homepage_content' && 'Edit quiz diagnostic rules, custom badges, subscription button CTAs, and Display Priority Display Order weights.'}
-                    {activePane === 'multi_site' && 'Register client subdomains, configure domains and toggle status of isolated site instances.'}
+                    {activePane === 'multi_site' && 'Register accepted domains, pause or resume them, and keep the server-side host registry in sync — synced to the database.'}
                     {activePane === 'settings' && 'Set names, descriptions, welcome newsletters, and social networks link matrices.'}
                     {activePane === 'tts_settings' && 'Configure custom neural synthesizers, display styles, reading speeds, and defaults for article voice narration.'}
                     {activePane === 'integrations' && 'Manage secure configuration values for advertising, payment gateways, analytics, search consoles, and email services.'}
@@ -3300,7 +3470,7 @@ export default function AdminConsole({
                     {activePane === 'upload_manager' && 'High-performance drag-and-drop file optimization engine in real time.'}
                     {activePane === 'moderation' && 'Perform bulk moderations and flag spam networks content selectively.'}
                     {activePane === 'ads_manager' && 'Execute direct campaign deals and track click-rates across sponsorship spaces.'}
-                    {activePane === 'adsense_settings' && 'Google AdSense verification compliance codes, layout scripts, and auto-ad hooks.'}
+                    {(activePane === 'adsense_settings' || activePane === 'ads') && 'Google AdSense verification compliance codes, layout scripts, and auto-ad hooks.'}
                     {activePane === 'banner_slots' && 'Determine placements of programmatic bento-cards across layout slots.'}
                     {activePane === 'roles_permissions' && 'Strictly enforce category security clearances per system account.'}
                     {activePane === 'newsletter' && 'Customize beautiful HTML dispatch campaign blueprints for subscribers.'}
@@ -3310,22 +3480,25 @@ export default function AdminConsole({
                     {activePane === 'site_branding' && 'Fine-tune typography, luxury layouts, card designs, headers, footers, dark mode defaults, and animation dynamics instantly.'}
                     {activePane === 'article_display_settings' && 'Fine-tune article reading layouts, typography scaling, featured image presentation, metadata visibility, desktop and mobile-specific settings immediately.'}
                     {activePane === 'security' && 'Browser storage audits, security sanitizer, and access diagnostics.'}
-                    {activePane === 'sentiment_guard' && 'Automated scanning of audience sentiment logs, trigger anxiety threshold patterns, and serve expert co-regulation drafts.'}
-                    {activePane === 'acoustic_pulse' && 'Synthesize custom acoustic soundscapes natively in your browser to maintain deep calm and focus during admin sessions.'}
+                    {activePane === 'sentiment_guard' && 'AI tone and reader-safety scans of recent articles and comments, with a persistent audit trail — synced to the database.'}
+                    {activePane === 'acoustic_pulse' && 'Browser-native soundscape synthesis for focus sessions. Presets sync to the database.'}
                     {activePane === 'webhooks' && 'Simulate outgoing event webhooks, examine API request payloads, and track webhook endpoint status logs.'}
-                    {activePane === 'localization' && 'Register and translate your relationship articles, category slugs, and SEO fragments globally.'}
-                    {activePane === 'ai_features' && 'Directly access, customize, run and inspect automated AI capabilities across your entire CMS workspace.'}
+                    {activePane === 'localization' && 'Override built-in UI translations per language — overrides apply live, synced to the database.'}
+                    {activePane === 'ai_features' && 'The real AI features wired into Heartsync, with live key status and on/off toggles — synced to the database.'}
                   </p>
                 </div>
 
                 {activePane === 'posts' && (
                   <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => setShowAICopilot(!showAICopilot)}
-                      className={`px-4 py-2 font-sans font-extrabold text-xs rounded-xl transform transition-all shadow-md flex items-center gap-1.5 cursor-pointer border ${showAICopilot ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900' : 'bg-rose-50 text-rose-500 border-rose-200'}`}
+                      onClick={() => {
+                        setEditPost(undefined);
+                        setIsEditing(true);
+                      }}
+                      className="px-4 py-2 font-sans font-extrabold text-xs rounded-xl transform transition-all shadow-md flex items-center gap-1.5 cursor-pointer border bg-rose-50 text-rose-500 border-rose-200"
                     >
                       <Cpu className="w-4 h-4" />
-                      <span>{showAICopilot ? 'Hide AI Writer' : 'AI Copilot Desk'}</span>
+                      <span>✨ AI Article Writer</span>
                     </button>
                     <button 
                       onClick={() => {
@@ -6454,8 +6627,9 @@ export default function AdminConsole({
                 </div>
               )}
 
-              {/* ADSENSE & MULTI-NETWORK COMMERCIAL AD MONETIZATION ENGINE */}
-              {activePane === 'adsense_settings' && (
+              {/* ADSENSE & MULTI-NETWORK COMMERCIAL AD MONETIZATION ENGINE
+                  ('ads' is the legacy pane key — it renders this same engine.) */}
+              {(activePane === 'adsense_settings' || activePane === 'ads') && (
                 <div className="space-y-6 text-xs font-sans">
                   {/* Top Networks Hub Navigation Bar */}
                   <div className="bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-zinc-200 dark:border-zinc-850 flex flex-wrap items-center justify-between gap-3 shadow-xs">
@@ -13870,28 +14044,14 @@ export default function AdminConsole({
                     {billingSubTab === 'digital_products' && (
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                          <h3 className="font-bold text-sm text-zinc-800 dark:text-zinc-200">Digital E-Book & Somatic Printable Store</h3>
+                          <div>
+                            <h3 className="font-bold text-sm text-zinc-800 dark:text-zinc-200">Digital E-Book & Somatic Printable Store</h3>
+                            <p className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                              {digitalProductsLoading ? 'Syncing catalog...' : `${digitalProducts.length} products in catalog - ${digitalOrders.length} lifetime orders ($${digitalOrders.reduce((sum: number, o: any) => sum + Number(o.amount || 0), 0).toFixed(2)} revenue)`}
+                            </p>
+                          </div>
                           <button
-                            onClick={() => {
-                              const title = prompt('Enter E-Book or Worksheet Title:');
-                              if (title) {
-                                const newProduct = {
-                                  id: `dp-${Date.now()}`,
-                                  title,
-                                  type: 'PDF Guide',
-                                  price: 14.99,
-                                  sales: 0,
-                                  totalRevenue: 0.00,
-                                  status: 'Active',
-                                  downloadUrl: 'https://heartsync.app/downloads/guide.pdf',
-                                  image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=400'
-                                };
-                                const updated = [...digitalProducts, newProduct];
-                                setDigitalProducts(updated);
-                                heartsync.updateSettings({ ...siteSettings, digital_products: updated });
-                                triggerToast(`Published '${title}' to digital store!`);
-                              }
-                            }}
+                            onClick={() => openDpForm()}
                             className="px-3.5 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-[11px] flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
                             <Plus className="w-3.5 h-3.5" />
@@ -13899,36 +14059,102 @@ export default function AdminConsole({
                           </button>
                         </div>
 
+                        {dpFormOpen && (
+                          <div className="p-4 border border-rose-200 dark:border-rose-900 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-bold text-xs text-zinc-800 dark:text-zinc-200">{dpEditingId ? 'Edit Digital Product' : 'New Digital Product'}</h4>
+                              <button onClick={() => { setDpFormOpen(false); setDpEditingId(null); }} className="text-[10px] text-zinc-400 hover:text-zinc-600 font-bold cursor-pointer">CANCEL</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <input type="text" value={dpForm.title} onChange={e => setDpForm({ ...dpForm, title: e.target.value })} placeholder="Title (e.g. The Anxious-Avoidant Playbook)" className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs" />
+                              <input type="text" value={dpForm.subtitle} onChange={e => setDpForm({ ...dpForm, subtitle: e.target.value })} placeholder="Short subtitle" className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs" />
+                              <input type="text" value={dpForm.price} onChange={e => setDpForm({ ...dpForm, price: e.target.value })} placeholder="Base price (USD, e.g. 19.99)" className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs" />
+                              <input type="text" value={dpForm.salePrice} onChange={e => setDpForm({ ...dpForm, salePrice: e.target.value })} placeholder="Sale price (optional)" className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs" />
+                              <input type="text" value={dpForm.coverImage} onChange={e => setDpForm({ ...dpForm, coverImage: e.target.value })} placeholder="Cover image URL" className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs" />
+                              <input type="text" value={dpForm.fileUrl} onChange={e => setDpForm({ ...dpForm, fileUrl: e.target.value })} placeholder="Deliverable file URL (what buyers download)" className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs" />
+                              <select value={dpForm.fileType} onChange={e => setDpForm({ ...dpForm, fileType: e.target.value })} className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs">
+                                <option value="pdf">PDF</option><option value="epub">EPUB</option><option value="zip">ZIP bundle</option><option value="audio">Audio</option>
+                              </select>
+                              <select value={dpForm.category} onChange={e => setDpForm({ ...dpForm, category: e.target.value })} className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs">
+                                <option>E-Books & Workbooks</option><option>Printable Cards</option><option>Audio Programs</option><option>Course Bundles</option>
+                              </select>
+                              <input type="text" value={dpForm.tags} onChange={e => setDpForm({ ...dpForm, tags: e.target.value })} placeholder="Tags (comma separated)" className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs md:col-span-2" />
+                              <textarea value={dpForm.description} onChange={e => setDpForm({ ...dpForm, description: e.target.value })} placeholder="Full description shown on the storefront" rows={3} className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs md:col-span-2" />
+                              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                                <input type="checkbox" checked={dpForm.isFeatured} onChange={e => setDpForm({ ...dpForm, isFeatured: e.target.checked })} className="w-4 h-4 rounded text-rose-500 cursor-pointer" />
+                                Featured on storefront
+                              </label>
+                            </div>
+                            <button
+                              onClick={saveDpForm}
+                              disabled={dpSaving}
+                              className="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 font-bold text-[11px] cursor-pointer shadow-xs disabled:opacity-50"
+                            >
+                              {dpSaving ? 'Saving...' : (dpEditingId ? 'Save Changes' : 'Publish to Storefront')}
+                            </button>
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {digitalProducts.map(prod => (
-                            <div key={prod.id} className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900 shadow-xs space-y-3 flex flex-col justify-between">
+                            <div key={prod.id} className={`p-4 border rounded-2xl shadow-xs space-y-3 flex flex-col justify-between ${prod.is_active ? 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900' : 'border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 opacity-70'}`}>
                               <div className="space-y-2">
-                                <img src={prod.image} alt={prod.title} className="w-full h-32 object-cover rounded-xl" />
+                                {prod.cover_image ? (
+                                  <img src={prod.cover_image} alt={prod.title} className="w-full h-32 object-cover rounded-xl" />
+                                ) : (
+                                  <div className="w-full h-32 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center"><span className="text-[9px] font-mono text-zinc-400">NO COVER IMAGE</span></div>
+                                )}
                                 <div className="flex justify-between items-start">
                                   <div>
                                     <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{prod.title}</h4>
-                                    <span className="text-[10px] text-zinc-400 font-mono">{prod.type}</span>
+                                    <span className="text-[10px] text-zinc-400 font-mono">{prod.category} - {String(prod.file_type).toUpperCase()}</span>
                                   </div>
-                                  <span className="font-serif text-base font-extrabold text-rose-600 dark:text-rose-400">${prod.price}</span>
+                                  <span className="font-serif text-base font-extrabold text-rose-600 dark:text-rose-400">
+                                    ${prod.sale_price ?? prod.price}{prod.sale_price != null && <s className="text-[10px] text-zinc-400 ml-1">${prod.price}</s>}
+                                  </span>
                                 </div>
                               </div>
                               <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-[10px] text-zinc-500 font-mono">
-                                <span>Sales: <strong>{prod.sales}</strong> (${prod.totalRevenue.toFixed(2)})</span>
-                                <button
-                                  onClick={() => {
-                                    const filtered = digitalProducts.filter(p => p.id !== prod.id);
-                                    setDigitalProducts(filtered);
-                                    heartsync.updateSettings({ ...siteSettings, digital_products: filtered });
-                                    triggerToast(`Deleted ${prod.title}`);
-                                  }}
-                                  className="text-rose-500 hover:underline cursor-pointer font-bold"
-                                >
-                                  Remove
-                                </button>
+                                <span>Sales: <strong>{prod.total_sales || 0}</strong>{!prod.is_active && <span className="ml-1 text-amber-500 font-bold">HIDDEN</span>}</span>
+                                <span className="flex items-center gap-2">
+                                  <button onClick={() => toggleDpActive(prod)} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer font-bold">{prod.is_active ? 'HIDE' : 'SHOW'}</button>
+                                  <button onClick={() => openDpForm(prod)} className="text-sky-500 hover:underline cursor-pointer font-bold">EDIT</button>
+                                  <button onClick={() => deleteDp(prod)} className="text-rose-500 hover:underline cursor-pointer font-bold">REMOVE</button>
+                                </span>
                               </div>
                             </div>
                           ))}
                         </div>
+
+                        {!digitalProductsLoading && digitalProducts.length === 0 && (
+                          <div className="p-8 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-center">
+                            <p className="text-xs text-zinc-400">The catalog is empty. Publish your first real digital product - it appears instantly on the public storefront.</p>
+                          </div>
+                        )}
+
+                        {digitalOrders.length > 0 && (
+                          <div className="overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-400 font-mono uppercase text-[9px]">
+                                <tr>
+                                  <th className="p-3">Order</th><th className="p-3">Buyer</th><th className="p-3">Product</th><th className="p-3">Gateway</th><th className="p-3">Amount</th><th className="p-3 text-right">Date</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {digitalOrders.slice(0, 8).map((o: any) => (
+                                  <tr key={o.id} className="border-t border-zinc-100 dark:border-zinc-800/60">
+                                    <td className="p-3 font-mono text-[10px] text-zinc-400">{o.id}</td>
+                                    <td className="p-3">{o.user_email}</td>
+                                    <td className="p-3 font-semibold">{o.product_title}</td>
+                                    <td className="p-3 font-mono text-[10px] uppercase">{o.gateway}</td>
+                                    <td className="p-3 font-bold">${Number(o.amount || 0).toFixed(2)}</td>
+                                    <td className="p-3 text-right text-[10px] text-zinc-400">{new Date(o.created_at).toLocaleDateString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -14887,6 +15113,56 @@ export default function AdminConsole({
               )}
 
               {/* HOMEPAGE CONTENT & FEATURE MANAGEMENT PANE */}
+              {/* ===== ACTIVATED PANES (real DB-backed) ===== */}
+              {activePane === 'localization' && (
+                <LocalizationPane
+                  triggerToast={triggerToast}
+                  siteSettings={siteSettings}
+                  setSiteSettings={setSiteSettings}
+                  saveSettings={persistSiteSettings}
+                />
+              )}
+              {activePane === 'page_builder' && (
+                <PageBuilderPane
+                  triggerToast={triggerToast}
+                  siteSettings={siteSettings}
+                  setSiteSettings={setSiteSettings}
+                  saveSettings={persistSiteSettings}
+                />
+              )}
+              {activePane === 'multi_site' && (
+                <MultiSitePane
+                  triggerToast={triggerToast}
+                  siteSettings={siteSettings}
+                  setSiteSettings={setSiteSettings}
+                  saveSettings={persistSiteSettings}
+                />
+              )}
+              {activePane === 'sentiment_guard' && (
+                <SentimentGuardPane
+                  triggerToast={triggerToast}
+                  siteSettings={siteSettings}
+                  setSiteSettings={setSiteSettings}
+                  saveSettings={persistSiteSettings}
+                />
+              )}
+              {activePane === 'acoustic_pulse' && (
+                <AcousticPulsePane
+                  triggerToast={triggerToast}
+                  siteSettings={siteSettings}
+                  setSiteSettings={setSiteSettings}
+                  saveSettings={persistSiteSettings}
+                />
+              )}
+              {activePane === 'ai_features' && (
+                <AiFeaturesPane
+                  triggerToast={triggerToast}
+                  siteSettings={siteSettings}
+                  setSiteSettings={setSiteSettings}
+                  saveSettings={persistSiteSettings}
+                />
+              )}
+
               {activePane === 'homepage_content' && (
                 <div className="space-y-6 text-xs font-sans text-left animate-fadeIn">
                   

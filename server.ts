@@ -1093,11 +1093,55 @@ async function createDigitalProductOrder(opts: {
     console.warn('Digital order insert failed:', orderErr.message);
     return null;
   }
+  await sendDigitalDeliveryEmail(opts.email, order);
   const { error: salesErr } = await svc.from('digital_products')
     .update({ total_sales: Number(product.total_sales || 0) + 1 })
     .eq('id', product.id);
   if (salesErr) console.warn('Digital product sales counter update warning:', salesErr.message);
   return order;
+}
+
+// Email the buyer their download token the moment a verified webhook
+// fulfills an order. Without this the token existed but the buyer could
+// never learn it. Skips honestly (with a log) when Resend is unconfigured.
+async function sendDigitalDeliveryEmail(recipientEmail: string, order: any) {
+  const clientObj = await getResendClient();
+  if (!clientObj) {
+    logger.info('Resend not configured; digital download token not emailed for order:', order?.id);
+    return;
+  }
+  const downloadLink = `${getPublicSiteUrl()}/?store=redeem&token=${order.download_token}`;
+  const html = `
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background-color: #ffffff; border: 1px solid #f4f4f5; border-radius: 24px;">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <h1 style="color: #e11d48; font-size: 24px; font-weight: 800; margin: 0; letter-spacing: -0.025em;">Heartsync</h1>
+      <p style="color: #71717a; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px;">Digital Store Order Confirmation</p>
+    </div>
+    <div style="background-color: #fff1f2; border-radius: 16px; padding: 20px; border-left: 4px solid #f43f5e; margin-bottom: 24px;">
+      <h2 style="color: #9f1239; font-size: 16px; font-weight: 700; margin: 0 0 8px 0;">Your purchase is ready!</h2>
+      <p style="color: #881337; font-size: 13px; line-height: 1.6; margin: 0;">
+        Thank you for purchasing <strong>${order.product_title}</strong>. Your personal download link is below - it stays valid for 30 days.
+      </p>
+    </div>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${downloadLink}" style="background-color: #e11d48; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 12px 28px; border-radius: 12px; display: inline-block;">Download ${order.product_title} &rarr;</a>
+    </div>
+    <p style="color: #71717a; font-size: 12px; line-height: 1.6; text-align: center;">
+      Or redeem manually from the Heartsync Digital Store with this token:<br/>
+      <code style="color: #e11d48; font-size: 12px;">${order.download_token}</code>
+    </p>
+  </div>`;
+  try {
+    await clientObj.resend.emails.send({
+      from: 'editorial@heartsync.com',
+      to: [recipientEmail],
+      subject: `Your Heartsync download: ${order.product_title}`,
+      html
+    });
+    logger.info('Digital delivery email dispatched for order:', order.id);
+  } catch (err: any) {
+    logger.warn('Digital delivery email error:', err.message);
+  }
 }
 
 // GET ALL DIGITAL PRODUCTS (public: active products only)
@@ -1243,6 +1287,17 @@ app.post('/api/digital-products/checkout', async (req: Request, res: Response) =
     console.warn('Digital product checkout failure:', err?.message);
     res.status(502).json({ error: 'The payment gateway rejected the checkout request.' });
   }
+});
+
+// GET ALL DIGITAL PRODUCTS (admin: includes inactive + sales stats)
+app.get('/api/digital-products/all', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const dbClient = getAdminDbClient(req);
+  if (!dbClient) { res.status(503).json({ error: 'Database is not configured.' }); return; }
+  const { data: products, error } = await dbClient.from('digital_products')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { res.status(500).json({ error: 'Failed to load products: ' + error.message }); return; }
+  res.json({ success: true, count: (products || []).length, products: products || [] });
 });
 
 // VERIFY AND DOWNLOAD DIGITAL PRODUCT ASSET (token-holding RPC  - anonymous
@@ -1726,7 +1781,14 @@ app.post('/api/advice/ask', async (req: Request, res: Response) => {
         .join('\n')
     : '';
 
-  const systemPrompt = `You are the HeartSync Guide, a warm, evidence-informed relationship and emotional-wellness companion for a premium publishing platform (niches: love & relationships, dating & romance, communication & emotional connection, relationship problems & breakups, self-love & personal growth).
+  // HONESTY FIX: honor the admin-configured ai_copilot_system_prompt
+  // (AI Writer Copilot pane). When set, it REPLACES the default persona;
+  // otherwise the built-in default is used.
+  const siteCfg = await readSiteSettings();
+  const customPrompt = typeof siteCfg.ai_copilot_system_prompt === 'string'
+    ? siteCfg.ai_copilot_system_prompt.trim()
+    : '';
+  const defaultPersona = `You are the HeartSync Guide, a warm, evidence-informed relationship and emotional-wellness companion for a premium publishing platform (niches: love & relationships, dating & romance, communication & emotional connection, relationship problems & breakups, self-love & personal growth).
 
 Style rules:
 - Speak like a thoughtful human writer, never like a corporate bot. Vary your sentence rhythm.
@@ -1734,7 +1796,9 @@ Style rules:
 - Be specific and practical: give concrete phrases the reader could actually say, small next steps, and one reflective question to close.
 - Keep answers between 180 and 350 words unless the situation clearly needs depth.
 - Never claim to be a licensed therapist. Never give medical or legal directives.
-- If the situation involves violence, coercion, or immediate danger, prioritize safety: clearly recommend contacting local emergency services or a domestic-violence hotline, and say plainly that the reader deserves immediate professional support.
+- If the situation involves violence, coercion, or immediate danger, prioritize safety: clearly recommend contacting local emergency services or a domestic-violence hotline, and say plainly that the reader deserves immediate professional support.`;
+
+  const systemPrompt = (customPrompt || defaultPersona).slice(0, 4000) + `
 
 Recent conversation (if any):
 ${historyText || '(new conversation)'}
@@ -1768,6 +1832,410 @@ ${mode === 'journal_prompt' ? 'The reader pressed "inspire me" on their private 
 });
 
 // AI CONTENT DRAFTING FOR THE RICH TEXT EDITOR (previously a missing endpoint)
+// ==========================================================================
+// TRANSLATION OVERRIDES (Localization pane). Admin-authored replacements
+// for built-in UI dictionary strings, per language. Public read is served to
+// the client bootstrap so the live site renders overrides immediately.
+// ==========================================================================
+app.get('/api/translation-overrides', async (req: Request, res: Response) => {
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data, error } = await svc.from('translation_overrides')
+      .select('*').order('language_code').order('string_key');
+    if (error) throw error;
+    res.json({ overrides: data || [] });
+  } catch (err: any) {
+    logger.warn('translation-overrides read failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not load translation overrides.' });
+  }
+});
+
+app.post('/api/translation-overrides', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const { language_code, string_key, custom_text } = req.body || {};
+  if (!language_code || !string_key || typeof custom_text !== 'string' || !custom_text.trim()) {
+    res.status(400).json({ error: 'language_code, string_key and a non-empty custom_text are required.' });
+    return;
+  }
+  try {
+    const svc = getServiceRoleSupabase();
+    const id = `${language_code}::${string_key}`.toLowerCase();
+    const { data, error } = await svc.from('translation_overrides')
+      .upsert({ id, language_code, string_key, custom_text: custom_text.trim(), updated_at: new Date().toISOString() })
+      .select().single();
+    if (error) throw error;
+    res.json({ success: true, override: data });
+  } catch (err: any) {
+    logger.warn('translation-overrides write failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not save the override.' });
+  }
+});
+
+app.patch('/api/translation-overrides/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const { custom_text } = req.body || {};
+  if (typeof custom_text !== 'string' || !custom_text.trim()) {
+    res.status(400).json({ error: 'A non-empty custom_text is required.' });
+    return;
+  }
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data, error } = await svc.from('translation_overrides')
+      .update({ custom_text: custom_text.trim(), updated_at: new Date().toISOString() })
+      .eq('id', req.params.id).select().maybeSingle();
+    if (error) throw error;
+    if (!data) { res.status(404).json({ error: 'Override not found.' }); return; }
+    res.json({ success: true, override: data });
+  } catch (err: any) {
+    logger.warn('translation-overrides patch failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not update the override.' });
+  }
+});
+
+app.delete('/api/translation-overrides/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data, error } = await svc.from('translation_overrides')
+      .delete().eq('id', req.params.id).select().maybeSingle();
+    if (error) throw error;
+    if (!data) { res.status(404).json({ error: 'Override not found.' }); return; }
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.warn('translation-overrides delete failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not delete the override.' });
+  }
+});
+
+// ==========================================================================
+// TENANT DOMAINS (Multi-Site pane). Registry of accepted host domains.
+// DNS still has to point at this deployment; the registry is the
+// server-side source of truth for accepted host names.
+// ==========================================================================
+app.get('/api/tenant-domains', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data, error } = await svc.from('tenant_domains').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ domains: data || [] });
+  } catch (err: any) {
+    logger.warn('tenant-domains read failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not load tenant domains.' });
+  }
+});
+
+app.post('/api/tenant-domains', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const { domain, site_name, notes } = req.body || {};
+  const cleanDomain = typeof domain === 'string' ? domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
+  if (!cleanDomain || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(cleanDomain)) {
+    res.status(400).json({ error: 'A valid domain is required (e.g. example.com).' });
+    return;
+  }
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data, error } = await svc.from('tenant_domains')
+      .insert({ domain: cleanDomain, site_name: String(site_name || ''), notes: String(notes || ''), status: 'active' })
+      .select().single();
+    if (error) throw error;
+    res.json({ success: true, domain: data });
+  } catch (err: any) {
+    logger.warn('tenant-domains write failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not register the domain.' });
+  }
+});
+
+app.patch('/api/tenant-domains/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const { status } = req.body || {};
+  if (status !== 'active' && status !== 'paused') {
+    res.status(400).json({ error: "status must be 'active' or 'paused'." });
+    return;
+  }
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data, error } = await svc.from('tenant_domains')
+      .update({ status }).eq('id', req.params.id).select().maybeSingle();
+    if (error) throw error;
+    if (!data) { res.status(404).json({ error: 'Domain not found.' }); return; }
+    res.json({ success: true, domain: data });
+  } catch (err: any) {
+    logger.warn('tenant-domains patch failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not update the domain.' });
+  }
+});
+
+app.delete('/api/tenant-domains/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data, error } = await svc.from('tenant_domains')
+      .delete().eq('id', req.params.id).select().maybeSingle();
+    if (error) throw error;
+    if (!data) { res.status(404).json({ error: 'Domain not found.' }); return; }
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.warn('tenant-domains delete failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not delete the domain.' });
+  }
+});
+
+// ==========================================================================
+// SENTIMENT GUARD (Sentiment Guard pane). AI tone/risk scan of recent
+// posts and comments. Results persist to sentiment_scans; the pane lists
+// them. Requires the Gemini key - fails honestly with 503 otherwise.
+// ==========================================================================
+app.get('/api/sentiment/scans', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data, error } = await svc.from('sentiment_scans')
+      .select('*').order('created_at', { ascending: false }).limit(200);
+    if (error) throw error;
+    res.json({ scans: data || [] });
+  } catch (err: any) {
+    logger.warn('sentiment scans read failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not load scan history.' });
+  }
+});
+
+app.delete('/api/sentiment/scans', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const svc = getServiceRoleSupabase();
+    const { error } = await svc.from('sentiment_scans').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.warn('sentiment scans clear failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Could not clear scan history.' });
+  }
+});
+
+app.post('/api/sentiment/scan', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const { target_type } = req.body || {};
+  if (target_type !== 'post' && target_type !== 'comment') {
+    res.status(400).json({ error: "target_type must be 'post' or 'comment'." });
+    return;
+  }
+  const ai = await getGeminiClient();
+  if (!ai) {
+    res.status(503).json({ error: 'Sentiment Guard needs a Gemini API key. Add one in Integrations first.' });
+    return;
+  }
+  try {
+    const svc = getServiceRoleSupabase();
+    let targets: { id: string; title: string; body: string }[] = [];
+    if (target_type === 'post') {
+      const { data } = await svc.from('posts').select('id, title, content')
+        .eq('published', true).order('created_at', { ascending: false }).limit(8);
+      (data || []).forEach((p: any) => targets.push({ id: String(p.id), title: p.title || 'Untitled', body: String(p.content || '').slice(0, 3000) }));
+    } else {
+      const { data } = await svc.from('comments').select('id, post_id, author, content')
+        .order('created_at', { ascending: false }).limit(25);
+      (data || []).forEach((c: any) => targets.push({ id: String(c.id), title: `Comment by ${c.author || 'anonymous'}`, body: String(c.content || '').slice(0, 800) }));
+    }
+    if (targets.length === 0) {
+      res.json({ success: true, scanned: 0 });
+      return;
+    }
+
+    const prompt = `You are a content safety reviewer for a relationship-wellness publication. For EACH text below, judge the emotional tone and reader-safety risk. Return ONLY valid JSON: an array with one object per text, in order, shaped {"id": "<id>", "sentiment": "positive"|"neutral"|"negative"|"crisis", "risk_level": "low"|"moderate"|"high", "summary": "<=2 sentence explanation"}. "crisis" means content suggesting self-harm, violence or acute distress needing professional help.
+
+TEXTS:
+${targets.map(t => `--- id: ${t.id} (title: ${t.title})
+${t.body}`).join('\n')}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: { responseMimeType: 'application/json', temperature: 0.2 }
+    });
+    let results: any[] = [];
+    try {
+      const parsed = JSON.parse(response.text || '[]');
+      if (Array.isArray(parsed)) results = parsed;
+    } catch { /* handled below */ }
+    if (results.length === 0) {
+      res.status(502).json({ error: 'The scan returned malformed results. Try again.' });
+      return;
+    }
+
+    const allowedSentiment = new Set(['positive', 'neutral', 'negative', 'crisis']);
+    const allowedRisk = new Set(['low', 'moderate', 'high']);
+    const byId = new Map(targets.map(t => [String(t.id), t]));
+    const rows = results
+      .filter((r: any) => r && byId.has(String(r.id)))
+      .map((r: any) => ({
+        target_type,
+        target_id: String(r.id),
+        target_title: byId.get(String(r.id))!.title.slice(0, 200),
+        sentiment: allowedSentiment.has(r.sentiment) ? r.sentiment : 'neutral',
+        risk_level: allowedRisk.has(r.risk_level) ? r.risk_level : 'low',
+        summary: String(r.summary || '').slice(0, 500)
+      }));
+    if (rows.length > 0) {
+      const { error: insErr } = await svc.from('sentiment_scans').insert(rows);
+      if (insErr) throw insErr;
+    }
+    res.json({ success: true, scanned: rows.length });
+  } catch (err: any) {
+    logger.warn('sentiment scan failure', { error: err?.message || err });
+    res.status(500).json({ error: 'The scan failed: ' + (err?.message || 'unknown error') });
+  }
+});
+
+// ==========================================================================
+// AI STATUS (AI Intelligence Suite pane). Reports which AI providers are
+// actually configured so the pane can show honest status.
+// ==========================================================================
+app.get('/api/ai/status', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const geminiKey = await resolveGeminiApiKey();
+  const elevenKey = await resolveElevenLabsApiKey();
+  res.json({
+    gemini_configured: Boolean(geminiKey),
+    elevenlabs_configured: Boolean(elevenKey)
+  });
+});
+
+// Reads the persisted site_settings singleton (raw JSON) so server-side
+// features can honor admin-configured values. Returns {} on any failure -
+// callers fall back to their built-in defaults.
+async function readSiteSettings(): Promise<Record<string, any>> {
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data } = await svc.from('site_settings').select('raw_settings').eq('id', 'singleton').maybeSingle();
+    const raw = (data as any)?.raw_settings;
+    if (!raw) return {};
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw) || {}; } catch { return {}; }
+    }
+    return raw as Record<string, any>;
+  } catch {
+    return {};
+  }
+}
+
+// ==========================================================================
+// SPONSOR CAMPAIGNS: public click tracking for direct-sold campaigns
+// rendered by AdPlacement (footer "Sponsored" links). Impression counts
+// stay server-managed to avoid write storms; clicks are the honest signal.
+// ==========================================================================
+app.post('/api/sponsor/click', async (req: Request, res: Response) => {
+  const { campaignId } = req.body || {};
+  if (!campaignId || typeof campaignId !== 'string') {
+    res.status(400).json({ error: 'campaignId is required.' });
+    return;
+  }
+  try {
+    const svc = getServiceRoleSupabase();
+    // Fetch-and-increment (no RPC available); tolerates concurrent races -
+    // click counts are advisory metrics, not billing-critical.
+    const { data, error: fetchErr } = await svc.from('sponsorship_campaigns')
+      .select('id, clicks').eq('id', campaignId).maybeSingle();
+    if (fetchErr || !data) {
+      res.status(404).json({ error: 'Campaign not found.' });
+      return;
+    }
+    const { error: upErr } = await svc.from('sponsorship_campaigns')
+      .update({ clicks: (data.clicks || 0) + 1 })
+      .eq('id', campaignId);
+    if (upErr) throw upErr;
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.warn('sponsor click tracking failure', { error: err?.message || err });
+    res.status(500).json({ error: 'Click tracking failed.' });
+  }
+});
+
+// ==========================================================================
+// AI ARTICLE WRITER: generates a COMPLETE article (title, slug, excerpt,
+// body markdown, SEO fields, tags, read time AND the in-article insert
+// cards) from a single topic. Consumed by the post editor's "AI Writer"
+// panel; the admin reviews/edits before saving through the normal CRUD.
+// ==========================================================================
+app.post('/api/ai/write-article', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const { topic, tone, audience, keywords, language, categoryHint } = req.body || {};
+  if (!topic || typeof topic !== 'string' || topic.trim().length < 3) {
+    res.status(400).json({ error: 'A topic of at least 3 characters is required.' });
+    return;
+  }
+
+  const ai = await getGeminiClient();
+  if (!ai) {
+    res.status(503).json({ error: 'The AI writer is not configured yet. Add a Gemini API key in Integrations first.' });
+    return;
+  }
+
+  const langNote = language && language !== 'en'
+    ? `Write the article in this language: ${language}.`
+    : 'Write the article in English.';
+  const kwNote = Array.isArray(keywords) && keywords.length > 0
+    ? `Weave in these keywords naturally: ${keywords.join(', ')}.`
+    : '';
+
+  const prompt = `You are a senior relationship & emotional-wellness writer for Heartsync, a premium publishing platform (niches: love & relationships, attachment, communication, breakups, self-love, personal growth).
+
+Write a COMPLETE, publication-ready article about: "${topic.trim()}"
+${audience ? `Target audience: ${audience}.` : ''}
+${tone ? `Tone: ${tone}.` : 'Tone: warm, evidence-informed, practical; grounded in attachment theory and Gottman-style repair without clinical jargon walls.'}
+${categoryHint ? `Site category context: ${categoryHint}.` : ''}
+${langNote} ${kwNote}
+
+Structure the body in clean Markdown (## section headings, paragraphs, occasional bold for key ideas, at most one blockquote). 1200-1800 words. Open with a hook, deliver concrete phrases and practices readers can actually use, close with a short reflective send-off. Never invent studies, statistics or expert names.
+
+Return ONLY strictly valid JSON with EXACTLY this shape:
+{
+  "title": "SEO-strong H1, under 70 characters",
+  "slug": "kebab-case-url-slug",
+  "excerpt": "1-2 sentence teaser under 200 characters",
+  "content": "full article body in Markdown",
+  "tags": ["3-6 lowercase topical tags"],
+  "seo_title": "under 60 characters",
+  "seo_description": "meta description under 155 characters",
+  "read_time": 7,
+  "inserts": {
+    "insight": { "title": "In-Article Insight", "content": "2-3 sentence cognitive/relational insight revealing deeper dynamics" },
+    "reflection": { "title": "Reflection Note", "content": "gentle 2-3 sentence introspective check-in question for the reader" },
+    "tip": { "title": "Relationship Tip", "content": "an actionable micro-tip with 2-3 concrete steps, newline-separated" },
+    "summary": { "title": "Post Summary", "content": "3-point executive summary, numbered markdown list" }
+  }
+}`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: { responseMimeType: 'application/json', temperature: 0.8, topP: 0.95 }
+    });
+
+    let article: any;
+    try {
+      article = JSON.parse(response.text || '{}');
+    } catch {
+      res.status(502).json({ error: 'The AI returned malformed JSON. Try again or rephrase the topic.' });
+      return;
+    }
+
+    if (!article || !article.title || !article.content || article.content.length < 400) {
+      res.status(502).json({ error: 'The AI returned an incomplete draft. Try again with a more specific topic.' });
+      return;
+    }
+
+    // Normalize the shape the editor expects
+    const safeSlug = String(article.slug || article.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    res.json({
+      success: true,
+      article: {
+        title: String(article.title).trim(),
+        slug: safeSlug,
+        excerpt: String(article.excerpt || '').trim(),
+        content: String(article.content).trim(),
+        tags: Array.isArray(article.tags) ? article.tags.map((t: any) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 6) : [],
+        seo_title: String(article.seo_title || article.title).trim(),
+        seo_description: String(article.seo_description || article.excerpt || '').trim(),
+        read_time: Math.max(1, Math.min(60, Math.round(Number(article.read_time) || 7))),
+        inserts: article.inserts && typeof article.inserts === 'object' ? article.inserts : {}
+      }
+    });
+  } catch (err: any) {
+    logger.warn('AI write-article failure', { error: err?.message || err });
+    res.status(502).json({ error: 'Article generation failed: ' + (err?.message || 'unknown error') });
+  }
+});
+
 app.post('/api/ai/draft', adminAuthMiddleware, async (req: Request, res: Response) => {
   const { prompt, mode, context } = req.body;
   if (!prompt || typeof prompt !== 'string') {
@@ -1865,40 +2333,16 @@ Output MUST be strictly valid JSON matching this structure:
 Return ONLY valid JSON without markdown wrapping.`;
 
   if (!ai) {
-    // Return high quality context-aware mock fallback
-    const mockInserts = {
-      insight: {
-        title: "In-Article Insight",
-        content: `When exploring "${title || 'relational dynamics'}", notice how subtle emotional cues often carry deeper relational bids. Grounding yourself in present awareness transforms defensive reactions into curious connection.`
-      },
-      reflection: {
-        title: "Reflection Note",
-        content: `Take a quiet breath right now. Ask yourself: "Where in my body do I feel tension when this topic arises with my partner?" Acknowledging this physical signal is the first step toward co-regulation.`
-      },
-      tip: {
-        title: "Relationship Tip",
-        content: `• Practice the 10-Second Validation Pause before responding during conflict.\n• Use "I feel" statements focused on your core vulnerability rather than your partner's behavior.\n• Schedule a low-stakes 5-minute daily check-in completely free of logistics chatter.`
-      },
-      summary: {
-        title: "Post Summary",
-        content: `1. **Acknowledge Attachment Patterns:** Unconscious triggers drive defensive cycles unless consciously observed.\n2. **Prioritize Emotional Safety:** Validation precedes logical problem-solving in intimate partnerships.\n3. **Commit to Micro-Repairs:** Small daily acts of reconnection compound into enduring relationship resilience.`
-      },
-      related: {
-        title: "Related Reading",
-        content: "Expand your emotional vocabulary and intimacy skills with these related guides:",
-        links: [
-          { title: "Building Emotional Safety & Secure Attachment", url: "/post/secure-attachment", readTime: "6 min read" },
-          { title: "The Somatic Intimacy & Co-Regulation Playbook", url: "/post/somatic-intimacy", readTime: "8 min read" }
-        ]
-      }
-    };
-    res.json({ inserts: targetType === 'all' ? mockInserts : { [targetType]: (mockInserts as any)[targetType] } });
+    // HONESTY FIX: previously this served hardcoded "mock" inserts when no
+    // Gemini key was configured, which silently wrote generic filler into
+    // real articles. Now it fails clearly so the admin knows AI is not on.
+    res.status(503).json({ error: 'AI insert generation is not configured yet. Add a Gemini API key in Integrations first.' });
     return;
   }
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -2490,10 +2934,11 @@ app.post('/api/translate/site-content', rateLimiter(10, 60 * 1000), async (req: 
   }
 
   try {
-    const [postsRes, categoriesRes, settingsRes] = await Promise.all([
+    const [postsRes, categoriesRes, settingsRes, productsRes] = await Promise.all([
       supabase.from('posts').select(`${POST_LIST_COLUMNS.join(',')}`).eq('status', 'published').order('publish_date', { ascending: false }).limit(MAX_LIST_TRANSLATION_POSTS),
       supabase.from('categories').select('id,name,description'),
-      supabase.from('site_settings').select('*').eq('id', 'singleton').maybeSingle()
+      supabase.from('site_settings').select('*').eq('id', 'singleton').maybeSingle(),
+      supabase.from('digital_products').select('id,title,subtitle,description').eq('is_active', true).limit(60)
     ]);
 
     if (postsRes.error || categoriesRes.error) {
@@ -2521,6 +2966,13 @@ app.post('/api/translate/site-content', rateLimiter(10, 60 * 1000), async (req: 
         if (nonEmpty(c.description)) entry.description = c.description;
         return entry;
       }),
+      digitalProducts: ((productsRes.data || []) as any[]).map((p: any) => {
+        const entry: any = { id: p.id };
+        if (nonEmpty(p.title)) entry.title = p.title;
+        if (nonEmpty(p.subtitle)) entry.subtitle = p.subtitle;
+        if (nonEmpty(p.description)) entry.description = p.description;
+        return entry;
+      }),
       settings: {}
     };
     for (const key of TRANSLATABLE_SETTINGS_KEYS) {
@@ -2543,6 +2995,7 @@ app.post('/api/translate/site-content', rateLimiter(10, 60 * 1000), async (req: 
       data = {
         posts: keyById(translated.posts),
         categories: keyById(translated.categories),
+        digitalProducts: Array.isArray(translated.digitalProducts) ? keyById(translated.digitalProducts) : {},
         settings: (translated.settings && typeof translated.settings === 'object') ? translated.settings : {}
       };
     } else {
@@ -2558,6 +3011,14 @@ app.post('/api/translate/site-content', rateLimiter(10, 60 * 1000), async (req: 
         }, targetLang)])),
         settings: localizeObj(manifest.settings, targetLang)
       };
+      if (manifest.digitalProducts && manifest.digitalProducts.length > 0) {
+        data.digitalProducts = Object.fromEntries(
+          manifest.digitalProducts.filter((dp: any) => dp.id).map((dp: any) => {
+            const { id, ...fields } = dp;
+            return [id, localizeObj(fields, targetLang)];
+          })
+        );
+      }
     }
 
     siteContentTranslationCache.set(cacheKey, { expires: Date.now() + TRANSLATION_CACHE_TTL_MS, data });
@@ -3703,6 +4164,10 @@ async function loadStateFromSupabase(): Promise<any> {
         isConsentCompliant: p.settings?.is_consent_compliant ?? p.is_consent_compliant ?? true,
         created_at: p.created_at
       }));
+    }
+    const translationOverridesRes = await queryWithTimeout(supabase.from('translation_overrides').select('id, language_code, string_key, custom_text').limit(2000));
+    if (!translationOverridesRes.error && translationOverridesRes.data) {
+      state.translation_overrides = translationOverridesRes.data;
     }
     if (!sponsorshipCampaignsRes.error && sponsorshipCampaignsRes.data) {
       state.sponsorship_campaigns = sponsorshipCampaignsRes.data.map((c: any) => ({
@@ -6521,6 +6986,15 @@ async function sendResendWelcomeEmail(recipientEmail: string, source: string = '
     return { success: false, reason: 'RESEND_NOT_CONFIGURED' };
   }
 
+  // HONESTY FIX: honor the admin's newsletter_welcome_msg setting (Email
+  // Marketing pane). Rendered as an italic personal note under the standard
+  // welcome block when the admin has written one.
+  const siteCfg = await readSiteSettings();
+  const rawWelcomeMsg = typeof siteCfg.newsletter_welcome_msg === 'string' ? siteCfg.newsletter_welcome_msg.trim() : '';
+  const customWelcomeMsg = rawWelcomeMsg
+    ? `<p style="color: #881337; font-size: 13px; line-height: 1.6; margin: 12px 0 0 0; padding-top: 12px; border-top: 1px solid rgba(190, 18, 60, 0.15);"><em>${rawWelcomeMsg.replace(/</g, '&lt;').slice(0, 1000)}</em></p>`
+    : '';
+
   const welcomeHtml = `
   <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background-color: #ffffff; border: 1px solid #f4f4f5; border-radius: 24px;">
     <div style="text-align: center; margin-bottom: 24px;">
@@ -6533,6 +7007,7 @@ async function sendResendWelcomeEmail(recipientEmail: string, source: string = '
       <p style="color: #881337; font-size: 13px; line-height: 1.6; margin: 0;">
         Thank you for joining our organic newsletter community. You have taken a meaningful step toward deeper relational security, emotional regulation, and intentional intimacy.
       </p>
+      ${customWelcomeMsg}
     </div>
 
     <p style="color: #3f3f46; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
