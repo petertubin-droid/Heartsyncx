@@ -5760,7 +5760,7 @@ app.get('/api/posts/:slug', async (req: Request, res: Response) => {
 // bodies here. This endpoint ONLY fills bodies that are currently empty -
 // it never overwrites existing content - and it is gated by a single-use
 // recovery token shared with that page. Remove both once recovery is done.
-const ARTICLE_RECOVERY_TOKEN = 'hxrec_b39c975dadf0569aa37d099035f0a91b';
+const ARTICLE_RECOVERY_TOKEN = process.env.HX_RECOVERY_TOKEN || 'hxrec_b39c975dadf0569aa37d099035f0a91b';
 app.post('/api/recover-articles', async (req: Request, res: Response) => {
   try {
     const token = String((req.headers['x-recovery-token'] as string) || '');
@@ -5814,7 +5814,7 @@ app.post('/api/recover-articles', async (req: Request, res: Response) => {
 //   { action: 'restore_batch', articles: { slug: content } } -> fills ONLY
 //     currently-empty bodies (never overwrites) and republishes those
 //     articles, so each rewritten batch goes live the moment it is restored.
-const ARTICLE_MAINT_TOKEN = 'hxmaint_c378fe6d8c395f60905dd1b4b03aeb88';
+const ARTICLE_MAINT_TOKEN = process.env.HX_MAINT_TOKEN || 'hxmaint_c378fe6d8c395f60905dd1b4b03aeb88';
 app.post('/api/maint/articles', async (req: Request, res: Response) => {
   try {
     const token = String((req.headers['x-maint-token'] as string) || '');

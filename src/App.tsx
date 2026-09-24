@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 
 // The 16k-line admin console is split out of the reader bundle  - it only
@@ -13,16 +13,16 @@ import ArticleShareRow from './components/ArticleShareRow';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import RichTextEditor from './components/RichTextEditor';
 import AdminLogin from './components/AdminLogin';
-import AiCopilot from './components/AiCopilot';
-import LoveVault from './components/LoveVault';
-import ImageLightbox from './components/ImageLightbox';
+const AiCopilot = React.lazy(() => import('./components/AiCopilot'));
+const LoveVault = React.lazy(() => import('./components/LoveVault'));
+const ImageLightbox = React.lazy(() => import('./components/ImageLightbox'));
 import { CookieBanner } from './components/CookieBanner';
 import { InstallPrompt } from './components/InstallPrompt';
 import { useCookieConsent } from './components/useCookieConsent';
-import LiveChatWidget from './components/LiveChatWidget';
-import SubscriptionPage from './components/SubscriptionPage';
+const LiveChatWidget = React.lazy(() => import('./components/LiveChatWidget'));
+const SubscriptionPage = React.lazy(() => import('./components/SubscriptionPage'));
 import ArticleBodyWithInserts from './components/ArticleBodyWithInserts';
-import ArticleTTS from './components/ArticleTTS';
+const ArticleTTS = React.lazy(() => import('./components/ArticleTTS'));
 import OfflineReaderBanner from './components/OfflineReaderBanner';
 import { AdPlacement, AdsterraDirectLink } from './components/AdPlacement';
 import { AdNetworkScripts } from './components/AdNetworkScripts';
@@ -3659,7 +3659,7 @@ export default function App() {
                                 {activeArticle.likes || 0}
                               </button>
                             )}
-                            <ArticleTTS content={articleBody} compact />
+                            <Suspense fallback={null}><ArticleTTS content={articleBody} compact /></Suspense>
                             <button
                               type="button"
                               onClick={() => setShareMenuOpen((v) => !v)}
@@ -5716,17 +5716,17 @@ export default function App() {
 
             {/* 17c. PREMIUM MEMBERSHIP SUBSCRIPTION PAGE */}
             {currentTab === 'subscription' && (
-              <SubscriptionPage onNavigate={navigateTo} />
+              <Suspense fallback={null}><SubscriptionPage onNavigate={navigateTo} /></Suspense>
             )}
 
             {/* 17d. AI ADVICE ENGINE  - the HeartSync Guide */}
             {currentTab === 'ai_copilot' && (
-              <AiCopilot onNavigate={navigateTo} />
+              <Suspense fallback={null}><AiCopilot onNavigate={navigateTo} /></Suspense>
             )}
 
             {/* 17e. LOVEVAULT  - private vault, journal, boundary scripts */}
             {currentTab === 'lovevault' && (
-              <LoveVault />
+              <Suspense fallback={null}><LoveVault /></Suspense>
             )}
 
             {/* 18. ADMIN AUTHENTICATION  - real sign-in gate */}
@@ -5782,7 +5782,7 @@ export default function App() {
       {currentTab !== 'admin' && (
         <>
           <CookieBanner onLearnMore={() => navigateTo('cookies')} />
-          <LiveChatWidget />
+          <Suspense fallback={null}><LiveChatWidget /></Suspense>
           <InstallPrompt />
         </>
       )}
@@ -5963,7 +5963,7 @@ export default function App() {
       )}
 
       {/* Accessible article image lightbox (Esc closes, focus trapped) */}
-      <ImageLightbox image={lightboxImage} onClose={() => setLightboxImage(null)} />
+      <Suspense fallback={null}><ImageLightbox image={lightboxImage} onClose={() => setLightboxImage(null)} /></Suspense>
 
     </div>
   );

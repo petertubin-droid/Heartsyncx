@@ -13,7 +13,13 @@ import { MORE_POSTS, MORE_CATEGORIES } from '../data/moreArticles';
  * does not regress into thin/placeholder content (an AdSense policy risk).
  */
 
+// Structural checks run against MORE_POSTS (what ships client-side: metadata).
+// Content-quality checks run against HEARTSYNC_ARTICLES - the full-body
+// archive. MORE_POSTS carries '' bodies by design (see
+// clientBundleWeight.test.ts): bodies are fetched on demand from
+// GET /api/posts/:slug, never bundled.
 const corpus = MORE_POSTS;
+const fullBodies = HEARTSYNC_ARTICLES;
 const corpusIds = new Set(corpus.map((p) => p.id));
 const corpusSlugs = new Set(corpus.map((p) => p.slug));
 const categoryIds = new Set(MORE_CATEGORIES.map((c) => c.id));
@@ -26,6 +32,7 @@ const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 describe('article corpus integrity', () => {
   it('has a non-empty corpus of 35 restored articles', () => {
     expect(corpus.length).toBe(35);
+    expect(fullBodies.length).toBe(30);
   });
 
   it('contains the 30 long-form HeartSync articles', () => {
@@ -58,8 +65,8 @@ describe('article corpus integrity', () => {
     }
   });
 
-  it('every article is substantive (no thin content)', () => {
-    for (const p of corpus) {
+  it('every full-body article is substantive (no thin content)', () => {
+    for (const p of fullBodies) {
       const words = wordCount(p.content);
       expect(words, `${p.slug} has only ${words} words`).toBeGreaterThanOrEqual(300);
       expect(h2Count(p.content), `${p.slug} needs >= 3 section headings`).toBeGreaterThanOrEqual(3);
@@ -68,7 +75,7 @@ describe('article corpus integrity', () => {
 
   it('contains no placeholder or lorem marker text', () => {
     const markers = ['lorem ipsum', 'placeholder text', 'TODO:', 'TBD', 'xxx content'];
-    for (const p of corpus) {
+    for (const p of fullBodies) {
       const haystack = `${p.title} ${p.excerpt} ${p.content}`.toLowerCase();
       for (const m of markers) {
         expect(haystack.includes(m.toLowerCase()), `${p.slug} contains "${m}"`).toBe(false);

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ArticleBodyWithInserts from '../ArticleBodyWithInserts';
 import { ConsentProvider } from '../ConsentProvider';
-import { MORE_POSTS } from '../../utils/data/moreArticles';
+import { HEARTSYNC_ARTICLES } from '../../utils/data/articles';
 
 /**
  * Article body suite (article page surface). Kept in its own file, separate
@@ -11,8 +11,8 @@ import { MORE_POSTS } from '../../utils/data/moreArticles';
  * rendering of these components. Production is unaffected - single bundle.
  */
 
-const sample = MORE_POSTS[0];
-const longForm = MORE_POSTS.find(p => (p.content || '').length > 5000) || sample;
+const sample = HEARTSYNC_ARTICLES[0];
+const longForm = HEARTSYNC_ARTICLES.find(p => (p.content || '').length > 5000) || sample;
 
 describe('ArticleBodyWithInserts (article page surface)', () => {
   it('renders long-form markdown with its section headings', () => {

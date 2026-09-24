@@ -33,6 +33,11 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode || 'development', process.cwd(), '');
 
   return {
+    // PERF (2026-09-24): production client bundles drop console chatter and
+    // debugger statements. Server logs are unaffected (separate esbuild pass).
+    esbuild: mode === 'production'
+      ? { drop: ['console', 'debugger'] }
+      : undefined,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
