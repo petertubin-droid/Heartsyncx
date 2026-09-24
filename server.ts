@@ -5805,6 +5805,82 @@ app.post('/api/recover-articles', async (req: Request, res: Response) => {
   }
 });
 
+// Article maintenance (2026-09-24): token-gated, same pattern as the recovery
+// endpoint above. The 37 body-wiped articles are being rewritten by the owner's
+// agent in batches; while a rewrite is in flight its article stays OFF the
+// public site. Actions:
+//   { action: 'unpublish_empty' }  -> every published post whose content is
+//     empty/whitespace goes to draft (removes it from the public site).
+//   { action: 'restore_batch', articles: { slug: content } } -> fills ONLY
+//     currently-empty bodies (never overwrites) and republishes those
+//     articles, so each rewritten batch goes live the moment it is restored.
+const ARTICLE_MAINT_TOKEN = 'hxmaint_c378fe6d8c395f60905dd1b4b03aeb88';
+app.post('/api/maint/articles', async (req: Request, res: Response) => {
+  try {
+    const token = String((req.headers['x-maint-token'] as string) || '');
+    if (token !== ARTICLE_MAINT_TOKEN) {
+      res.status(401).json({ error: 'Invalid maintenance token.' });
+      return;
+    }
+    const svc = getServiceRoleSupabase();
+    if (!svc) {
+      res.status(503).json({ error: 'Database service role is not configured.' });
+      return;
+    }
+    const action = String((req.body && (req.body as any).action) || '');
+    if (action === 'unpublish_empty') {
+      const { data: victims, error: findErr } = await svc.from('posts')
+        .select('id, slug, title').eq('status', 'published');
+      if (findErr) { res.status(500).json({ error: 'Lookup failed: ' + findErr.message }); return; }
+      const emptyOnes = (victims || []).filter((p: any) => !(typeof p.content === 'string'));
+      // select() above omits content; re-check each candidate with content so we
+      // only ever draft posts that are truly bodyless.
+      const confirmed: any[] = [];
+      for (const p of emptyOnes) {
+        const { data: row, error: rowErr } = await svc.from('posts').select('id, content').eq('id', p.id).maybeSingle();
+        if (!rowErr && row && !(typeof row.content === 'string' && row.content.trim().length > 0)) confirmed.push(p);
+      }
+      let unpublished = 0;
+      const slugs: string[] = [];
+      for (const p of confirmed) {
+        const { error: updErr } = await svc.from('posts').update({ status: 'draft', updated_at: new Date().toISOString() }).eq('id', p.id);
+        if (!updErr) { unpublished++; slugs.push(p.slug); }
+      }
+      res.json({ unpublished, slugs });
+      return;
+    }
+    if (action === 'restore_batch') {
+      const articles = (req.body && typeof req.body === 'object' && (req.body as any).articles) as Record<string, unknown> | undefined;
+      if (!articles || typeof articles !== 'object' || Array.isArray(articles)) {
+        res.status(400).json({ error: 'Expected an articles object of slug -> content.' });
+        return;
+      }
+      let restored = 0, skipped = 0, missing = 0, tooShort = 0;
+      const restoredSlugs: string[] = [];
+      for (const [slug, content] of Object.entries(articles).slice(0, 500)) {
+        if (!/^[a-z0-9][a-z0-9-]{0,199}$/.test(slug) || typeof content !== 'string' || content.trim().length < 500) {
+          tooShort++; continue;
+        }
+        const { data: post, error: fetchErr } = await svc.from('posts').select('id, content').eq('slug', slug).maybeSingle();
+        if (fetchErr || !post) { missing++; continue; }
+        const hasBody = typeof post.content === 'string' && post.content.trim().length > 0;
+        if (hasBody) { skipped++; continue; }
+        const { error: updateErr } = await svc.from('posts')
+          .update({ content, status: 'published', updated_at: new Date().toISOString() })
+          .eq('id', post.id);
+        if (updateErr) { skipped++; continue; }
+        restored++;
+        restoredSlugs.push(slug);
+      }
+      res.json({ restored, skipped, missing, tooShort, slugs: restoredSlugs });
+      return;
+    }
+    res.status(400).json({ error: 'Unknown action. Use unpublish_empty or restore_batch.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Maintenance failed: ' + err.message });
+  }
+});
+
 app.get('/api/state', async (req: Request, res: Response) => {
   const now = Date.now();
   
