@@ -33,6 +33,7 @@ import RichTextEditor from './RichTextEditor';
 import { getCategoryIcon, PREMIUM_ICONS_BY_GROUP, ALL_PREMIUM_ICONS } from '../utils/categoryIcons';
 
 import AnalyticsPanel from './AnalyticsPanel';
+import AdSlotConnectivity from './AdSlotConnectivity';
 import { FeatureManager } from './FeatureManager';
 import { ModuleViewRenderer } from '../modules/ModuleLoader';
 import { moduleRegistry } from '../modules/ModuleRegistry';
@@ -1149,6 +1150,8 @@ export default function AdminConsole({
   const [bannerSidebarEnabled, setBannerSidebarEnabled] = useState(() => siteSettings.banner_sidebar_enabled ?? heartsync.site_settings.banner_sidebar_enabled ?? true);
   const [bannerFooterEnabled, setBannerFooterEnabled] = useState(() => siteSettings.banner_footer_enabled ?? heartsync.site_settings.banner_footer_enabled ?? true);
   const [bannerInArticleEnabled, setBannerInArticleEnabled] = useState(() => siteSettings.banner_in_article_enabled ?? heartsync.site_settings.banner_in_article_enabled ?? true);
+  const [bannerHomepageEnabled, setBannerHomepageEnabled] = useState(() => Boolean((siteSettings as Record<string, unknown>).banner_homepage_enabled ?? (heartsync.site_settings as Record<string, unknown>).banner_homepage_enabled ?? true));
+  const [bannerArticleBottomEnabled, setBannerArticleBottomEnabled] = useState(() => Boolean((siteSettings as Record<string, unknown>).banner_article_bottom_enabled ?? (heartsync.site_settings as Record<string, unknown>).banner_article_bottom_enabled ?? true));
 
   // Monetag Ad Network State
   const [monetagActive, setMonetagActive] = useState(() => siteSettings.monetag_active ?? heartsync.site_settings.monetag_active ?? true);
@@ -6616,6 +6619,33 @@ export default function AdminConsole({
                         <div className="p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/70 dark:border-blue-900/30 text-[10px] leading-relaxed text-blue-800 dark:text-blue-300 space-y-1">
                           <strong className="text-zinc-800 dark:text-zinc-200">MultiTag serves all formats from one tag.</strong>
                           <span className="block">One MultiTag script covers OnClick Popunder, Push Notifications, In-Page Push and Vignette Banner — there is no format switch to configure. For Push Notifications over HTTPS, also host the sw.js file Monetag provides at your site root.</span>
+                          <strong className="text-zinc-800 dark:text-zinc-200 block pt-1">IMPORTANT: the MultiTag does NOT show visible banner ads.</strong>
+                          <span className="block">Its formats (popunder, vignette, in-page push) are non-display by design. For VISIBLE Monetag ads inside the website's ad slots, create <em>Native Banner</em> zones in your Monetag dashboard (Websites &gt; your site &gt; Add zone &gt; Native Banner), then paste each zone's id (or its full tag snippet) into the per-slot fields below. Each slot then renders that zone's native banner after cookie consent. A slot uses Monetag only when it has neither AdSense nor Adsterra configured.</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Per-Slot Native Banner Zones (visible in-content Monetag ads — paste the zone id or the full tag snippet from the dashboard)</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {([
+                            ['monetag_zone_header', 'Header zone'],
+                            ['monetag_zone_sidebar', 'Sidebar zone'],
+                            ['monetag_zone_in_article', 'In-article zone'],
+                            ['monetag_zone_footer', 'Footer zone'],
+                            ['monetag_zone_homepage', 'Homepage zone'],
+                            ['monetag_zone_article_bottom', 'Article bottom zone']
+                          ] as const).map(([field, label]) => (
+                            <div key={field} className="space-y-0.5">
+                              <span className="text-[9px] text-zinc-400">{label}</span>
+                              <input
+                                type="text"
+                                placeholder="zone id or tag snippet"
+                                value={(siteSettings as Record<string, string>)[field] || ''}
+                                onChange={(e) => setSiteSettings({ ...siteSettings, [field]: e.target.value })}
+                                className="w-full p-2 rounded-xl border bg-transparent outline-none focus:border-blue-500 text-zinc-900 dark:text-zinc-100 font-mono text-[11px]"
+                              />
+                            </div>
+                          ))}
                         </div>
                       </div>
 
@@ -6712,8 +6742,15 @@ export default function AdminConsole({
                         />
                       </div>
 
+                      <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border text-[10px] leading-relaxed text-zinc-600 dark:text-zinc-300 space-y-1">
+                        <strong className="text-zinc-800 dark:text-zinc-100 block">All Adsterra formats this site supports (from adsterra.com/ad-formats):</strong>
+                        <span className="block">1. <strong>Banners</strong> and <strong>2. Native Banners</strong> — visible in-content display units, any size (728x90, 468x60, 320x50, 300x250, 160x300, 160x600...). One unit per placement below; paste the snippet, its own size is honored.</span>
+                        <span className="block">3. <strong>Popunder</strong> — site-wide script URL field below. 4. <strong>Social Bar</strong> — site-wide snippet field below. 5. <strong>In-Page Push</strong> — site-wide snippet field below. 6. <strong>Interstitial</strong> — site-wide snippet field below.</span>
+                        <span className="block">7. <strong>Direct Link / Smartlink</strong> — a plain URL (no script); it renders as a labelled sponsored link in the site footer. 8. <strong>Skim</strong> — site-wide snippet that monetizes your existing outbound links.</span>
+                      </div>
+
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Per-Slot Banner Keys (create one Native Banner / Banner unit per placement in your Adsterra dashboard). Paste the bare key or the whole banner snippet — the key is auto-extracted.</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Per-Slot Banner / Native Banner units (create one unit per placement in your Adsterra dashboard — Banner or Native Banner, any size: 728x90, 468x60, 320x50, 300x250, 160x300, 160x600...). Paste the bare key or the whole snippet — the key is auto-extracted, and when you paste the full snippet its own size and format are honored exactly as Adsterra issued them.</label>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                           {([
                             ['adsterra_key_header', 'Header 728x90', 'adsterra_url_header'],
@@ -6756,11 +6793,30 @@ export default function AdminConsole({
                         <span className="text-[10px] text-zinc-400 block">The Adsterra popunder unit is one script URL from your dashboard (Websites &gt; Ad Units &gt; Popunder &gt; get ad codes). This URL takes precedence over the pasted snippet below.</span>
                       </div>
 
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Direct Link / Smartlink URL (Websites &gt; Ad Units &gt; Direct Link — renders as a labelled sponsored link in the footer)</label>
+                        <input
+                          type="text"
+                          placeholder="https://example.com/... (Direct Link URL from the dashboard)"
+                          value={(siteSettings as Record<string, string>)['adsterra_direct_link_url'] || ''}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, adsterra_direct_link_url: e.target.value })}
+                          className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-amber-500 text-zinc-900 dark:text-zinc-100 font-mono text-[10px]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Link text (optional) — default: Sponsored: check out this offer"
+                          value={(siteSettings as Record<string, string>)['adsterra_direct_link_label'] || ''}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, adsterra_direct_link_label: e.target.value })}
+                          className="w-full p-2.5 rounded-xl border bg-transparent outline-none focus:border-amber-500 text-zinc-900 dark:text-zinc-100 text-[10px]"
+                        />
+                      </div>
+
                       {([
                         ['adsterra_popunder_script', 'Popunder code'],
                         ['adsterra_social_bar_script', 'Social Bar code'],
                         ['adsterra_interstitial_script', 'Interstitial code'],
-                        ['adsterra_inpage_push_script', 'In-Page Push code']
+                        ['adsterra_inpage_push_script', 'In-Page Push code'],
+                        ['adsterra_skim_script', 'Skim code (monetizes existing outbound links)']
                       ] as const).map(([field, label]) => (
                         <div key={field} className="space-y-1">
                           <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{label} (full snippet from dashboard)</label>
@@ -6796,7 +6852,10 @@ export default function AdminConsole({
                               adsterra_popunder_script: siteSettings.adsterra_popunder_script,
                               adsterra_social_bar_script: siteSettings.adsterra_social_bar_script,
                               adsterra_interstitial_script: siteSettings.adsterra_interstitial_script,
-                              adsterra_inpage_push_script: siteSettings.adsterra_inpage_push_script
+                              adsterra_inpage_push_script: siteSettings.adsterra_inpage_push_script,
+                              adsterra_skim_script: (siteSettings as Record<string, string>).adsterra_skim_script || '',
+                              adsterra_direct_link_url: (siteSettings as Record<string, string>).adsterra_direct_link_url || '',
+                              adsterra_direct_link_label: (siteSettings as Record<string, string>).adsterra_direct_link_label || ''
                             });
                             // updateSettings() only throws on client-side validation; a
                             // rejected/expired admin session resolves quietly (see
@@ -6872,7 +6931,30 @@ export default function AdminConsole({
                               className="w-4 h-4 text-rose-500 rounded cursor-pointer" 
                             />
                           </label>
+                          <label className="p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-xl flex items-center justify-between cursor-pointer">
+                            <span className="text-xs font-semibold">Homepage Banner</span>
+                            <input 
+                              type="checkbox" 
+                              checked={bannerHomepageEnabled} 
+                              onChange={(e) => setBannerHomepageEnabled(e.target.checked)} 
+                              className="w-4 h-4 text-rose-500 rounded cursor-pointer" 
+                            />
+                          </label>
+                          <label className="p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-xl flex items-center justify-between cursor-pointer">
+                            <span className="text-xs font-semibold">Article Bottom Banner</span>
+                            <input 
+                              type="checkbox" 
+                              checked={bannerArticleBottomEnabled} 
+                              onChange={(e) => setBannerArticleBottomEnabled(e.target.checked)} 
+                              className="w-4 h-4 text-rose-500 rounded cursor-pointer" 
+                            />
+                          </label>
                         </div>
+                      </div>
+
+                      {/* Slot -> Provider connectivity table with live checks */}
+                      <div className="space-y-2 pt-2 border-t">
+                        <AdSlotConnectivity />
                       </div>
                     </div>
                   )}
@@ -6910,10 +6992,28 @@ export default function AdminConsole({
                           adsterra_social_bar_script: siteSettings.adsterra_social_bar_script,
                           adsterra_interstitial_script: siteSettings.adsterra_interstitial_script,
                           adsterra_inpage_push_script: siteSettings.adsterra_inpage_push_script,
+                          adsterra_skim_script: (siteSettings as Record<string, string>).adsterra_skim_script || '',
+                          adsterra_direct_link_url: (siteSettings as Record<string, string>).adsterra_direct_link_url || '',
+                          adsterra_direct_link_label: (siteSettings as Record<string, string>).adsterra_direct_link_label || '',
                           banner_header_enabled: bannerHeaderEnabled,
                           banner_sidebar_enabled: bannerSidebarEnabled,
                           banner_footer_enabled: bannerFooterEnabled,
-                          banner_in_article_enabled: bannerInArticleEnabled
+                          banner_in_article_enabled: bannerInArticleEnabled,
+                          banner_homepage_enabled: bannerHomepageEnabled,
+                          banner_article_bottom_enabled: bannerArticleBottomEnabled,
+                          adsterra_url_header: siteSettings.adsterra_url_header,
+                          adsterra_url_sidebar: siteSettings.adsterra_url_sidebar,
+                          adsterra_url_in_article: siteSettings.adsterra_url_in_article,
+                          adsterra_url_footer: siteSettings.adsterra_url_footer,
+                          adsterra_url_homepage: siteSettings.adsterra_url_homepage,
+                          adsterra_url_article_bottom: siteSettings.adsterra_url_article_bottom,
+                          adsterra_popunder_url: siteSettings.adsterra_popunder_url,
+                          monetag_zone_header: (siteSettings as Record<string, string>).monetag_zone_header || '',
+                          monetag_zone_sidebar: (siteSettings as Record<string, string>).monetag_zone_sidebar || '',
+                          monetag_zone_in_article: (siteSettings as Record<string, string>).monetag_zone_in_article || '',
+                          monetag_zone_footer: (siteSettings as Record<string, string>).monetag_zone_footer || '',
+                          monetag_zone_homepage: (siteSettings as Record<string, string>).monetag_zone_homepage || '',
+                          monetag_zone_article_bottom: (siteSettings as Record<string, string>).monetag_zone_article_bottom || ''
                         };
                         setSiteSettings(updatedSettings);
                         heartsync.updateSettings(updatedSettings);

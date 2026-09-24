@@ -16,8 +16,11 @@ import { useCookieConsent } from './useCookieConsent';
  *   zone id is provided, the standard MultiTag loader shape is used.
  * - Adsterra: one snippet field per site-wide format
  *   (adsterra_popunder_script, adsterra_social_bar_script,
- *   adsterra_interstitial_script, adsterra_inpage_push_script)  - paste each
- *   format's code from the dashboard.
+ *   adsterra_interstitial_script, adsterra_inpage_push_script,
+ *   adsterra_skim_script)  - paste each format's code from the dashboard.
+ *   Adsterra's per-placement display units (Banners and Native Banners,
+ *   any of their sizes) and the Direct Link / Smartlink are wired in
+ *   AdPlacement.tsx instead.
  *
  * Everything is consent-gated: nothing injects until the visitor has
  * consented and accepted marketing cookies. Nothing renders when the
@@ -111,7 +114,11 @@ export const AdNetworkScripts: React.FC = () => {
         adsterraPopunderSnippet,
         str(s.adsterra_social_bar_script),
         str(s.adsterra_interstitial_script),
-        str(s.adsterra_inpage_push_script)
+        str(s.adsterra_inpage_push_script),
+        // Skim: Adsterra's site-wide snippet that converts existing outbound
+        // links into monetized ones. Same injection path as the other
+        // site-wide formats.
+        str(s.adsterra_skim_script)
       ].filter(Boolean)
     : [];
 

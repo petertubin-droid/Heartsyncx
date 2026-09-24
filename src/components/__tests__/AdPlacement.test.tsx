@@ -127,6 +127,7 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
   });
 
   it('falls back to a sandboxed Adsterra banner when AdSense is unconfigured but an Adsterra key exists', () => {
+    heartsync.site_settings.adsterra_active = true; // master switch now honored by AdPlacement
     heartsync.site_settings.adsterra_key_header = 'a1b2c3d4e5f60718293a';
     const { container } = renderPlacement();
     act(() => { screen.getByTestId('grant').click(); });
@@ -140,6 +141,7 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
   });
 
   it('extracts the key from a pasted full Adsterra snippet (publishers paste the whole snippet, not the bare key)', () => {
+    heartsync.site_settings.adsterra_active = true; // master switch now honored by AdPlacement
     heartsync.site_settings.adsterra_key_article_bottom =
       `<script> atOptions = { 'key' : 'cc0e07aff6cf4787d7a8d08e2b12278c', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} }; </script>` +
       `<script src="https://www.highrevenueformat.com/cc0e07aff6cf4787d7a8d08e2b12278c/invoke.js"></script>`;
@@ -153,6 +155,7 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
   });
 
   it('extracts the key from an invoke.js-only snippet paste', () => {
+    heartsync.site_settings.adsterra_active = true; // master switch now honored by AdPlacement
     heartsync.site_settings.adsterra_key_header = '<script src="https://www.highperformanceformat.com/deadbeefdeadbeefdeadbeefdeadbeef/invoke.js"></script>';
     const { container } = renderPlacement();
     act(() => { screen.getByTestId('grant').click(); });
@@ -162,6 +165,7 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
   });
 
   it('honors the per-slot URL field: a full invoke.js URL overrides the serving domain', () => {
+    heartsync.site_settings.adsterra_active = true; // master switch now honored by AdPlacement
     heartsync.site_settings.adsterra_key_header = 'a1b2c3d4e5f60718293a';
     heartsync.site_settings.adsterra_url_header = 'https://www.effectivegatecpm.com/a1b2c3d4e5f60718293a/invoke.js';
     const { container } = renderPlacement();
@@ -173,6 +177,7 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
   });
 
   it('accepts a bare domain in the per-slot URL field', () => {
+    heartsync.site_settings.adsterra_active = true; // master switch now honored by AdPlacement
     heartsync.site_settings.adsterra_key_header = 'a1b2c3d4e5f60718293a';
     heartsync.site_settings.adsterra_url_header = 'highrevenueformat.com';
     const { container } = renderPlacement();
@@ -183,6 +188,7 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
   });
 
   it('renders from the URL field alone when the key field is empty (full invoke URL carries the key)', () => {
+    heartsync.site_settings.adsterra_active = true; // master switch now honored by AdPlacement
     heartsync.site_settings.adsterra_key_header = '';
     heartsync.site_settings.adsterra_url_header = 'https://www.highperformanceformat.com/cc0e07aff6cf4787d7a8d08e2b12278c/invoke.js';
     const { container } = renderPlacement();
@@ -221,5 +227,61 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
     const ins = container.querySelector('ins.adsbygoogle');
     expect(ins?.getAttribute('data-ad-layout')).toBe('in-article');
     expect(ins?.getAttribute('data-ad-format')).toBe('fluid');
+  });
+
+  it('suppresses the Adsterra banner when the adsterra_active master switch is off', () => {
+    heartsync.site_settings.adsterra_key_header = 'a1b2c3d4e5f60718293a';
+    heartsync.site_settings.adsterra_active = false;
+    const { container } = renderPlacement();
+    act(() => { screen.getByTestId('grant').click(); });
+    expect(container.querySelector('iframe[title="Advertisement"]')).toBeNull();
+    expect(container.querySelector('[data-ad-slot-reserved="true"]')).not.toBeNull();
+  });
+
+  it('honors a pasted snippet with non-default dimensions (native banner size, e.g. 320x50)', () => {
+    heartsync.site_settings.adsterra_active = true;
+    heartsync.site_settings.adsterra_key_header = `atOptions = { 'key' : 'a1b2c3d4e5f60718293a', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };`;
+    const { container } = renderPlacement();
+    act(() => { screen.getByTestId('grant').click(); });
+    const iframe = container.querySelector('iframe[title="Advertisement"]') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+    const srcDoc = iframe.getAttribute('srcdoc') || '';
+    expect(srcDoc).toContain("'height' : 50");
+    expect(srcDoc).toContain("'width' : 320");
+    expect(srcDoc).toContain("'format' : 'iframe'");
+    expect(iframe.getAttribute('style') || '').toContain('height: 50px');
+  });
+
+  it('falls back to a Monetag native banner zone when AdSense and Adsterra are unconfigured', () => {
+    heartsync.site_settings.monetag_active = true;
+    heartsync.site_settings.monetag_zone_header = '284167';
+    const { container } = renderPlacement();
+    act(() => { screen.getByTestId('grant').click(); });
+    const iframe = container.querySelector('iframe[title="Advertisement"]') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+    const srcDoc = iframe.getAttribute('srcdoc') || '';
+    expect(srcDoc).toContain('alwingulla.com/284167/tag.min.js');
+    expect(srcDoc).toContain('data-zone="284167"');
+    heartsync.site_settings.monetag_zone_header = '';
+  });
+
+  it('uses the account domain from the Monetag MultiTag snippet for bare zone ids', () => {
+    heartsync.site_settings.monetag_active = true;
+    heartsync.site_settings.monetag_script_code = '<script src="https://alwingulla.com/284167/tag.min.js" data-zone="284167" async data-cfasync="false"></script>';
+    heartsync.site_settings.monetag_zone_header = '555123';
+    const { container } = renderPlacement();
+    act(() => { screen.getByTestId('grant').click(); });
+    const srcDoc = (container.querySelector('iframe[title="Advertisement"]') as HTMLIFrameElement)?.getAttribute('srcdoc') || '';
+    expect(srcDoc).toContain('alwingulla.com/555123/tag.min.js');
+    heartsync.site_settings.monetag_zone_header = '';
+  });
+
+  it('suppresses the Monetag banner when the monetag_active master switch is off', () => {
+    heartsync.site_settings.monetag_active = false;
+    heartsync.site_settings.monetag_zone_header = '284167';
+    const { container } = renderPlacement();
+    act(() => { screen.getByTestId('grant').click(); });
+    expect(container.querySelector('iframe[title="Advertisement"]')).toBeNull();
+    heartsync.site_settings.monetag_zone_header = '';
   });
 });

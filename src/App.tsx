@@ -24,7 +24,7 @@ import SubscriptionPage from './components/SubscriptionPage';
 import ArticleBodyWithInserts from './components/ArticleBodyWithInserts';
 import ArticleTTS from './components/ArticleTTS';
 import OfflineReaderBanner from './components/OfflineReaderBanner';
-import { AdPlacement } from './components/AdPlacement';
+import { AdPlacement, AdsterraDirectLink } from './components/AdPlacement';
 import { AdNetworkScripts } from './components/AdNetworkScripts';
 import { heartsync, getAuthors } from './store';
 import { ADS_SUSPEND_EVENT, ADS_RESUME_EVENT } from './utils/adminArea';
@@ -1499,7 +1499,16 @@ export default function App() {
           lang={lang}
           setLang={setLang}
         />
-      )}
+        )}
+
+        {/* Header leaderboard ad slot (728x90 class) - desktop only; the
+            admin console has always advertised this spot, but it was never
+            mounted. Hidden on mobile where a 728-wide unit cannot fit. */}
+        {currentTab !== 'admin' && (
+          <div className="hidden md:block">
+            <AdPlacement slot="header" />
+          </div>
+        )}
 
       {/* Floating alert notification toast */}
       <AnimatePresence>
@@ -5759,7 +5768,11 @@ export default function App() {
 
           {/* Footer Ad Banner (Google AdSense)  - never on admin/auth/error views */}
           {['admin', 'login', 'error', 'access-denied'].every((t) => t !== currentTab) && (
-            <AdPlacement slot="footer" lazy />
+            <>
+              <AdPlacement slot="footer" lazy />
+              {/* Adsterra Direct Link / Smartlink (labelled sponsored link) */}
+              <AdsterraDirectLink />
+            </>
           )}
         </>
       )}

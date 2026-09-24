@@ -101,6 +101,13 @@ function ensureAdsenseLibrary(publisherId: string): void {
 interface AdsterraUnitRef {
   key: string;
   domain: string;
+  /** Banner/native-banner dimensions pasted inside the snippet's atOptions.
+   *  Adsterra issues native banners in many sizes (160x300, 160x600, 320x50,
+   *  468x60, 728x90, 300x250...) - when the admin pastes the whole snippet we
+   *  honor ITS dimensions instead of forcing the slot default, so ANY
+   *  Adsterra banner or native-banner unit renders at its native size. */
+  width?: number;
+  height?: number;
 }
 
 const ADSTERRA_DEFAULT_DOMAIN = 'www.highperformanceformat.com';
@@ -149,12 +156,63 @@ function normalizeAdsterraUnit(raw: string): AdsterraUnitRef | null {
   if (!key) return null;
   const domMatch = v.match(new RegExp(`https?://(?:www\.)?(${ADSTERRA_BANNER_DOMAINS.source})/${key}/invoke\.js`, 'i'));
   const domain = domMatch ? `www.${domMatch[1].toLowerCase().replace(/^www\./, '')}` : ADSTERRA_DEFAULT_DOMAIN;
-  return { key, domain };
+  const h = v.match(/['"]height['"]\s*:\s*(\d{2,4})\b/i);
+  const w = v.match(/['"]width['"]\s*:\s*(\d{2,4})\b/i);
+  const dims =
+    h && w && +h[1] >= 50 && +h[1] <= 1200 && +w[1] >= 120 && +w[1] <= 1600
+      ? { width: +w[1], height: +h[1] }
+      : undefined;
+  return { key, domain, ...dims };
 }
 
-/** Adsterra's documented native-banner snippet, isolated in a sandboxed iframe. */
+/**
+ * Monetag per-slot tag (Native Banner zones). Monetag zones of type Native
+ * Banner (and Interstitial) are VISIBLE, in-content display units - unlike
+ * the MultiTag zone, whose formats (popunder, vignette, in-page push) are
+ * non-display by design. The zone tag is a single script:
+ *   <script src="https://<account-domain>/<zone>/tag.min.js" data-zone="<zone>" async data-cfasync="false"></script>
+ * Admins may paste that whole snippet or just the zone id; the account's
+ * serving domain is taken from the configured MultiTag loader/snippet so a
+ * bare zone id alone is enough.
+ */
+interface MonetagTagRef {
+  src: string;
+  zone: string;
+}
+
+const MONETAG_DEFAULT_DOMAIN = 'alwingulla.com';
+
+function monetagAccountDomain(): string {
+  const loader = str(settings().monetag_loader_url);
+  const fromLoader = loader.match(/^https?:\/\/([a-z0-9.-]+\.[a-z]+)/i);
+  if (fromLoader) return fromLoader[1].toLowerCase();
+  const snippet = str(settings().monetag_script_code);
+  const fromSnippet = snippet.match(/https?:\/\/([a-z0-9.-]+\.[a-z]+)\/[a-z0-9._-]+\/[a-z0-9._-]+\.js/i);
+  if (fromSnippet) return fromSnippet[1].toLowerCase();
+  return MONETAG_DEFAULT_DOMAIN;
+}
+
+function normalizeMonetagTag(raw: string): MonetagTagRef | null {
+  const v = raw.trim();
+  if (!v) return null;
+  const srcMatch = v.match(/https?:\/\/[^"'\s\\]+\/tag\.min\.js/i);
+  const zoneMatch = v.match(/data-zone=["']?(\d{4,12})/i) || v.match(/\/(\d{4,12})\/tag\.min\.js/i);
+  if (srcMatch) {
+    // Extract the account domain so the admin can see it in the health table.
+    return { src: srcMatch[0], zone: (zoneMatch?.[1] || '').trim() };
+  }
+  if (/^\d{4,12}$/.test(v)) {
+    return { src: `https://${monetagAccountDomain()}/${v}/tag.min.js`, zone: v };
+  }
+  return null;
+}
+
+/** Adsterra banner / native-banner snippet, isolated in a sandboxed iframe.
+ *  Renders at the pasted snippet's own size when it carries one (native
+ *  banners come in 160x300, 160x600, 320x50, 468x60, 728x90, 300x250...),
+ *  otherwise at the slot's default display-banner size. */
 const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
-  const dims = ADSTERRA_FORMAT[slot];
+  const fallback = ADSTERRA_FORMAT[slot];
   // The unit key may live in the key field OR inside the URL field (when the
   // admin pasted the full invoke.js URL). Prefer an explicit key field.
   const unit =
@@ -163,9 +221,16 @@ const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
   if (!unit) return null;
   const { key } = unit;
   const domain = adsterraDomainFromUrlField(str(settings()[`adsterra_url_${slot}`])) || unit.domain;
+  // atOptions 'format' must be the literal banner size Adsterra issued for
+  // the unit (e.g. 'iframe' for native banners) - when the admin pasted a
+  // full snippet we repeat ITS exact format string, else the slot default.
+  const pastedFormat = str(settings()[`adsterra_key_${slot}`]).match(/['"]format['"]\s*:\s*['"]([^'"]+)['"]/i)?.[1];
+  const width = unit.width || fallback.width;
+  const height = unit.height || fallback.height;
+  const format = pastedFormat || `${width}x${height}`;
   const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;display:flex;justify-content:center;align-items:flex-start;overflow:hidden}</style></head><body>
 <script type="text/javascript">
-	atOptions = { 'key' : '${key}', 'format' : '${dims.format}', 'height' : ${dims.height}, 'width' : ${dims.width}, 'params' : {} };
+	atOptions = { 'key' : '${key}', 'format' : '${format}', 'height' : ${height}, 'width' : ${width}, 'params' : {} };
 </script>
 <script type="text/javascript" src="//${domain}/${key}/invoke.js"></script>
 </body></html>`;
@@ -173,10 +238,62 @@ const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
     <iframe
       title="Advertisement"
       srcDoc={srcDoc}
-      style={{ border: 0, width: '100%', maxWidth: dims.width, height: dims.height }}
+      style={{ border: 0, width: '100%', maxWidth: width, height }}
       scrolling="no"
       sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
     />
+  );
+};
+
+/**
+ * Monetag Native Banner zone tag, isolated in a sandboxed iframe so it stays
+ * inside the slot it was placed in. Visible display unit (unlike the
+ * site-wide MultiTag). Zone configured per slot via monetag_zone_<slot>.
+ */
+const MonetagBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
+  const tag = normalizeMonetagTag(str(settings()[`monetag_zone_${slot}`]));
+  if (!tag) return null;
+  const fallback = ADSTERRA_FORMAT[slot];
+  const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;display:flex;justify-content:center;align-items:flex-start;overflow:hidden}</style></head><body>
+<script type="text/javascript" src="${tag.src}" data-zone="${tag.zone}" async data-cfasync="false"></script>
+</body></html>`;
+  return (
+    <iframe
+      title="Advertisement"
+      srcDoc={srcDoc}
+      style={{ border: 0, width: '100%', maxWidth: fallback.width, height: fallback.height, minHeight: 90 }}
+      scrolling="no"
+      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+    />
+  );
+};
+
+/**
+ * Adsterra Direct Link / Smartlink unit. A Direct Link is not a script - it
+ * is a plain URL from the dashboard ("Websites > Ad Units > Direct Link")
+ * that earns per click. Rendered as a clearly labelled, rel=sponsored text
+ * link under the footer ad slot; gated on the Adsterra master switch,
+ * marketing consent, and a configured URL.
+ */
+export const AdsterraDirectLink: React.FC = () => {
+  const { hasConsented, preferences } = useCookieConsent();
+  const marketingConsent = !!((preferences as unknown as Record<string, unknown> | undefined)?.marketing);
+  const s = settings();
+  const url = str(s.adsterra_direct_link_url);
+  const label = str(s.adsterra_direct_link_label) || 'Sponsored: check out this offer';
+  if (!url || s.adsterra_active === false || !hasConsented || !marketingConsent) return null;
+  if (!/^https?:\/\//i.test(url)) return null;
+  return (
+    <div className="flex justify-center py-1 select-none" data-ad-slot-family="direct_link" aria-label="Advertisement">
+      <a
+        href={url}
+        target="_blank"
+        rel="sponsored noopener noreferrer"
+        className="text-[10px] text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 underline underline-offset-2"
+      >
+        {label}
+      </a>
+    </div>
   );
 };
 
@@ -226,7 +343,9 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
     header: 'banner_header_enabled',
     sidebar: 'banner_sidebar_enabled',
     footer: 'banner_footer_enabled',
-    in_article: 'banner_in_article_enabled'
+    in_article: 'banner_in_article_enabled',
+    homepage: 'banner_homepage_enabled',
+    article_bottom: 'banner_article_bottom_enabled'
   };
   void settingsVersion;
   const toggle = toggleField[slot];
@@ -273,9 +392,15 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
   const dims = SLOT_DIMENSIONS[slot];
 
   if (!adsenseConfigured) {
-    // No AdSense config for this slot  - Adsterra banner if configured, else a
-    // visible, labelled reserved ad space (crawlable, no layout shift).
+    // No AdSense config for this slot  - provider chain per slot:
+    // Adsterra banner/native banner -> Monetag native banner -> reserved.
+    // Every network honors its master switch; everything is consent-gated.
     const fmt = ADSTERRA_FORMAT[slot];
+    const adsterraMasterOn = settings().adsterra_active !== false;
+    const monetagMasterOn = settings().monetag_active !== false;
+    const monetagZone = normalizeMonetagTag(str(settings()[`monetag_zone_${slot}`]));
+    const showAdsterra = adsterraKey && adsterraMasterOn && hasConsented;
+    const showMonetag = !!monetagZone && monetagMasterOn && hasConsented;
     return (
       <div
         ref={ref}
@@ -286,15 +411,17 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
       >
         <span className="text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-600 select-none mb-1">{dims.label}</span>
         {inView
-          ? (adsterraKey && hasConsented
+          ? (showAdsterra
               ? <AdsterraBanner slot={slot} />
-              : <div
-                  className="flex items-center justify-center rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 text-[10px] text-zinc-300 dark:text-zinc-600 select-none"
-                  style={{ width: fmt.width, height: fmt.height }}
-                  data-ad-slot-reserved="true"
-                >
-                  Reserved ad space
-                </div>)
+              : showMonetag
+                ? <MonetagBanner slot={slot} />
+                : <div
+                    className="flex items-center justify-center rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 text-[10px] text-zinc-300 dark:text-zinc-600 select-none"
+                    style={{ width: fmt.width, height: fmt.height }}
+                    data-ad-slot-reserved="true"
+                  >
+                    Reserved ad space
+                  </div>)
           : <div style={{ width: fmt.width, height: fmt.height }} />}
       </div>
     );
