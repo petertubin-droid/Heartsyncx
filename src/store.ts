@@ -2702,12 +2702,26 @@ export class HeartsyncStore {
           merged.slug = updates.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         }
         merged = expandArticleContent(merged);
-        finalUpdates = {
-          ...finalUpdates,
-          content: merged.content,
-          read_time: merged.read_time,
-          slug: merged.slug
-        };
+        // SECURITY FIX (2026-09-24): posts loaded from the list projection
+        // have no body in memory (content is fetched per-article on the
+        // article page). Sending `content: ''` on an unrelated edit wiped
+        // the real body in the database. Only sync content when the edit
+        // actually supplied one, or the in-memory post genuinely holds a
+        // body (e.g. a fresh addPost or a fully hydrated article).
+        if (updates.content !== undefined || (p.content && String(p.content).trim().length > 0)) {
+          finalUpdates = {
+            ...finalUpdates,
+            content: merged.content,
+            read_time: merged.read_time,
+            slug: merged.slug
+          };
+        } else {
+          finalUpdates = {
+            ...finalUpdates,
+            read_time: merged.read_time,
+            slug: merged.slug
+          };
+        }
         return merged;
       }
       return p;

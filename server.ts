@@ -3735,7 +3735,6 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
             title: post.title,
             slug: post.slug || post.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
             excerpt: post.excerpt || '',
-            content: post.content || '',
             status: post.status || 'draft',
             publish_date: post.publish_date || new Date().toISOString(),
             featured_image: post.featured_image || '',
@@ -3748,6 +3747,13 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
             is_premium: post.is_premium ?? false,
             price: Number(post.price) || 0,
             in_article_inserts: post.in_article_inserts || null
+            // SECURITY FIX (2026-09-24): `content` is deliberately NOT synced
+            // here. Boot state carries list columns only (bodies are fetched
+            // per-article via GET /api/posts/:slug), so posts in the client
+            // state have no body — upserting `content: post.content || ''`
+            // wiped every article body in the database on the first admin
+            // save after phase-5. Bodies are managed exclusively through the
+            // dedicated addPost/updatePost paths, which DO carry content.
           }))
         );
       }
