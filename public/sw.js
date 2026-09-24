@@ -47,7 +47,13 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (!Object.values(CACHE_NAMES).includes(cacheName)) {
-
+            // Article-recovery guard (2026-09-24): caches from previous SW
+            // versions may hold the only surviving copies of article bodies
+            // that were wiped from the database. Never delete an articles
+            // cache here - /recover.html harvests them to restore the DB.
+            if (cacheName.startsWith('heartsync-articles-')) {
+              return null;
+            }
             return caches.delete(cacheName);
           }
         })

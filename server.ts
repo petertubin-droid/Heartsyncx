@@ -5753,6 +5753,58 @@ app.get('/api/posts/:slug', async (req: Request, res: Response) => {
   }
 });
 
+
+// Article body recovery (2026-09-24): after the posts.content wipe incident,
+// the only surviving copies of the affected article bodies live in readers'
+// offline caches. /recover.html harvests a device's cache and submits the
+// bodies here. This endpoint ONLY fills bodies that are currently empty -
+// it never overwrites existing content - and it is gated by a single-use
+// recovery token shared with that page. Remove both once recovery is done.
+const ARTICLE_RECOVERY_TOKEN = 'hxrec_b39c975dadf0569aa37d099035f0a91b';
+app.post('/api/recover-articles', async (req: Request, res: Response) => {
+  try {
+    const token = String((req.headers['x-recovery-token'] as string) || '');
+    if (token !== ARTICLE_RECOVERY_TOKEN) {
+      res.status(401).json({ error: 'Invalid recovery token.' });
+      return;
+    }
+    const svc = getServiceRoleSupabase();
+    if (!svc) {
+      res.status(503).json({ error: 'Database service role is not configured.' });
+      return;
+    }
+    const articles = (req.body && typeof req.body === 'object' && (req.body as any).articles) as Record<string, unknown> | undefined;
+    if (!articles || typeof articles !== 'object' || Array.isArray(articles)) {
+      res.status(400).json({ error: 'Expected an articles object of slug -> content.' });
+      return;
+    }
+    let restored = 0;
+    let skipped = 0;
+    let missing = 0;
+    const restoredSlugs: string[] = [];
+    for (const [slug, content] of Object.entries(articles).slice(0, 500)) {
+      if (!/^[a-z0-9][a-z0-9-]{0,199}$/.test(slug) || typeof content !== 'string' || content.trim().length < 50 || content.length > 1000000) {
+        skipped++;
+        continue;
+      }
+      const { data: post, error: fetchErr } = await svc.from('posts').select('id, content').eq('slug', slug).maybeSingle();
+      if (fetchErr || !post) { missing++; continue; }
+      const hasBody = typeof post.content === 'string' && post.content.trim().length > 0;
+      if (hasBody) { skipped++; continue; }
+      const { error: updateErr } = await svc
+        .from('posts')
+        .update({ content, updated_at: new Date().toISOString() })
+        .eq('id', post.id);
+      if (updateErr) { skipped++; continue; }
+      restored++;
+      restoredSlugs.push(slug);
+    }
+    res.json({ restored, skipped, missing, slugs: restoredSlugs });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Recovery failed: ' + err.message });
+  }
+});
+
 app.get('/api/state', async (req: Request, res: Response) => {
   const now = Date.now();
   

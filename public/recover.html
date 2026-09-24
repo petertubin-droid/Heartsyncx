@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Heartsync — Article Recovery</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #faf7f5; color: #292524; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .card {
+    max-width: 520px; width: 100%; background: #fff; border-radius: 16px;
+    padding: 28px; box-shadow: 0 4px 24px rgba(0,0,0,.08);
+    border: 1px solid #eee6e1;
+  }
+  h1 { font-size: 20px; margin-bottom: 6px; }
+  p.sub { color: #78716c; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+  button {
+    width: 100%; padding: 15px; font-size: 16px; font-weight: 600; color: #fff;
+    background: #e11d48; border: 0; border-radius: 12px; cursor: pointer;
+  }
+  button:disabled { background: #d6d3d1; cursor: not-allowed; }
+  button.secondary { background: #f5f5f4; color: #44403c; margin-top: 10px; display: none; }
+  #status { margin-top: 18px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  #status.ok { color: #15803d; }
+  #status.err { color: #b91c1c; }
+  ul { margin: 10px 0 0 20px; font-size: 13px; color: #57534e; }
+  li { margin-bottom: 4px; word-break: break-all; }
+  .count { font-size: 28px; font-weight: 700; margin: 14px 0; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Article Recovery</h1>
+  <p class="sub">This page reads the offline article copies stored on this device by the Heartsync reader and restores any missing article bodies back to the database. Nothing that already has content will be touched.</p>
+  <div id="count" class="count" style="display:none"></div>
+  <div id="status">Tap the button below — no other action needed.</div>
+  <ul id="list"></ul>
+  <button id="go" onclick="runRecovery()">Scan this device and restore</button>
+  <button id="save" class="secondary" onclick="downloadBackup()">Download backup copy of what was found</button>
+</div>
+<script>
+var found = {};
+
+function note(msg, cls) {
+  var el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+function addSlug(slug, len) {
+  var li = document.createElement('li');
+  li.textContent = slug + '  (' + len.toLocaleString() + ' chars)';
+  document.getElementById('list').appendChild(li);
+}
+
+async function collectPost(p) {
+  if (!p || typeof p !== 'object') return;
+  var slug = typeof p.slug === 'string' ? p.slug : (typeof p.id === 'string' && p.id.indexOf('/') < 0 ? p.id : null);
+  var content = typeof p.content === 'string' ? p.content : null;
+  if (!slug || !content || content.replace(/\s/g, '').length < 100) return;
+  if (!found[slug] || content.length > found[slug].length) {
+    found[slug] = content;
+    addSlug(slug, content.length);
+  }
+}
+
+async function harvest() {
+  if (!('caches' in window)) throw new Error('This browser has no offline cache to read.');
+  var names = await caches.keys();
+  var articleCaches = names.filter(function (n) { return n.indexOf('heartsync-') === 0; });
+  if (!articleCaches.length) throw new Error('No Heartsync offline caches found on this device.');
+  for (var i = 0; i < articleCaches.length; i++) {
+    var cache = await caches.open(articleCaches[i]);
+    var keys = await cache.keys();
+    for (var j = 0; j < keys.length; j++) {
+      try {
+        var res = cache.match(keys[j]);
+        if (!res) continue;
+        var ct = res.headers.get('content-type') || '';
+        if (ct.indexOf('json') < 0) continue;
+        var json = await res.json();
+        if (Array.isArray(json)) { json.forEach(collectPost); }
+        else if (json && Array.isArray(json.posts)) { json.posts.forEach(collectPost); }
+        else if (json && json.post) { collectPost(json.post); }
+        else { collectPost(json); }
+      } catch (e) { /* skip unreadable entries */ }
+    }
+  }
+}
+
+async function runRecovery() {
+  var btn = document.getElementById('go');
+  btn.disabled = true;
+  try {
+    note('Scanning this device\u2026');
+    found = {};
+    document.getElementById('list').innerHTML = '';
+    await harvest();
+    var slugs = Object.keys(found);
+    var countEl = document.getElementById('count');
+    countEl.style.display = 'block';
+    countEl.textContent = slugs.length + ' article' + (slugs.length === 1 ? '' : 's') + ' found';
+    if (!slugs.length) {
+      note('No article bodies were found in this device\u2019s offline storage. This device may not be the one that read them, or the cache was refreshed after the data loss.', 'err');
+      btn.disabled = false;
+      return;
+    }
+    document.getElementById('save').style.display = 'block';
+    note('Restoring ' + slugs.length + ' article' + (slugs.length === 1 ? '' : 's') + ' to the database\u2026');
+    var resp = await fetch('/api/recover-articles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-recovery-token': 'hxrec_b39c975dadf0569aa37d099035f0a91b' },
+      body: JSON.stringify({ articles: found })
+    });
+    var data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Server rejected the recovery.');
+    note('Done.\nRestored: ' + (data.restored || 0) + ' article' + ((data.restored || 0) === 1 ? '' : 's') +
+      '\nAlready had content (untouched): ' + (data.skipped || 0) +
+      '\nSlugs no longer on the site: ' + (data.missing || 0), 'ok');
+  } catch (err) {
+    note('Recovery failed: ' + err.message, 'err');
+    btn.disabled = false;
+  }
+}
+
+function downloadBackup() {
+  var blob = new Blob([JSON.stringify(found, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'heartsync-article-bodies.json';
+  a.click();
+}
+</script>
+</body>
+</html>
