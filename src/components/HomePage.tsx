@@ -16,6 +16,7 @@ import {
 
 export interface HomePageProps {
   currentTab: string;
+  theme: 'light' | 'dark';
   siteSettings: any;
   categories: any[];
   categoriesState: Category[];
@@ -35,7 +36,8 @@ export interface HomePageProps {
 }
 
 export default function HomePage({
-  currentTab, siteSettings, categories, categoriesState, publishedArticles, navigateTo, showToast,
+  currentTab,
+  theme, siteSettings, categories, categoriesState, publishedArticles, navigateTo, showToast,
   homeNewsletterEmail, setHomeNewsletterEmail, homeNewsletterSubscribed, setHomeNewsletterSubscribed,
   quizStep, setQuizStep, quizAnswers, setQuizAnswers, quizOutcome, setQuizOutcome
 }: HomePageProps) {
@@ -158,16 +160,24 @@ export default function HomePage({
                       const finalImageUrl = sec.imageUrl && !sec.imageUrl.includes("unsplash") ? sec.imageUrl : (siteSettings?.hero_settings?.image_url || sec.imageUrl || "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=800");
 
                       const heroSettings = (siteSettings?.hero_settings || {}) as any;
+                      // DARK MODE FIX: the admin hero background is configured for
+                      // light mode (default #FAF5F5 / white gradients). Applying it
+                      // in dark mode kept a near-white surface under white hero text,
+                      // making the hero unreadable. In dark mode the section keeps
+                      // its own dark surface classes and the text uses the dark:
+                      // color utilities, so custom light-mode-only colors are
+                      // ignored rather than layering light-on-light.
+                      const isDarkHero = theme === 'dark';
                       const bgType = heroSettings.bg_type || 'solid';
                       const heroBgStyle: React.CSSProperties = {};
                       
                       if (bgType === 'solid') {
-                        heroBgStyle.backgroundColor = heroSettings.bg_color || '#FAF5F5';
+                        if (!isDarkHero) heroBgStyle.backgroundColor = heroSettings.bg_color || '#FAF5F5';
                       } else if (bgType === 'gradient') {
                         const start = heroSettings.bg_gradient_start || heroSettings.bg_color || '#ffffff';
                         const end = heroSettings.bg_gradient_end || '#ffe4e6';
                         const angle = heroSettings.bg_gradient_angle || '135deg';
-                        heroBgStyle.backgroundImage = `linear-gradient(${angle}, ${start}, ${end})`;
+                        if (!isDarkHero) heroBgStyle.backgroundImage = `linear-gradient(${angle}, ${start}, ${end})`;
                       } else if (bgType === 'image' || bgType === 'overlay') {
                         if (heroSettings.bg_image_url) {
                           heroBgStyle.backgroundImage = `url(${heroSettings.bg_image_url})`;
@@ -199,22 +209,24 @@ export default function HomePage({
                           if (heroSettings.bg_parallax) {
                             heroBgStyle.backgroundAttachment = 'fixed';
                           }
-                        } else {
+                        } else if (!isDarkHero) {
                           heroBgStyle.backgroundColor = heroSettings.bg_color || '#FAF5F5';
                         }
                       }
 
                       // Adjust custom coloring details from the theme settings
-                      const textOverrideStyle: React.CSSProperties = {
+                      // (light mode only - see the DARK MODE FIX note above; in
+                      // dark mode the dark: utilities below own the colors).
+                      const textOverrideStyle: React.CSSProperties = isDarkHero ? {} : {
                         color: heroSettings.text_color || undefined
                       };
-                      const headingStyle: React.CSSProperties = {
+                      const headingStyle: React.CSSProperties = isDarkHero ? {} : {
                         color: heroSettings.heading_color || heroSettings.text_color || undefined
                       };
-                      const subheadingStyle: React.CSSProperties = {
+                      const subheadingStyle: React.CSSProperties = isDarkHero ? {} : {
                         color: heroSettings.subheading_color || heroSettings.text_color || undefined
                       };
-                      const badgeStyle: React.CSSProperties = {
+                      const badgeStyle: React.CSSProperties = isDarkHero ? {} : {
                         color: heroSettings.badge_color || undefined,
                         backgroundColor: heroSettings.badge_bg_color || undefined
                       };
@@ -231,7 +243,7 @@ export default function HomePage({
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               transition={{ duration: 0.4, ease: 'easeOut' }}
-                              className="premium-card relative overflow-hidden rounded-[2.5rem] border border-rose-100/20 dark:border-rose-500/25 dark:shadow-[0_0_60px_-14px_rgba(244,63,94,0.28)] p-5 sm:p-12 lg:p-16 transition-all duration-300 shadow-sm"
+                              className="premium-card relative overflow-hidden rounded-[2.5rem] border border-rose-100/20 dark:border-rose-500/25 dark:bg-zinc-950 dark:shadow-[0_0_60px_-14px_rgba(244,63,94,0.28)] p-5 sm:p-12 lg:p-16 transition-all duration-300 shadow-sm"
                               style={{
                                 ...heroBgStyle,
                                 ...textOverrideStyle

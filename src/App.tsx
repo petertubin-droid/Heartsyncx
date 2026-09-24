@@ -30,7 +30,7 @@ import { ADS_SUSPEND_EVENT, ADS_RESUME_EVENT } from './utils/adminArea';
 import { Post, Category, Author, SiteSettings, Topic } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
-import { Language, getSavedLanguage, getTranslation } from './utils/i18n';
+import { Language, getSavedLanguage, getTranslation, isRTL, getLanguageInfo } from './utils/i18n';
 import { getArticleSeoData } from './utils/seoArticleData';
 import { clearUnauthorizedStorageKeys } from './utils/storageAudit';
 import { 
@@ -78,6 +78,17 @@ export default function App() {
   });
 
   // Load language settings on mount & clean up any device-specific caching/layout storage
+  // Internationalization: mirror the chosen language onto the document
+  // (correct screen-reader pronunciation) and flip direction for RTL
+  // scripts (Arabic, Hebrew, Persian, Urdu).
+  useEffect(() => {
+    try {
+      document.documentElement.lang = lang;
+      document.documentElement.dir = isRTL(lang) ? 'rtl' : 'ltr';
+      document.documentElement.title = document.title; // no-op, keeps lints honest
+    } catch (_) {}
+  }, [lang]);
+
   useEffect(() => {
     setLang(getSavedLanguage());
 
@@ -1609,6 +1620,7 @@ export default function App() {
             {currentTab === 'home' && (
               <HomePage
                 currentTab={currentTab}
+                theme={frontendTheme}
                 siteSettings={siteSettings}
                 categories={categories}
                 categoriesState={categoriesState}

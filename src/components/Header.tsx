@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import HamburgerButton from './HamburgerButton';
 import MobileMenu from './MobileMenu';
 import NavigationLinks from './NavigationLinks';
-import { Language, getTranslation, saveLanguage, getEnabledLanguages } from '../utils/i18n';
+import { Language, getTranslation, saveLanguage, getEnabledLanguages, getLanguageInfo } from '../utils/i18n';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -503,7 +503,7 @@ export default function Header({
                 <form onSubmit={handleSearchSubmit} className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center bg-zinc-50 dark:bg-zinc-805 border border-zinc-200 dark:border-zinc-700 dark:border-rose-500/25 dark:shadow-[0_0_12px_rgba(244,63,94,0.15)] rounded-full px-2.5 py-0.5 w-48 shadow-sm transition-all duration-300">
                   <input 
                     type="text" 
-                    placeholder="Search..." 
+                    placeholder={getTranslation('searchPlaceholder', lang)} 
                     value={tempSearch}
                     onChange={(e) => setTempSearch(e.target.value)}
                     autoFocus
@@ -526,6 +526,31 @@ export default function Header({
                 </button>
               )}
             </div>
+
+            {/* Language Switcher - worldwide audience, see i18n.ts */}
+            <Select
+              value={lang}
+              onValueChange={(v) => {
+                saveLanguage(v as Language);
+                setLang(v as Language);
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                title="Language"
+                className="h-8 w-auto gap-1 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 text-[10px] font-sans font-bold text-zinc-605 dark:text-zinc-405 hover:bg-rose-50/50 dark:hover:bg-zinc-850/50 hover:text-[#CE2B5E] transition-colors"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                {getEnabledLanguages().map((code) => (
+                  <SelectItem key={code} value={code} className="text-xs">
+                    {getLanguageInfo(code)?.native || code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {/* Theme Toggle */}
             <Button
