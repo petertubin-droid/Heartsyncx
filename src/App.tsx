@@ -85,7 +85,6 @@ export default function App() {
     try {
       document.documentElement.lang = lang;
       document.documentElement.dir = isRTL(lang) ? 'rtl' : 'ltr';
-      document.documentElement.title = document.title; // no-op, keeps lints honest
     } catch (_) {}
   }, [lang]);
 
@@ -277,14 +276,6 @@ export default function App() {
 
   const activeArticleId = activeArticleState?.id || '';
 
-  // Single language site (English)
-  useEffect(() => {
-    setTranslatedPosts([]);
-    setTranslatedCategories([]);
-    setTranslatedSiteSettings(null);
-    setIsTranslating(false);
-  }, []);
-
   // Read-only shadowing variables for Reader mode dynamic localization
   const isAdminView = currentTab === 'login' || currentTab === 'admin';
   const siteSettings = (lang === 'en' || isAdminView) ? siteSettingsState : (translatedSiteSettings || siteSettingsState);
@@ -295,6 +286,82 @@ export default function App() {
     if (lang === 'en' || isAdminView) return activeArticleState;
     return translatedPosts.find(p => p.id === activeArticleState.id) || activeArticleState;
   }, [activeArticleState, lang, translatedPosts, isAdminView]);
+
+  // LIVE CONTENT TRANSLATION (worldwide i18n, src/utils/i18n.ts):
+  // when the visitor picks a non-English language, the server translates
+  // the published catalog (titles/excerpts/category names/key settings,
+  // and the open article's full body) and this state shadows the English
+  // originals. Nothing is sent FROM the client except the language code
+  // and article id - the server only ever translates DB-published text,
+  // so the endpoints cannot be abused as a generic translation proxy.
+  // If translation fails, the arrays stay empty and English originals
+  // keep rendering (honest degradation).
+  const translatingCountRef = useRef(0);
+
+  useEffect(() => {
+    if (lang === 'en' || isAdminView) {
+      setTranslatedPosts([]);
+      setTranslatedCategories([]);
+      setTranslatedSiteSettings(null);
+      setIsTranslating(false);
+      return;
+    }
+
+    let cancelled = false;
+    const targetLang = lang;
+
+    const run = async () => {
+      translatingCountRef.current += 1;
+      setIsTranslating(true);
+      try {
+        // 1. Light content: catalog titles/excerpts, categories, settings.
+        const res = await fetch('/api/translate/site-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetLang })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data) return;
+
+        const postFields: Record<string, any> = data.posts || {};
+        setTranslatedPosts(postsState.map((p: any) => ({ ...p, ...(postFields[p.id] || {}) })));
+        const catFields: Record<string, any> = data.categories || {};
+        setTranslatedCategories(categoriesState.map((c: any) => ({ ...c, ...(catFields[c.id] || {}) })));
+        const settingsFields = (data.settings && Object.keys(data.settings).length > 0) ? data.settings : null;
+        setTranslatedSiteSettings(settingsFields ? { ...siteSettingsState, ...settingsFields } : null);
+
+        // 2. Full body of the open article, if one is being read.
+        if (activeArticleId) {
+          const res2 = await fetch('/api/translate/article', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ articleId: activeArticleId, targetLang })
+          });
+          if (!res2.ok) return;
+          const data2 = await res2.json();
+          if (cancelled || !data2 || data2.id !== activeArticleId) return;
+          setTranslatedPosts((prev: Post[]) => prev.map((p) =>
+            p.id === data2.id ? { ...p, ...(data2.translated || {}) } : p
+          ));
+        }
+      } catch (err) {
+        // Network/API failure: keep English originals (arrays may be empty).
+      } finally {
+        translatingCountRef.current -= 1;
+        if (!cancelled && translatingCountRef.current <= 0) {
+          setIsTranslating(false);
+        }
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+    // postsKey/categoriesKey/settingsKey are engagement-metric-stable
+    // (id:title serializations), so likes/views/bookmarks never re-trigger
+    // a translation - only real content or language changes do.
+  }, [lang, isAdminView, postsKey, categoriesKey, settingsKey, activeArticleId, postsState, categoriesState, siteSettingsState]);
+
   // The hero already shows the title; if the article's own markdown
   // opens with a "# <same title>" line, strip it so the body doesn't
   // repeat it as a second, unstyled heading right before the first

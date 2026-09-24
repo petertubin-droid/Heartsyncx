@@ -2402,6 +2402,224 @@ ${jsonStr}`;
 });
 
 // --------------------------------------------------------
+// PUBLIC CONTENT TRANSLATION (worldwide i18n - src/utils/i18n.ts)
+// --------------------------------------------------------
+// Visitors switching to a non-English language get articles, categories
+// and key site chrome translated on the fly. Abuse-proof by
+// construction: the client only sends a language code (plus, for the
+// article route, an article id) - every translated string is fetched
+// from the live published DB server-side, never taken from the request
+// body, so this endpoint can never be used as a free generic
+// translation proxy. Results are cached in memory per language
+// (12h TTL). When Gemini is unconfigured, the localizeObj helper
+// dictionary degrades honestly (English surfaces stay English).
+
+// Keep in sync with LANGUAGE_CODES in src/utils/i18n.ts
+const TRANSLATABLE_LANGS = [
+  'en','es','de','fr','it','pt','ar','zh','ja','ru','tr','hi','yo','ig','ha','sw',
+  'nl','pl','ko','vi','uk','sv','el','he','th','id','fa','no','fi','da','cs','bn','ur'
+];
+
+const isTranslationLang = (lang: any): boolean =>
+  typeof lang === 'string' && lang !== 'en' && (TRANSLATABLE_LANGS as string[]).includes(lang);
+
+const TRANSLATION_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12h: titles/categories rarely change
+const MAX_LIST_TRANSLATION_POSTS = 80; // cap Gemini payload + cost for very large catalogs
+const TRANSLATABLE_SETTINGS_KEYS = [
+  'site_description', 'newsletter_welcome_msg', 'related_block_title',
+  'homepage_topics_heading', 'homepage_topics_subheading', 'homepage_trending_title'
+];
+
+const siteContentTranslationCache = new Map<string, { expires: number, data: any }>();
+const articleTranslationCache = new Map<string, { expires: number, data: any }>();
+
+// Translate a JSON manifest (string leaves only) via Gemini, preserving
+// the exact JSON shape. Returns null when Gemini is unconfigured or the
+// call fails - callers then fall back to the local dictionary.
+async function translateManifestViaGemini(manifest: any, targetLang: string): Promise<any | null> {
+  const ai = await getGeminiClient();
+  if (!ai) return null;
+  try {
+    const prompt = `You are a professional linguist and relationships-psychology editor.
+Translate the string values of the following JSON into the target language "${targetLang}".
+Keep the empathetic, expert counseling tone. Preserve the exact JSON structure and keys -
+do not add, rename or omit keys. Preserve all Markdown formatting (titles, bolding,
+lists, line breaks) exactly. Translate only natural-language string values; leave
+URLs, codes and brand names (like "Heartsync") untouched.
+Output ONLY the translated JSON.
+Input:
+${JSON.stringify(manifest)}`;
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: { temperature: 0.25, responseMimeType: 'application/json' }
+    });
+    const parsed = JSON.parse(response.text || '');
+    return parsed;
+  } catch (error: any) {
+    console.warn('Heartsync content translation AI error:', error);
+    return null;
+  }
+}
+
+const nonEmpty = (v: any): v is string => typeof v === 'string' && v.trim().length > 0;
+
+// POST /api/translate/site-content  { targetLang }
+// Returns { posts: {id: {title, excerpt, seo_title, seo_description}},
+//           categories: {id: {name, description}},
+//           settings: {key: value} }
+app.post('/api/translate/site-content', rateLimiter(10, 60 * 1000), async (req: Request, res: Response) => {
+  const { targetLang } = req.body || {};
+  if (!isTranslationLang(targetLang)) {
+    res.status(400).json({ error: 'A supported non-English targetLang is required.' });
+    return;
+  }
+
+  const cacheKey = `site-content:${targetLang}`;
+  const cached = siteContentTranslationCache.get(cacheKey);
+  if (cached && Date.now() < cached.expires) {
+    res.json(cached.data);
+    return;
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    res.status(503).json({ error: 'Storage is not configured.' });
+    return;
+  }
+
+  try {
+    const [postsRes, categoriesRes, settingsRes] = await Promise.all([
+      supabase.from('posts').select(`${POST_LIST_COLUMNS.join(',')}`).eq('status', 'published').order('publish_date', { ascending: false }).limit(MAX_LIST_TRANSLATION_POSTS),
+      supabase.from('categories').select('id,name,description'),
+      supabase.from('site_settings').select('*').eq('id', 'singleton').maybeSingle()
+    ]);
+
+    if (postsRes.error || categoriesRes.error) {
+      throw new Error(postsRes.error?.message || categoriesRes.error?.message || 'DB read failed');
+    }
+
+    const posts: any[] = postsRes.data || [];
+    const categories: any[] = categoriesRes.data || [];
+    const settings: any = settingsRes.data || {};
+
+    // Manifest: ONLY the whitelisted natural-language fields travel to the
+    // model; ids/slug/colors/images never do.
+    const manifest: any = {
+      posts: posts.map((p: any) => {
+        const entry: any = { id: p.id };
+        if (nonEmpty(p.title)) entry.title = p.title;
+        if (nonEmpty(p.excerpt)) entry.excerpt = p.excerpt;
+        if (nonEmpty(p.seo_title)) entry.seo_title = p.seo_title;
+        if (nonEmpty(p.seo_description)) entry.seo_description = p.seo_description;
+        return entry;
+      }),
+      categories: categories.map((c: any) => {
+        const entry: any = { id: c.id };
+        if (nonEmpty(c.name)) entry.name = c.name;
+        if (nonEmpty(c.description)) entry.description = c.description;
+        return entry;
+      }),
+      settings: {}
+    };
+    for (const key of TRANSLATABLE_SETTINGS_KEYS) {
+      if (nonEmpty(settings[key])) manifest.settings[key] = settings[key];
+    }
+
+    const translated = await translateManifestViaGemini(manifest, targetLang);
+    let data: any;
+    if (translated && Array.isArray(translated.posts) && Array.isArray(translated.categories)) {
+      const keyById = (rows: any[]) => {
+        const out: Record<string, any> = {};
+        for (const row of rows) {
+          if (row && typeof row.id === 'string') {
+            const { id, ...fields } = row;
+            out[id] = fields;
+          }
+        }
+        return out;
+      };
+      data = {
+        posts: keyById(translated.posts),
+        categories: keyById(translated.categories),
+        settings: (translated.settings && typeof translated.settings === 'object') ? translated.settings : {}
+      };
+    } else {
+      // Honest degradation: local helper dictionary (partial coverage).
+      data = {
+        posts: Object.fromEntries(posts.map((p: any) => [p.id, localizeObj({
+          ...(nonEmpty(p.title) ? { title: p.title } : {}),
+          ...(nonEmpty(p.excerpt) ? { excerpt: p.excerpt } : {})
+        }, targetLang)])),
+        categories: Object.fromEntries(categories.map((c: any) => [c.id, localizeObj({
+          ...(nonEmpty(c.name) ? { name: c.name } : {}),
+          ...(nonEmpty(c.description) ? { description: c.description } : {})
+        }, targetLang)])),
+        settings: localizeObj(manifest.settings, targetLang)
+      };
+    }
+
+    siteContentTranslationCache.set(cacheKey, { expires: Date.now() + TRANSLATION_CACHE_TTL_MS, data });
+    res.json(data);
+  } catch (error: any) {
+    console.warn('Heartsync site-content translation error:', error);
+    res.status(500).json({ error: 'Translation is temporarily unavailable.' });
+  }
+});
+
+// POST /api/translate/article  { articleId, targetLang }
+// Translates ONE published article's body (fetched server-side by id).
+app.post('/api/translate/article', rateLimiter(20, 60 * 1000), async (req: Request, res: Response) => {
+  const { articleId, targetLang } = req.body || {};
+  if (!isTranslationLang(targetLang) || typeof articleId !== 'string' || !articleId.trim() || articleId.length > 100) {
+    res.status(400).json({ error: 'A published articleId and a supported non-English targetLang are required.' });
+    return;
+  }
+
+  const cacheKey = `article:${articleId}:${targetLang}`;
+  const cached = articleTranslationCache.get(cacheKey);
+  if (cached && Date.now() < cached.expires) {
+    res.json(cached.data);
+    return;
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    res.status(503).json({ error: 'Storage is not configured.' });
+    return;
+  }
+
+  try {
+    const { data: post, error } = await supabase.from('posts')
+      .select('id,title,excerpt,content,seo_title,seo_description,status')
+      .eq('id', articleId)
+      .eq('status', 'published')
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!post) {
+      res.status(404).json({ error: 'Article not found.' });
+      return;
+    }
+
+    const manifest: any = { title: post.title, content: post.content };
+    if (nonEmpty(post.excerpt)) manifest.excerpt = post.excerpt;
+    if (nonEmpty(post.seo_title)) manifest.seo_title = post.seo_title;
+    if (nonEmpty(post.seo_description)) manifest.seo_description = post.seo_description;
+
+    const translated = await translateManifestViaGemini(manifest, targetLang);
+    const data: any = translated && nonEmpty(translated.content)
+      ? { id: post.id, translated }
+      : { id: post.id, translated: localizeObj(manifest, targetLang), fallback: true };
+
+    articleTranslationCache.set(cacheKey, { expires: Date.now() + TRANSLATION_CACHE_TTL_MS, data });
+    res.json(data);
+  } catch (error: any) {
+    console.warn('Heartsync article translation error:', error);
+    res.status(500).json({ error: 'Translation is temporarily unavailable.' });
+  }
+});
+
+// --------------------------------------------------------
 // SECURED TEXT-TO-SPEECH (TTS) PROXY & CACHE (ELEVENLABS)
 // --------------------------------------------------------
 const ttsCache = new Map<string, { base64: string, mimeType: string }>();
