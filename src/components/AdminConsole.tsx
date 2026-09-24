@@ -1176,22 +1176,57 @@ export default function AdminConsole({
   // most once - after the first hydration - so it never clobbers an
   // admin's in-progress unsaved edits later in the session.
   const hasHydratedAdNetworkSettings = React.useRef(false);
+  // Mount-time seeds for every field the resync below self-heals. The resync
+  // replaces a field's state ONLY while it still equals its mount seed -
+  // i.e. the admin has not touched it. A hydration that settles while the
+  // admin is mid-edit (typed but not yet saved) therefore never clobbers
+  // their in-progress value; untouched fields still pick up the true DB row.
+  const adNetworkMountSeeds = React.useRef<Record<string, unknown>>({
+    monetagActive,
+    monetagZoneId,
+    monetagScriptCode,
+    adsterraActive,
+    adsensePubId,
+    adsenseAutoCode,
+    bannerHeaderEnabled,
+    bannerSidebarEnabled,
+    bannerFooterEnabled,
+    bannerInArticleEnabled,
+    bannerHomepageEnabled,
+    bannerArticleBottomEnabled
+  });
   useEffect(() => {
+    const applyIfUntouched = <T,>(current: T, seedKey: string, liveValue: T): T =>
+      current === (adNetworkMountSeeds.current as Record<string, unknown>)[seedKey] ? liveValue : current;
     const resync = () => {
       if (hasHydratedAdNetworkSettings.current) return;
       if (!heartsync.serverStateLoaded) return;
       hasHydratedAdNetworkSettings.current = true;
       const live = heartsync.site_settings as Record<string, unknown>;
-      setMonetagActive((live.monetag_active as boolean) ?? true);
-      setMonetagZoneId((live.monetag_zone_id as string) ?? '');
-      setMonetagScriptCode((live.monetag_script_code as string) ?? '');
-      setAdsterraActive((live.adsterra_active as boolean) ?? true);
-      setAdsensePubId((live.adsense_client_id as string) ?? '');
-      setAdsenseAutoCode(String((live.adsense_active as boolean) ?? true));
-      setBannerHeaderEnabled((live.banner_header_enabled as boolean) ?? true);
-      setBannerSidebarEnabled((live.banner_sidebar_enabled as boolean) ?? true);
-      setBannerFooterEnabled((live.banner_footer_enabled as boolean) ?? true);
-      setBannerInArticleEnabled((live.banner_in_article_enabled as boolean) ?? true);
+      setMonetagActive((cur) => applyIfUntouched(cur, 'monetagActive', (live.monetag_active as boolean) ?? true));
+      setMonetagZoneId((cur) => applyIfUntouched(cur, 'monetagZoneId', (live.monetag_zone_id as string) ?? ''));
+      setMonetagScriptCode((cur) => applyIfUntouched(cur, 'monetagScriptCode', (live.monetag_script_code as string) ?? ''));
+      setAdsterraActive((cur) => applyIfUntouched(cur, 'adsterraActive', (live.adsterra_active as boolean) ?? true));
+      setAdsensePubId((cur) => applyIfUntouched(cur, 'adsensePubId', (live.adsense_client_id as string) ?? ''));
+      setAdsenseAutoCode((cur) => applyIfUntouched(cur, 'adsenseAutoCode', String((live.adsense_active as boolean) ?? true)));
+      setBannerHeaderEnabled((cur) => applyIfUntouched(cur, 'bannerHeaderEnabled', (live.banner_header_enabled as boolean) ?? true));
+      setBannerSidebarEnabled((cur) => applyIfUntouched(cur, 'bannerSidebarEnabled', (live.banner_sidebar_enabled as boolean) ?? true));
+      setBannerFooterEnabled((cur) => applyIfUntouched(cur, 'bannerFooterEnabled', (live.banner_footer_enabled as boolean) ?? true));
+      setBannerInArticleEnabled((cur) => applyIfUntouched(cur, 'bannerInArticleEnabled', (live.banner_in_article_enabled as boolean) ?? true));
+      // These two toggles feed the same "Synchronize All Ad Networks"
+      // submit but were missing from the old resync - a pre-hydration mount
+      // left them frozen on mount defaults, so the master button could
+      // still wipe their stored values on an unrelated ad save.
+      setBannerHomepageEnabled((cur) => applyIfUntouched(
+        cur,
+        'bannerHomepageEnabled',
+        Boolean((live as Record<string, unknown>).banner_homepage_enabled ?? true)
+      ));
+      setBannerArticleBottomEnabled((cur) => applyIfUntouched(
+        cur,
+        'bannerArticleBottomEnabled',
+        Boolean((live as Record<string, unknown>).banner_article_bottom_enabled ?? true)
+      ));
     };
     resync();
     const unsub = heartsync.subscribe(resync);
