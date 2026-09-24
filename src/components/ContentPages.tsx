@@ -83,6 +83,8 @@ export default function ContentPages({
                     <p className="text-xs sm:text-sm text-zinc-400 dark:text-zinc-500 font-sans mt-1.5 max-w-xl leading-relaxed">Expert essays on emotional resilience, attachment, and relationship wellness  - written by clinicians, curated with care.</p>
                   </div>
 
+                  <AdPlacement slot="homepage" className="my-2" lazy />
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {publishedArticles.map(post => (
                       <BlogCard 
@@ -97,6 +99,7 @@ export default function ContentPages({
 
                 <div className="col-span-12 lg:col-span-4 lg:pl-6 border-t lg:border-t-0 lg:border-l border-rose-100/30 dark:border-zinc-850 pt-8 lg:pt-0">
                   {renderSidebar()}
+                  <AdPlacement slot="sidebar" className="mt-8" lazy />
                 </div>
               </div>
             )}
@@ -109,6 +112,8 @@ export default function ContentPages({
                     <h1 className="font-serif font-bold text-3xl text-zinc-900 dark:text-white mt-1">Interpersonal Categories</h1>
                     <p className="text-xs text-zinc-400 dark:text-zinc-500 font-sans mt-0.5">Filter through specialized connection topics to discover practical, research-backed connection steps.</p>
                   </div>
+
+                  <AdPlacement slot="homepage" className="my-2" lazy />
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {categories.map(cat => {
@@ -141,6 +146,7 @@ export default function ContentPages({
 
                 <div className="col-span-12 lg:col-span-4 lg:pl-6 border-t lg:border-t-0 lg:border-l border-rose-100/30 dark:border-zinc-850 pt-8 lg:pt-0">
                   {renderSidebar()}
+                  <AdPlacement slot="sidebar" className="mt-8" lazy />
                 </div>
               </div>
             )}
@@ -416,10 +422,12 @@ export default function ContentPages({
                     </>
                   );
                 })()}
+                <AdPlacement slot="in_article" className="mt-8" lazy />
                 </div>
 
                 <div className="col-span-12 lg:col-span-4 lg:pl-6 border-t lg:border-t-0 lg:border-l border-rose-100/30 dark:border-zinc-850 pt-8 lg:pt-0">
                   {renderSidebar()}
+                  <AdPlacement slot="sidebar" className="mt-8" lazy />
                 </div>
               </div>
             )}
@@ -481,6 +489,7 @@ export default function ContentPages({
                     </div>
                   );
                 })()}
+                <AdPlacement slot="homepage" lazy />
               </div>
             )}
 
@@ -529,6 +538,7 @@ export default function ContentPages({
                     </>
                   );
                 })()}
+                <AdPlacement slot="homepage" lazy />
               </div>
             )}
 
@@ -562,6 +572,7 @@ export default function ContentPages({
                     </div>
                   );
                 })()}
+                <AdPlacement slot="homepage" lazy />
               </div>
             )}
 
@@ -596,6 +607,7 @@ export default function ContentPages({
                     </p>
                   </div>
                 </div>
+                <AdPlacement slot="article_bottom" lazy />
               </div>
             )}
 
@@ -647,6 +659,7 @@ export default function ContentPages({
                     </>
                   );
                 })()}
+                <AdPlacement slot="article_bottom" lazy />
               </div>
             )}
 
@@ -803,6 +816,7 @@ export default function ContentPages({
                     For customized CPM/CPC package proposals, transmit a syndication draft via our Contact Editorial form.
                   </p>
                 </div>
+                <AdPlacement slot="homepage" lazy />
               </div>
             )}
 

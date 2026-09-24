@@ -81,12 +81,6 @@ export default function HomePage({
                 }
               }
 
-              {/* Homepage mid-feed ad slot (Google AdSense, lazy) */}
-              {['admin', 'login', 'error', 'access-denied'].every((t) => t !== currentTab) && (
-                <div className="max-w-6xl mx-auto px-4 w-full">
-                  <AdPlacement slot="homepage" className="my-8" lazy />
-                </div>
-              )}
               // Redesign requirements: Inject Latest Articles and Premium Articles sections if not already present
               if (!seenTypes.has('latest_articles')) {
                 homeSectionsList.push({ id: 'sec-latest-articles', type: 'latest_articles', title: "Latest Publications", is_active: true });
@@ -151,6 +145,7 @@ export default function HomePage({
                         return sec.is_active !== false;
                       })
                       .map((sec) => {
+                        const sectionNode = (() => {
                         switch (sec.type) {
                     case 'hero': {
                       const finalBadgeText = sec.badgeText || siteSettings?.hero_settings?.badge_text || "RELATIONSHIP ADVICE";
@@ -1857,6 +1852,29 @@ export default function HomePage({
                     default:
                       return null;
                   }
+                  })();
+
+                  // Interleave live ad slots after key homepage sections so
+                  // the home experience carries real inventory (the old
+                  // "mid-feed" slot was dead code that never rendered).
+                  // Slot families map to the admin console's per-slot provider
+                  // config (AdSense unit id -> Adsterra banner -> Monetag),
+                  // each behind its banner_*_enabled toggle, consent-gated.
+                  const AD_SLOT_AFTER_SECTION: Record<string, 'header' | 'in_article' | 'homepage' | 'article_bottom'> = {
+                    hero: 'header',
+                    trending: 'in_article',
+                    categories: 'homepage',
+                    latest_articles: 'article_bottom'
+                  };
+                  const adSlotAfter = AD_SLOT_AFTER_SECTION[sec.type];
+                  return adSlotAfter ? (
+                    <React.Fragment key={`adwrap-${sec.id}`}>
+                      {sectionNode}
+                      <div className="max-w-6xl mx-auto px-4 w-full">
+                        <AdPlacement slot={adSlotAfter} className="my-6" lazy />
+                      </div>
+                    </React.Fragment>
+                  ) : sectionNode;
                 })})()}
               </div>
             );
