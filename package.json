@@ -20,6 +20,7 @@
     "@elevenlabs/elevenlabs-js": "^2.49.1",
     "@fontsource-variable/geist": "^5.2.9",
     "@google/genai": "^1.29.0",
+    "@radix-ui/react-select": "^2.3.7",
     "@supabase/supabase-js": "^2.106.1",
     "@tailwindcss/vite": "^4.3.3",
     "class-variance-authority": "^0.7.1",
