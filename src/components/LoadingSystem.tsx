@@ -724,10 +724,14 @@ export const LoadingProgressBar: React.FC<{ isAnimating: boolean }> = ({ isAnima
 };
 
 // 10. Simple custom loading wrapper (Route Suspense wrapper style)
+// children is optional: skeleton-only usages (e.g. holding an article route
+// through hydration in App.tsx) legitimately pass just isLoading + type and
+// render nothing until the real content mounts. Children only render in the
+// !isLoading branch, so omitting them is safe by construction.
 interface SuspenseWrapperProps {
   isLoading: boolean;
   type?: 'home' | 'article' | 'dashboard' | 'profile' | 'grid';
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export const HeartsyncSuspense: React.FC<SuspenseWrapperProps> = ({ 
