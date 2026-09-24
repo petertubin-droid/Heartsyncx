@@ -3,6 +3,10 @@ import { Post } from '../types';
 
 let swRegistration: ServiceWorkerRegistration | null = null;
 
+// One-shot guards for the controllerchange auto-reload (see below).
+let swReloadedForNewBuild = false;
+let swControllerChangeListenerInstalled = false;
+
 /**
  * Register the Service Worker for offline article caching and cozy reading.
  */
@@ -16,6 +20,27 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
     swRegistration = registration;
 
     console.log('[Heartsync SW] Registered successfully with scope:', registration.scope);
+
+    // AUTO-RELOAD WHEN A NEW BUILD TAKES OVER (fixes "old website until you
+    // refresh again"): sw.js calls skipWaiting() + clients.claim(), so a
+    // newly deployed service worker takes control of this page immediately -
+    // but the page is still RUNNING the old build's JS/CSS that was served
+    // from the previous worker's caches. Until now that left visitors on the
+    // old site until their next manual reload (reported live 2026-09-24:
+    // reload shows the old website, refresh again shows the current one).
+    // When the controlling worker changes mid-session, reload ONCE onto the
+    // fresh build. The guard prevents a reload loop, and first-ever visits
+    // (no previous controller) are left alone.
+    const hadControllerAtRegister = !!navigator.serviceWorker.controller;
+    if (hadControllerAtRegister && !swControllerChangeListenerInstalled) {
+      swControllerChangeListenerInstalled = true;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (swReloadedForNewBuild) return;
+        swReloadedForNewBuild = true;
+        console.log('[Heartsync SW] New build took over - reloading onto it.');
+        try { window.location.reload(); } catch { /* noop */ }
+      });
+    }
 
     // Listen for updates
     registration.onupdatefound = () => {

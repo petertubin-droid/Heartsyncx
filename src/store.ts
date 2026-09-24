@@ -929,8 +929,67 @@ export class HeartsyncStore {
     'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=800'
   ];
 
+  // ---- Server-state snapshot (fixes "reload shows the old website") ----
+  // The store boots with the built-in seed catalog (35 seed essays, seed
+  // menus/labels) and only swaps to the REAL database state once /api/state
+  // resolves. That gap painted returning visitors the seed site on every
+  // reload for 0.2-2s (or indefinitely on a failing first fetch) - reported
+  // live as "reloading shows the old website until you refresh again".
+  // Snapshotting the last good public /api/state payload and hydrating from
+  // it on boot paints the current site instantly; the fresh /api/state call
+  // then revalidates in the background.
+  private static readonly SERVER_STATE_SNAPSHOT_KEY = 'hs_server_state_snapshot_v1';
+  private static readonly SERVER_STATE_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 1 day
+
+  /** Paint the last known server state on boot instead of the seed catalog.
+   *  Public data only (posts/categories/authors/site_settings) - the same
+   *  payload the anonymous /api/state endpoint returns to every visitor. */
+  private hydrateFromServerStateSnapshot(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(HeartsyncStore.SERVER_STATE_SNAPSHOT_KEY);
+      if (!raw) return;
+      const snap = JSON.parse(raw);
+      if (!snap || typeof snap.saved_at !== 'number') return;
+      if (Date.now() - snap.saved_at > HeartsyncStore.SERVER_STATE_SNAPSHOT_MAX_AGE_MS) return;
+      if (Array.isArray(snap.posts) && snap.posts.length > 0) {
+        this.posts = snap.posts;
+        if (Array.isArray(snap.categories)) this.categories = snap.categories;
+        if (Array.isArray(snap.authors)) this.authors = snap.authors;
+        if (snap.site_settings && typeof snap.site_settings === 'object') {
+          this.site_settings = snap.site_settings;
+        }
+        console.log('🩶 Hydrated from last server-state snapshot (' + new Date(snap.saved_at).toISOString() + ') - seed catalog skipped.');
+      }
+    } catch {
+      // Corrupt/unreadable snapshot - fall through to the seed catalog.
+    }
+  }
+
+  /** Persist the last good /api/state response for the next boot's hydration.
+   *  Best-effort: quota failures are silently ignored. */
+  private saveServerStateSnapshot(data: any): void {
+    if (typeof window === 'undefined' || !data) return;
+    try {
+      window.localStorage.setItem(
+        HeartsyncStore.SERVER_STATE_SNAPSHOT_KEY,
+        JSON.stringify({
+          saved_at: Date.now(),
+          posts: data.posts,
+          categories: data.categories,
+          authors: data.authors,
+          site_settings: data.site_settings
+        })
+      );
+    } catch {
+      // localStorage quota exceeded or unavailable - hydration is a
+      // best-effort enhancement, never a hard requirement.
+    }
+  }
+
   constructor() {
     this.loadState();
+    this.hydrateFromServerStateSnapshot();
     this.initSupabaseConnection();
     this.loadServerState();
     if (typeof window !== 'undefined') {
@@ -1962,6 +2021,10 @@ export class HeartsyncStore {
           if (data.webhook_logs) this.webhook_logs = data.webhook_logs;
           if (data.email_campaigns) this.email_campaigns = data.email_campaigns;
           if (data.email_templates) this.email_templates = data.email_templates;
+
+          // Snapshot this good response so the NEXT boot paints the
+          // current site instantly (see hydrateFromServerStateSnapshot).
+          this.saveServerStateSnapshot(data);
 
           // Notify React listeners for immediate update
           this.onStateChangeCallbacks.forEach(cb => cb());
