@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { reportFatal } from '../lib/codeSentry';
 
 interface Props {
   children: ReactNode;
@@ -29,6 +30,8 @@ export class ErrorBoundary extends Component<Props, State> {
     });
     // Safely log to console in development, or transmit to production logging systems
     console.error("⚡ [Heartsync Global Error Boundary Boundary]", error, errorInfo);
+    // Code sentry: fatal render crashes leave immediately, no batch delay.
+    try { reportFatal(error, 'react-fatal'); } catch { /* monitoring must never throw */ }
   }
 
   private handleReload = () => {

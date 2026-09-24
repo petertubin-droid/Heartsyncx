@@ -7,6 +7,10 @@ import {ConsentProvider} from './components/ConsentProvider.tsx';
 import {ErrorBoundary} from './components/ErrorBoundary.tsx';
 import {registerServiceWorker} from './utils/offlineCache.ts';
 import {clearUnauthorizedStorageKeys} from './utils/storageAudit.ts';
+import {initCodeSentry} from './lib/codeSentry.ts';
+
+// Code sentry first: capture every crash from the first possible moment.
+initCodeSentry();
 
 // Safely audit and clean unauthorized storage keys without wiping user preferences (bookmarks, themes)
 try {

@@ -428,3 +428,64 @@ describe('GET /api/posts/:slug (public read contract)', () => {
     expect((await req('GET', '/api/posts/ghost-post')).status).toBe(404);
   });
 });
+
+// ===========================================================================
+// 5. CODE SENTRY CONTRACT - POST /api/sentry/capture + admin reads
+// ===========================================================================
+describe('POST /api/sentry/capture (code watchdog contract)', () => {
+  it('accepts valid events and reports the buffered count', async () => {
+    const res = await req('POST', '/api/sentry/capture', {
+      events: [
+        { type: 'error', message: 'boom', url: 'https://heartsyncx.netlify.app/', session: 'sess_x', fingerprint: 'f' },
+        { type: 'fatal', message: 'react died', stack: 'at Render', fingerprint: 'g' }
+      ]
+    });
+    expect(res.ok).toBe(true);
+    const body = await res.json();
+    expect(body.stored).toBe(2);
+    expect(body.buffered).toBeGreaterThanOrEqual(2);
+  });
+
+  it('rejects malformed payloads (no events array, empty array, oversized batch)', async () => {
+    expect((await req('POST', '/api/sentry/capture', {})).status).toBe(400);
+    expect((await req('POST', '/api/sentry/capture', { events: [] })).status).toBe(400);
+    expect((await req('POST', '/api/sentry/capture', { events: new Array(25).fill({ message: 'x' }) })).status).toBe(400);
+  });
+
+  it('sanitizes hostile event fields (oversized + unknown types clamped)', async () => {
+    const res = await req('POST', '/api/sentry/capture', {
+      events: [{ type: 'sql-injection-attempt', message: 'A'.repeat(5000), stack: 'S'.repeat(9000) }]
+    });
+    expect(res.ok).toBe(true);
+    const read = await req('GET', '/api/sentry/events?limit=5', undefined, { Authorization: 'Bearer admin-token' });
+    expect(read.ok).toBe(true);
+    const data = await read.json();
+    const ev = data.events.find((e: any) => e.message.startsWith('A'));
+    expect(ev).toBeTruthy();
+    expect(ev.type).toBe('error');            // unknown type clamped
+    expect(ev.message.length).toBeLessThanOrEqual(500);
+    expect(ev.stack.length).toBeLessThanOrEqual(2000);
+    // Privacy: only an IP hash is stored, never the raw IP.
+    expect(ev.ip_hash).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('rate-limits a flooding source (429 after the per-IP budget)', async () => {
+    // Budget is 30 per 5 min; the two tests above consumed some of it.
+    let saw429 = false;
+    for (let i = 0; i < 32; i++) {
+      const res = await req('POST', '/api/sentry/capture', {
+        events: [{ type: 'error', message: `flood ${i}`, fingerprint: `flood-${i}` }]
+      });
+      if (res.status === 429) { saw429 = true; break; }
+    }
+    expect(saw429).toBe(true);
+  });
+
+  it('guards admin reads: 401 anonymous, 403 reader, 200 admin', async () => {
+    expect((await req('GET', '/api/sentry/events')).status).toBe(401);
+    expect((await req('GET', '/api/sentry/events', undefined, { Authorization: 'Bearer reader-token' })).status).toBe(403);
+    const res = await req('GET', '/api/sentry/events', undefined, { Authorization: 'Bearer admin-token' });
+    expect(res.ok).toBe(true);
+    expect((await res.json()).events).toBeInstanceOf(Array);
+  });
+});

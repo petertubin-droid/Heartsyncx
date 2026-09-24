@@ -5881,6 +5881,87 @@ app.post('/api/maint/articles', async (req: Request, res: Response) => {
   }
 });
 
+// ===========================================================================
+// CODE SENTRY (2026-09-24) - in-repo error watchdog storage. The browser
+// capture lib (src/lib/codeSentry.ts) batches errors to POST /api/sentry/capture.
+// Events live in a per-instance ring buffer (Netlify functions are ephemeral,
+// so this is best-effort alerting, not durable analytics) and are mirrored to
+// the function log so a log drain can persist them. No third-party service.
+const SENTRY_BUFFER: any[] = [];
+const SENTRY_BUFFER_MAX = 500;
+const SENTRY_RATE = new Map<string, { count: number; resetAt: number }>(); // ip -> budget
+const SENTRY_RATE_MAX = 30;   // events per IP per window
+const SENTRY_RATE_WINDOW_MS = 5 * 60 * 1000;
+
+function sentryRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const bucket = SENTRY_RATE.get(ip);
+  if (!bucket || now > bucket.resetAt) {
+    SENTRY_RATE.set(ip, { count: 1, resetAt: now + SENTRY_RATE_WINDOW_MS });
+    if (SENTRY_RATE.size > 5000) SENTRY_RATE.clear(); // memory guard
+    return false;
+  }
+  bucket.count++;
+  return bucket.count > SENTRY_RATE_MAX;
+}
+
+app.post('/api/sentry/capture', (req: Request, res: Response) => {
+  try {
+    const ip = (req.headers['x-nf-client-connection-id'] as string) ||
+               (req.headers['x-forwarded-for'] as string || '?').split(',')[0].trim();
+    if (sentryRateLimited(ip)) {
+      res.status(429).json({ error: 'Rate limited.' });
+      return;
+    }
+    const events = (req.body && typeof req.body === 'object' && (req.body as any).events) as any[] | undefined;
+    if (!Array.isArray(events) || events.length === 0 || events.length > 20) {
+      res.status(400).json({ error: 'Expected an events array (1-20 items).' });
+      return;
+    }
+    let stored = 0;
+    for (const ev of events) {
+      if (!ev || typeof ev !== 'object') continue;
+      const message = typeof ev.message === 'string' ? ev.message.slice(0, 500) : 'Unknown error';
+      const type = ['error', 'rejection', 'fatal'].includes(ev.type) ? ev.type : 'error';
+      const record = {
+        id: `sentry-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type,
+        severity: type === 'fatal' ? 'fatal' : 'error',
+        message,
+        stack: typeof ev.stack === 'string' ? ev.stack.slice(0, 2000) : null,
+        source: typeof ev.source === 'string' ? ev.source.slice(0, 300) : null,
+        url: typeof ev.url === 'string' ? ev.url.slice(0, 300) : null,
+        userAgent: typeof ev.userAgent === 'string' ? ev.userAgent.slice(0, 300) : null,
+        viewport: typeof ev.viewport === 'string' ? ev.viewport.slice(0, 20) : null,
+        session: typeof ev.session === 'string' ? ev.session.slice(0, 40) : null,
+        release: typeof ev.release === 'string' ? ev.release.slice(0, 40) : null,
+        fingerprint: typeof ev.fingerprint === 'string' ? ev.fingerprint.slice(0, 600) : null,
+        ip_hash: crypto.createHash('sha256').update(ip + '|hs-sentry-salt').digest('hex').slice(0, 16),
+        created_at: new Date().toISOString()
+      };
+      SENTRY_BUFFER.push(record);
+      if (SENTRY_BUFFER.length > SENTRY_BUFFER_MAX) SENTRY_BUFFER.shift();
+      stored++;
+      // Mirror to the function log: a Netlify log drain can persist these.
+      console.warn(`[SENTRY] ${record.severity.toUpperCase()} ${record.type}: ${record.message} (${record.url})`);
+    }
+    res.json({ stored, buffered: SENTRY_BUFFER.length });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Sentry capture failed: ' + err.message });
+  }
+});
+
+app.get('/api/sentry/events', adminAuthMiddleware, (req: Request, res: Response) => {
+  const limit = Math.min(Number(req.query.limit) || 100, SENTRY_BUFFER_MAX);
+  const events = SENTRY_BUFFER.slice(-limit).reverse();
+  res.json({ success: true, count: events.length, events, note: 'Per-instance ring buffer - cold instances start empty. Pair with a Netlify log drain searching "[SENTRY]" for full history.' });
+});
+
+app.delete('/api/sentry/events', adminAuthMiddleware, (_req: Request, res: Response) => {
+  SENTRY_BUFFER.length = 0;
+  res.json({ success: true, message: 'Sentry buffer cleared.' });
+});
+
 app.get('/api/state', async (req: Request, res: Response) => {
   const now = Date.now();
   
