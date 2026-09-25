@@ -192,20 +192,25 @@ function ensureAdsenseLibrary(publisherId: string): void {
  * specific Adsterra banner serving domain (they have several mirrors),
  * honor it instead of the default.
  */
-interface AdsterraUnitRef {
+export interface AdsterraUnitRef {
   key: string;
   domain: string;
   /** Banner/native-banner dimensions pasted inside the snippet's atOptions.
    *  Adsterra issues native banners in many sizes (160x300, 160x600, 320x50,
    *  468x60, 728x90, 300x250...) - when the admin pastes the whole snippet we
    *  honor ITS dimensions instead of forcing the slot default, so ANY
-   *  Adsterra banner or native-banner unit renders at its native size. */
+   *  Adsterra banner or native-banner unit renders at its native size.
+   *  NATIVE BANNER units (native.js tag, or invoke.js + container-<key>)
+   *  declare no atOptions and must render into a container div on their
+   *  account subdomain; they are flagged `native` and rendered accordingly. */
   width?: number;
   height?: number;
+  /** 'invoke' = classic native banner (invoke.js + container div),
+   *  'native' = newer native.js tag. Undefined = regular banner unit. */
+  native?: 'invoke' | 'native';
 }
 
 const ADSTERRA_DEFAULT_DOMAIN = 'www.highperformanceformat.com';
-const ADSTERRA_BANNER_DOMAINS = /(highperformanceformat|highrevenueformat)\.[a-z]+/i;
 
 /**
  * The per-slot "URL" field may hold the unit's full invoke.js URL
@@ -224,7 +229,7 @@ const ADSTERRA_BANNER_DOMAINS = /(highperformanceformat|highrevenueformat)\.[a-z
  * hostname is returned exactly as it appears in the URL  - www. only when
  * the admin's own pasted URL actually had it.
  */
-function adsterraDomainFromUrlField(raw: string): string | null {
+export function adsterraDomainFromUrlField(raw: string): string | null {
   const v = raw.trim().replace(/\s+/g, '');
   if (!v) return null;
   // A full invoke.js URL names its own host explicitly  - honor it exactly
@@ -240,16 +245,47 @@ function adsterraDomainFromUrlField(raw: string): string | null {
   return `www.${bare.toLowerCase()}`;
 }
 
-function normalizeAdsterraUnit(raw: string): AdsterraUnitRef | null {
+export function normalizeAdsterraUnit(raw: string): AdsterraUnitRef | null {
   const v = raw.trim();
   if (!v) return null;
   if (/^[a-f0-9]{20,}$/i.test(v)) return { key: v.toLowerCase(), domain: ADSTERRA_DEFAULT_DOMAIN };
   const fromAtOptions = v.match(/['"]key['"]\s*:\s*['"]([a-f0-9]{20,})['"]/i);
+  // Native Banner markers (adsterra.com/ad-formats): the newer tag is a
+  // bare <script src=".../KEY/native.js">, the classic one is invoke.js
+  // plus <div id="container-KEY">. Neither carries atOptions; forcing
+  // them through the banner-iframe path (atOptions on
+  // highperformanceformat.com) is why configured native units rendered
+  // nothing. A bare invoke.js URL with no atOptions is also treated as a
+  // classic native tag.
+  const fromNativeJs = v.match(/([a-f0-9]{20,})\/native\.js/i);
+  const fromContainer = v.match(/id=["']?container-([a-f0-9]{20,})/i);
   const fromInvokeUrl = v.match(/([a-f0-9]{20,})\/invoke\.js/i);
-  const key = (fromAtOptions?.[1] || fromInvokeUrl?.[1] || '').toLowerCase();
+  const key = (
+    fromAtOptions?.[1] || fromNativeJs?.[1] || fromContainer?.[1] || fromInvokeUrl?.[1] || ''
+  ).toLowerCase();
   if (!key) return null;
-  const domMatch = v.match(new RegExp(`https?://(?:www\.)?(${ADSTERRA_BANNER_DOMAINS.source})/${key}/invoke\.js`, 'i'));
-  const domain = domMatch ? `www.${domMatch[1].toLowerCase().replace(/^www\./, '')}` : ADSTERRA_DEFAULT_DOMAIN;
+  // Exact serving host from any invoke.js/native.js URL in the snippet:
+  // protocol-relative "//pl31453269.profitableratecpmnetwork.com/..." is
+  // the common Adsterra form. Honored exactly as issued (no www.
+  // forcing, see adsterraDomainFromUrlField's bug note).
+  const hostMatch = v.match(
+    /(?:https?:)?\/\/((?:[a-z0-9-]+\.)+[a-z]{2,})\/[a-f0-9]{20,}\/(?:invoke|native)\.js/i
+  );
+  // Adsterra's two static banner domains (highperformanceformat.com /
+  // highrevenueformat.com) serve atOptions banners; an invoke.js URL on
+  // one of them stays a banner. Native banner evidence is required:
+  // a native.js tag, a container-<key> div, or an account subdomain
+  // (e.g. pl31453269.profitableratecpmnetwork.com).
+  const staticBannerDomain = /(?:^|\.)((?:highperformanceformat|highrevenueformat)\.[a-z]+)$/i.test(
+    hostMatch?.[1] ?? ''
+  );
+  const native: 'invoke' | 'native' | undefined = fromNativeJs
+    ? 'native'
+    : fromContainer || (!fromAtOptions && fromInvokeUrl && !staticBannerDomain)
+      ? 'invoke'
+      : undefined;
+  const domain = hostMatch ? hostMatch[1].toLowerCase() : ADSTERRA_DEFAULT_DOMAIN;
+  if (native) return { key, domain, native };
   const h = v.match(/['"]height['"]\s*:\s*(\d{2,4})\b/i);
   const w = v.match(/['"]width['"]\s*:\s*(\d{2,4})\b/i);
   const dims =
@@ -314,6 +350,20 @@ const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
     normalizeAdsterraUnit(str(settings()[`adsterra_url_${slot}`]));
   if (!unit) return null;
   const { key } = unit;
+
+  // NATIVE BANNER unit (native.js tag, or classic invoke.js +
+  // container-<key>): no atOptions, served from the account's own
+  // subdomain, rendered into a container div. Isolated in the same
+  // sandboxed srcdoc frame, auto-height sized to the creative the zone
+  // actually serves; collapses when the zone no-fills.
+  if (unit.native) {
+    const containerDiv = unit.native === 'invoke' ? `<div id="container-${key}"></div>\n` : '';
+    const nativeSrcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;overflow:hidden}</style></head><body>
+${containerDiv}<script type="text/javascript" src="https://${unit.domain}/${key}/${unit.native}.js" async data-cfasync="false"></script>
+</body></html>`;
+    return <AutoHeightFrame srcDoc={nativeSrcDoc} initialHeight={50} />;
+  }
+
   const domain = adsterraDomainFromUrlField(str(settings()[`adsterra_url_${slot}`])) || unit.domain;
   // atOptions 'format' must be the literal banner size Adsterra issued for
   // the unit (e.g. 'iframe' for native banners) - when the admin pasted a

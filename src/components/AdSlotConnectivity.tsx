@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { heartsync } from '../store';
+import { adsterraDomainFromUrlField, normalizeAdsterraUnit, type AdsterraUnitRef } from './AdPlacement';
 
 /**
  * Ad-slot connectivity checker (admin "Placements" tab).
  *
  * Mirrors AdPlacement.tsx's per-slot provider chain - AdSense -> Adsterra
- * (banner / native banner) -> Monetag (native banner) -> reserved - and shows,
+ * (banner / native banner) -> Monetag (native banner) -> nothing - and shows,
  * for every physical slot on the website, WHICH provider is configured to
  * fill it and whether that provider's unit is actually reachable/serving.
  *
@@ -63,13 +64,22 @@ function resolveSlotProvider(slot: SlotFamily): ResolvedProvider {
   const adsterraActive = s.adsterra_active !== false;
   const keyField = str(s[`adsterra_key_${slot}`]);
   const urlField = str(s[`adsterra_url_${slot}`]);
-  const keyMatch = keyField.match(/['"]key['"]\s*:\s*['"]([a-f0-9]{20,})['"]/i) || keyField.match(/([a-f0-9]{20,})\/invoke\.js/i);
-  const urlKeyMatch = urlField.match(/([a-f0-9]{20,})\/invoke\.js/i);
-  const key = (keyMatch?.[1] || urlKeyMatch?.[1] || (/^[a-f0-9]{20,}$/i.test(keyField) ? keyField : '')).toLowerCase();
-  if (adsterraActive && key) {
-    const domMatch = urlField.match(/^https?:\/\/([a-z0-9.-]+\.[a-z]+)\/[a-f0-9]{20,}\/invoke\.js/i);
-    const domain = domMatch ? domMatch[1].toLowerCase() : 'www.highperformanceformat.com';
-    return { provider: 'adsterra', label: `Adsterra unit ${key}`, probeUrl: `https://${domain}/${key}/invoke.js` };
+  // Same parser the renderer uses (single source of truth): understands
+  // bare keys, atOptions banner snippets, and Native Banner tags
+  // (native.js, or invoke.js + container-<key> on the account subdomain).
+  const unit: AdsterraUnitRef | null =
+    normalizeAdsterraUnit(keyField) || normalizeAdsterraUnit(urlField);
+  if (adsterraActive && unit) {
+    const key = unit.key;
+    const domain = unit.native
+      ? unit.domain
+      : adsterraDomainFromUrlField(urlField) || unit.domain;
+    const script = unit.native ?? 'invoke';
+    return {
+      provider: 'adsterra',
+      label: `Adsterra ${unit.native ? 'native banner' : 'banner'} unit ${key}`,
+      probeUrl: `https://${domain}/${key}/${script}.js`
+    };
   }
 
   const monetagActive = s.monetag_active !== false;
@@ -127,7 +137,7 @@ export const AdSlotConnectivity: React.FC = () => {
       } else if (resolved.provider === 'adsense') {
         next[slot] = { status: 'ok', detail: 'Configured - AdSense serves only after Google approves the site and the unit id is valid.' };
       } else {
-        next[slot] = { status: 'unconfigured', detail: 'Empty slot - visitors see the reserved placeholder. Configure AdSense, Adsterra or a Monetag native banner zone for this slot.' };
+        next[slot] = { status: 'unconfigured', detail: 'Empty slot - visitors see no ad for this placement. Configure AdSense, an Adsterra banner/native banner unit, or a Monetag native banner zone.' };
       }
       setChecks({ ...next });
     }

@@ -288,3 +288,74 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
     heartsync.site_settings.monetag_zone_header = '';
   });
 });
+
+describe('Adsterra Native Banner units (configured via admin per-slot fields)', () => {
+  beforeEach(() => {
+    heartsync.setLocalStorage('heartsync_cookie_consent', null);
+    heartsync.setLocalStorage('heartsync_cookie_preferences', null);
+    localStorage.clear();
+    heartsync.site_settings.adsense_client_id = '';
+    heartsync.site_settings.adsterra_key_header = '';
+    heartsync.site_settings.adsterra_url_header = '';
+    heartsync.site_settings.adsterra_active = true;
+  });
+
+  it('renders a classic native banner (invoke.js + container-<key>) into its container on the snippet domain', () => {
+    // Exact shape Adsterra issues for the classic Native Banner format.
+    heartsync.site_settings.adsterra_key_header =
+      '<script async="async" data-cfasync="false" src="//pl31453269.profitableratecpmnetwork.com/a1b2c3d4e5f60718293a/invoke.js"></script><div id="container-a1b2c3d4e5f60718293a"></div>';
+    const { container } = renderPlacement();
+    act(() => { screen.getByTestId('grant').click(); });
+    const iframe = container.querySelector('iframe[title="Advertisement"]') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+    const srcDoc = iframe.getAttribute('srcdoc') || '';
+    // Native banner: container div + invoke.js served from the snippet's
+    // own account subdomain (never the banner default domain).
+    expect(srcDoc).toContain('id="container-a1b2c3d4e5f60718293a"');
+    expect(srcDoc).toContain('https://pl31453269.profitableratecpmnetwork.com/a1b2c3d4e5f60718293a/invoke.js');
+    expect(srcDoc).not.toContain('highperformanceformat.com');
+    expect(srcDoc).not.toContain('atOptions');
+  });
+
+  it('renders the newer native.js tag without a container div', () => {
+    heartsync.site_settings.adsterra_key_header =
+      '<script async data-cfasync="false" src="https://pl31453269.profitableratecpmnetwork.com/a1b2c3d4e5f60718293a/native.js"></script>';
+    const { container } = renderPlacement();
+    act(() => { screen.getByTestId('grant').click(); });
+    const iframe = container.querySelector('iframe[title="Advertisement"]') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+    const srcDoc = iframe.getAttribute('srcdoc') || '';
+    expect(srcDoc).toContain('https://pl31453269.profitableratecpmnetwork.com/a1b2c3d4e5f60718293a/native.js');
+    expect(srcDoc).not.toContain('container-');
+    expect(srcDoc).not.toContain('atOptions');
+  });
+
+  it('still renders a banner snippet through the atOptions path (native detection does not swallow banners)', () => {
+    heartsync.site_settings.adsterra_key_header =
+      "atOptions = { 'key' : 'a1b2c3d4e5f60718293a', 'format' : 'iframe', 'height' : 90, 'width' : 728, 'params' : {} };";
+    heartsync.site_settings.adsterra_url_header = 'https://www.highrevenueformat.com/a1b2c3d4e5f60718293a/invoke.js';
+    const { container } = renderPlacement();
+    act(() => { screen.getByTestId('grant').click(); });
+    const iframe = container.querySelector('iframe[title="Advertisement"]') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+    const srcDoc = iframe.getAttribute('srcdoc') || '';
+    expect(srcDoc).toContain('atOptions');
+    expect(srcDoc).toContain("'height' : 90");
+    expect(srcDoc).toContain('www.highrevenueformat.com/a1b2c3d4e5f60718293a/invoke.js');
+    expect(srcDoc).not.toContain('container-');
+  });
+
+  it('exposes native units to the connectivity checker with the right probe URL', async () => {
+    const { normalizeAdsterraUnit } = await import('../AdPlacement');
+    const unit = normalizeAdsterraUnit(
+      '<script async="async" data-cfasync="false" src="//pl31453269.profitableratecpmnetwork.com/a1b2c3d4e5f60718293a/invoke.js"></script><div id="container-a1b2c3d4e5f60718293a"></div>'
+    );
+    expect(unit?.native).toBe('invoke');
+    expect(unit?.domain).toBe('pl31453269.profitableratecpmnetwork.com');
+    const bannerUnit = normalizeAdsterraUnit(
+      "atOptions = { 'key' : 'a1b2c3d4e5f60718293a', 'format' : 'iframe', 'height' : 90, 'width' : 728, 'params' : {} };"
+    );
+    expect(bannerUnit?.native).toBeUndefined();
+    expect(bannerUnit?.height).toBe(90);
+  });
+});

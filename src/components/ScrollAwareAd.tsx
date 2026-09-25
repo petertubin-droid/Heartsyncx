@@ -2,14 +2,26 @@ import { useEffect, useRef, useState } from 'react';
 import { AdPlacement } from './AdPlacement';
 
 /**
- * Scroll-aware ad wrapper: the wrapped ad unit disappears while the user is
- * actively scrolling and reappears a moment after scrolling stops.
+ * Scroll-aware ad wrapper: the wrapped ad unit fades out while the user is
+ * actively scrolling and fades back in a moment after scrolling stops.
  *
- * - Collapse is CSS-only (max-height + opacity + overflow) so the ad iframe
- *   is never unmounted: the provider keeps its slot state and refills
- *   normally when the unit becomes visible again.
- * - The reveal is debounced (~450ms after the last scroll event) so fast
- *   scroll gestures do not flicker the unit in and out.
+ * The hide is LAYOUT-STABLE by design (opacity + visibility only, never a
+ * height collapse). The first version collapsed the wrapper with
+ * maxHeight: 0 + overflow: hidden, which caused two bugs:
+ *   1. A collapsed (zero-height, clipped) wrapper can never intersect the
+ *      viewport, so the wrapped unit's lazy IntersectionObserver could not
+ *      fire while scrolling - the ad only ever loaded after the user
+ *      stopped at the very bottom (or overscrolled into the rubber band).
+ *   2. Toggling the wrapper's height between 0 and 460px resized the
+ *      document mid-scroll: the page jumped, the jump fired more scroll
+ *      events, and the unit flickered in and out ("glitching").
+ * Keeping the box geometry intact fixes both: the lazy observer works
+ * whenever the slot is in view, the document never reflows, and the
+ * provider's iframe is never unmounted, so the unit keeps its slot state
+ * and refills normally when it becomes visible again.
+ *
+ * The reveal is debounced (~450ms after the last scroll event) so fast
+ * scroll gestures do not flicker the unit in and out.
  */
 export default function ScrollAwareAd({
   slot,
@@ -48,10 +60,12 @@ export default function ScrollAwareAd({
     <div
       aria-hidden={hidden}
       style={{
-        maxHeight: hidden ? 0 : 460,
+        // Layout-stable hide: geometry stays intact so the lazy ad unit
+        // inside can load and the document never reflows on toggle.
         opacity: hidden ? 0 : 1,
-        overflow: 'hidden',
-        transition: 'max-height 350ms ease, opacity 300ms ease',
+        visibility: hidden ? 'hidden' : 'visible',
+        pointerEvents: hidden ? 'none' : 'auto',
+        transition: 'opacity 300ms ease, visibility 300ms ease'
       }}
     >
       <AdPlacement slot={slot} className={className} lazy={lazy} />
