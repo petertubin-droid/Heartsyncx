@@ -69,6 +69,8 @@ export const HeartsyncLoader: React.FC<HeartsyncLoaderProps> = ({ message, isFul
     return null;
   }
 
+  const loaderStyle = settings.loader_style || 'ring';
+  const loaderShowLogo = settings.loader_show_logo !== false;
   const loaderSize = settings.loader_size || 'md';
   const loaderSpeed = settings.loader_speed || 'normal';
   const loaderGlowIntensity = settings.loader_glow_intensity || 'medium';
@@ -110,8 +112,8 @@ export const HeartsyncLoader: React.FC<HeartsyncLoaderProps> = ({ message, isFul
           />
         )}
 
-        {/* Hardware-Accelerated SVG circle gradient spinner */}
-        <svg
+        {/* Hardware-Accelerated SVG circle gradient spinner (style: ring, default) */}
+        {loaderStyle === 'ring' && <svg
           width={sizePx}
           height={sizePx}
           viewBox="0 0 100 100"
@@ -155,10 +157,13 @@ export const HeartsyncLoader: React.FC<HeartsyncLoaderProps> = ({ message, isFul
             strokeDasharray="257.6"
             strokeDashoffset="75"
           />
-        </svg>
+        </svg>}
+
+        {/* Alternate loader style visuals */}
+        {loaderStyle !== 'ring' && <LoaderVariantStyle style={loaderStyle} sizePx={sizePx} primaryColor={primaryColor} secondaryColor={secondaryColor} speed={loaderSpeed} reducedMotion={prefersReducedMotion} />}
 
         {/* Central Floating Branding Brand mark */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+        {loaderShowLogo && <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <motion.div
             animate={prefersReducedMotion ? {} : {
               scale: [1, 1.05, 1],
@@ -179,14 +184,14 @@ export const HeartsyncLoader: React.FC<HeartsyncLoaderProps> = ({ message, isFul
               alt="Heartsync Logo"
               className="drop-shadow-sm transition-transform"
               style={{
-                width: `${sizePx * 0.36}px`,
-                height: `${sizePx * 0.36}px`,
+                width: `${sizePx * 0.38}px`,
+                height: `${sizePx * 0.38}px`,
                 objectFit: 'contain'
               }}
               referrerPolicy="no-referrer"
             />
           </motion.div>
-        </div>
+        </div>}
       </div>
 
       {/* Branded Identity Text */}
@@ -770,6 +775,170 @@ export const HeartsyncSuspense: React.FC<SuspenseWrapperProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+};
+
+/** Loader styles selectable from the admin panel (loader_style setting). */
+export const LOADER_STYLE_OPTIONS: { value: string; label: string; description: string }[] = [
+  { value: 'ring', label: 'Gradient Ring', description: 'Rotating gradient circle with logo (default)' },
+  { value: 'dual_ring', label: 'Dual Rings', description: 'Two arcs rotating in opposite directions' },
+  { value: 'spinner', label: 'Minimal Spinner', description: 'Single thin arc, quiet and light' },
+  { value: 'orbit', label: 'Orbiting Dots', description: 'Dots circling a soft core' },
+  { value: 'pulse', label: 'Soft Pulse', description: 'Glowing disc breathing in and out' },
+  { value: 'heartbeat', label: 'Heartbeat', description: 'Beating heart mark, brand-forward' },
+  { value: 'bars', label: 'Equalizer Bars', description: 'Five bars rising and falling' },
+  { value: 'dots', label: 'Bouncing Dots', description: 'Three dots hopping in sequence' },
+  { value: 'progress', label: 'Progress Bar', description: 'Indeterminate bar sliding across' },
+  { value: 'ripple', label: 'Ripple', description: 'Concentric circles expanding outward' }
+];
+
+interface LoaderVariantStyleProps {
+  style: string;
+  sizePx: number;
+  primaryColor: string;
+  secondaryColor: string;
+  speed: string;
+  reducedMotion: boolean;
+}
+
+const SPEED_MULT: Record<string, number> = { slow: 1.6, fast: 0.6, normal: 1 };
+const R = (v: number) => Math.round(v * 100) / 100;
+const css = (v: number) => `${v}s`;
+
+/** Visual for every non-default loader style. Rendered inside the loader
+ *  circle area; the center logo overlay and glow still apply on top. */
+export const LoaderVariantStyle: React.FC<LoaderVariantStyleProps> = ({
+  style, sizePx, primaryColor, secondaryColor, speed, reducedMotion
+}) => {
+  const mult = reducedMotion ? 3 : (SPEED_MULT[speed] || 1);
+  const dur = R(1.4 * mult);
+  const gradId = `loaderGrad-${style}`;
+
+  if (style === 'dual_ring' || style === 'spinner') {
+    const thin = style === 'spinner';
+    return (
+      <svg width={sizePx} height={sizePx} viewBox="0 0 100 100" className="relative z-10">
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={primaryColor} />
+            <stop offset="100%" stopColor={secondaryColor} />
+          </linearGradient>
+        </defs>
+        <circle cx="50" cy="50" r="41" fill="none" stroke="#a1a1aa" strokeWidth={thin ? 2 : 4} opacity="0.25" />
+        {thin ? (
+          <circle cx="50" cy="50" r="41" fill="none" stroke={`url(#${gradId})`} strokeWidth="4" strokeLinecap="round" strokeDasharray="200 60" className="animate-spin" style={{ animationDuration: css(dur), transformOrigin: '50% 50%' }} />
+        ) : (
+          <>
+            <circle cx="50" cy="50" r="41" fill="none" stroke={`url(#${gradId})`} strokeWidth="6" strokeLinecap="round" strokeDasharray="160 220" className="animate-spin" style={{ animationDuration: css(dur), transformOrigin: '50% 50%' }} />
+            <circle cx="50" cy="50" r="30" fill="none" stroke={secondaryColor} strokeWidth="3.5" strokeLinecap="round" strokeDasharray="80 110" className="animate-spin" style={{ animationDuration: css(R(1.1 * mult)), animationDirection: 'reverse', transformOrigin: '50% 50%' }} />
+          </>
+        )}
+      </svg>
+    );
+  }
+
+  if (style === 'orbit') {
+    return (
+      <div className="relative z-10" style={{ width: sizePx, height: sizePx }}>
+        <div className="absolute rounded-full" style={{ inset: sizePx * 0.38, backgroundColor: primaryColor, opacity: 0.35 }} />
+        <motion.div className="absolute inset-0" animate={reducedMotion ? {} : { rotate: 360 }} transition={{ repeat: Infinity, duration: R(1.5 * mult), ease: 'linear' }}>
+          {[0, 120, 240].map((deg) => (
+            <div key={deg} className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ width: sizePx * 0.14, height: sizePx * 0.14, backgroundColor: deg === 0 ? secondaryColor : primaryColor, transform: `rotate(${deg}deg) translateY(${sizePx * 0.08}px)`, transformOrigin: `50% ${sizePx * 0.5 - sizePx * 0.07}px` }} />
+          ))}
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (style === 'pulse') {
+    return (
+      <div className="relative z-10 flex items-center justify-center" style={{ width: sizePx, height: sizePx }}>
+        <motion.div
+          animate={reducedMotion ? {} : { scale: [0.7, 1, 0.7], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: R(1.6 * mult), ease: 'easeInOut' }}
+          className="rounded-full"
+          style={{ width: sizePx * 0.55, height: sizePx * 0.55, background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`, boxShadow: `0 0 ${sizePx * 0.18}px ${primaryColor}` }}
+        />
+      </div>
+    );
+  }
+
+  if (style === 'heartbeat') {
+    return (
+      <div className="relative z-10 flex items-center justify-center" style={{ width: sizePx, height: sizePx }}>
+        <motion.div
+          animate={reducedMotion ? {} : { scale: [1, 1.22, 1, 1.35, 1] }}
+          transition={{ repeat: Infinity, duration: R(1.1 * mult), ease: 'easeInOut' }}
+        >
+          <Heart className="drop-shadow-md" style={{ width: sizePx * 0.5, height: sizePx * 0.5, color: primaryColor, fill: secondaryColor }} />
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (style === 'bars') {
+    const bw = sizePx * 0.08;
+    return (
+      <div className="relative z-10 flex items-center justify-center gap-1.5" style={{ width: sizePx, height: sizePx }}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <motion.div
+            key={i}
+            className="rounded-full"
+            style={{ width: bw, background: `linear-gradient(180deg, ${primaryColor}, ${secondaryColor})` }}
+            animate={reducedMotion ? {} : { height: [sizePx * 0.15, sizePx * 0.55, sizePx * 0.15] }}
+            transition={{ repeat: Infinity, duration: R(0.9 * mult), ease: 'easeInOut', delay: i * 0.09 }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (style === 'dots') {
+    const d = sizePx * 0.13;
+    return (
+      <div className="relative z-10 flex items-center justify-center gap-2" style={{ width: sizePx, height: sizePx }}>
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="rounded-full"
+            style={{ width: d, height: d, backgroundColor: i === 1 ? secondaryColor : primaryColor }}
+            animate={reducedMotion ? {} : { y: [0, -sizePx * 0.14, 0] }}
+            transition={{ repeat: Infinity, duration: R(0.7 * mult), ease: 'easeOut', delay: i * 0.12 }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (style === 'progress') {
+    return (
+      <div className="relative z-10 flex items-center justify-center" style={{ width: sizePx, height: sizePx }}>
+        <div className="w-full rounded-full overflow-hidden bg-zinc-200/60 dark:bg-zinc-800/60" style={{ height: sizePx * 0.06, padding: 0 }}>
+          <motion.div
+            className="h-full rounded-full"
+            style={{ width: '45%', background: `linear-gradient(90deg, ${primaryColor}, ${secondaryColor})` }}
+            animate={reducedMotion ? {} : { x: [`${-sizePx}px`, `${sizePx}px`] }}
+            transition={{ repeat: Infinity, duration: R(1.2 * mult), ease: 'easeInOut' }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ripple
+  return (
+    <div className="relative z-10 flex items-center justify-center" style={{ width: sizePx, height: sizePx }}>
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full border-2"
+          style={{ borderColor: i % 2 ? secondaryColor : primaryColor, width: sizePx * 0.5, height: sizePx * 0.5 }}
+          animate={reducedMotion ? {} : { scale: [0.4, 1.6], opacity: [0.9, 0] }}
+          transition={{ repeat: Infinity, duration: R(1.5 * mult), ease: 'easeOut', delay: i * (0.5 * mult) }}
+        />
+      ))}
+      <div className="absolute rounded-full" style={{ width: sizePx * 0.18, height: sizePx * 0.18, background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }} />
     </div>
   );
 };

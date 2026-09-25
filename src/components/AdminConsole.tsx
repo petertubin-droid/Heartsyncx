@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { heartsync } from '../store';
+import { LOADER_STYLE_OPTIONS, LoaderVariantStyle } from './LoadingSystem';
 
 // Attach the current admin session to privileged API calls.
 const getAdminAuthHeaders = async (): Promise<Record<string, string>> => {
@@ -9196,6 +9197,67 @@ export default function AdminConsole({
                                 <option value="lg">Large (140px)</option>
                                 <option value="xl">Extra Large (180px)</option>
                               </select>
+                            </div>
+
+                            {/* Loader Animation Style */}
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold uppercase text-zinc-400 font-sans">Loader Animation Style</label>
+                              <select 
+                                value={siteSettings.loader_style || 'ring'} 
+                                onChange={(e) => {
+                                  setSiteSettings({ ...siteSettings, loader_style: e.target.value });
+                                }}
+                                className="w-full p-2 border bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-sans text-[10px]"
+                              >
+                                {LOADER_STYLE_OPTIONS.map((o) => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
+                              <p className="text-[8px] text-zinc-400 font-sans normal-case tracking-normal">
+                                {(LOADER_STYLE_OPTIONS.find((o) => o.value === (siteSettings.loader_style || 'ring')) || LOADER_STYLE_OPTIONS[0]).description}
+                              </p>
+                            </div>
+
+                            {/* Live style preview */}
+                            <div className="flex items-center justify-center py-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850">
+                              <div className="relative flex items-center justify-center" style={{ width: 72, height: 72 }}>
+                                {(siteSettings.loader_style || 'ring') === 'ring' ? (
+                                  <svg width="72" height="72" viewBox="0 0 100 100" className="animate-spin">
+                                    <defs>
+                                      <linearGradient id="adminPreviewGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor={siteSettings.loader_colors_light_primary || '#CE2B5E'} />
+                                        <stop offset="100%" stopColor={siteSettings.loader_colors_light_secondary || '#f43f5e'} />
+                                      </linearGradient>
+                                    </defs>
+                                    <circle cx="50" cy="50" r="41" stroke="url(#adminPreviewGrad)" strokeWidth="6" strokeLinecap="round" fill="none" strokeDasharray="257.6" strokeDashoffset="75" />
+                                  </svg>
+                                ) : (
+                                  <LoaderVariantStyle
+                                    style={siteSettings.loader_style || 'ring'}
+                                    sizePx={72}
+                                    primaryColor={siteSettings.loader_colors_light_primary || '#CE2B5E'}
+                                    secondaryColor={siteSettings.loader_colors_light_secondary || '#f43f5e'}
+                                    speed={siteSettings.loader_speed || 'normal'}
+                                    reducedMotion={false}
+                                  />
+                                )}
+                                {siteSettings.loader_show_logo !== false && (
+                                  <img src="/logo.svg" alt="" className="absolute rounded-full bg-white border border-zinc-150 p-0.5" style={{ width: 33, height: 33, objectFit: 'contain' }} />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Show logo inside loader */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-bold uppercase text-zinc-400 font-sans">Show Logo Inside Loader Circle</span>
+                              <input 
+                                type="checkbox" 
+                                checked={siteSettings.loader_show_logo !== false} 
+                                onChange={(e) => {
+                                  setSiteSettings({ ...siteSettings, loader_show_logo: e.target.checked });
+                                }}
+                                className="w-4 h-4 rounded text-rose-500 focus:ring-rose-400 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 cursor-pointer"
+                              />
                             </div>
 
                             {/* Rotation Speed Selector */}

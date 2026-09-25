@@ -24,6 +24,7 @@ import { MarkdownImageElement } from './utils/markdownImage';
 import ArticlePage from './components/ArticlePage';
 import OfflineReaderBanner from './components/OfflineReaderBanner';
 import { AdPlacement, AdsterraDirectLink } from './components/AdPlacement';
+import ScrollAwareAd from './components/ScrollAwareAd';
 import { AdNetworkScripts } from './components/AdNetworkScripts';
 import { heartsync, getAuthors } from './store';
 import { ADS_SUSPEND_EVENT, ADS_RESUME_EVENT } from './utils/adminArea';
@@ -1863,7 +1864,9 @@ export default function App() {
           {/* Footer Ad Banner (Google AdSense)  - never on admin/auth/error views */}
           {['admin', 'login', 'error', 'access-denied'].every((t) => t !== currentTab) && (
             <>
-              <AdPlacement slot="footer" lazy />
+              {/* Scroll-aware footer unit: hides while the user scrolls,
+                  reappears shortly after scrolling stops. */}
+              <ScrollAwareAd slot="footer" />
               {/* Adsterra Direct Link / Smartlink (labelled sponsored link) */}
               <AdsterraDirectLink />
             </>
