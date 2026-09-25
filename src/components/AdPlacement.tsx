@@ -17,13 +17,107 @@ declare global {
 
 type SlotFamily = AdPlacementProps['slot'];
 
-const SLOT_DIMENSIONS: Record<SlotFamily, { minHeight: number; label: string }> = {
-  header: { minHeight: 90, label: 'Advertisement' },
-  sidebar: { minHeight: 250, label: 'Advertisement' },
-  in_article: { minHeight: 250, label: 'Advertisement' },
-  footer: { minHeight: 60, label: 'Advertisement' },
-  homepage: { minHeight: 250, label: 'Advertisement' },
-  article_bottom: { minHeight: 250, label: 'Advertisement' }
+const SLOT_LABEL: Record<SlotFamily, string> = {
+  header: 'Advertisement',
+  sidebar: 'Advertisement',
+  in_article: 'Advertisement',
+  footer: 'Advertisement',
+  homepage: 'Advertisement',
+  article_bottom: 'Advertisement'
+};
+
+/**
+ * Sandboxed ad iframe that sizes itself to the ACTUAL rendered creative.
+ *
+ * Fixed-height ad frames are the root cause of the "big blank area under
+ * the ad" bug: a slot served a 728x90 creative inside a frame reserved
+ * for 300x250 shows 160px of dead space. Instead of reserving, this frame:
+ *   - starts at `initialHeight` (the provider-declared creative size when
+ *     known, so there is no flash; 0 when the provider sizes itself)
+ *   - measures the same-origin srcdoc body after load and on every inner
+ *     DOM change (providers inject asynchronously) and grows/shrinks to the
+ *     creative's real height
+ *   - collapses to 0 when a zone never fills, so the slot shows only the
+ *     compact label instead of a blank rectangle.
+ * The provider's own script is untouched inside the srcdoc; only the frame
+ * around it is sized.
+ */
+const AutoHeightFrame: React.FC<{ srcDoc: string; initialHeight: number; maxWidth?: number }> = ({
+  srcDoc,
+  initialHeight,
+  maxWidth
+}) => {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(initialHeight);
+  useEffect(() => {
+    const iframe = ref.current;
+    if (!iframe) return;
+    let stopped = false;
+    let mo: MutationObserver | null = null;
+    const measure = () => {
+      if (stopped) return;
+      let h = 0;
+      try {
+        const doc = iframe.contentDocument;
+        const body = doc?.body;
+        if (body) {
+          h = Math.ceil(
+            Math.max(
+              body.scrollHeight,
+              doc?.documentElement?.scrollHeight ?? 0,
+              body.firstElementChild instanceof HTMLElement
+                ? body.firstElementChild.getBoundingClientRect().height
+                : 0
+            )
+          );
+        }
+      } catch {
+        // Cross-origin document (should not happen with our srcdoc):
+        // keep the declared height rather than guessing.
+        return;
+      }
+      h = Math.min(Math.max(h, 0), 1200);
+      setHeight((prev) => (Math.abs(prev - h) > 4 ? h : prev));
+    };
+    const start = () => {
+      measure();
+      try {
+        const body = iframe.contentDocument?.body;
+        if (body) {
+          mo = new MutationObserver(measure);
+          mo.observe(body, { childList: true, subtree: true, attributes: true });
+        }
+      } catch {
+        // Measurement already ran; the timed re-checks below cover late fills.
+      }
+    };
+    iframe.addEventListener('load', start);
+    // Providers inject creatives well after load; re-check a few times so a
+    // late fill resizes the frame and a never-fill collapses it.
+    const timers = [400, 1200, 3000, 6000].map((ms) => window.setTimeout(measure, ms));
+    return () => {
+      stopped = true;
+      iframe.removeEventListener('load', start);
+      mo?.disconnect();
+      timers.forEach(clearTimeout);
+    };
+  }, [srcDoc]);
+  return (
+    <iframe
+      ref={ref}
+      title="Advertisement"
+      srcDoc={srcDoc}
+      style={{
+        border: 0,
+        display: 'block',
+        width: '100%',
+        maxWidth: maxWidth ?? '100%',
+        height: Math.max(height, 0)
+      }}
+      scrolling="no"
+      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+    />
+  );
 };
 
 /** AdSense unit-id settings field + build-time env fallback, per slot. */
@@ -234,15 +328,7 @@ const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
 </script>
 <script type="text/javascript" src="//${domain}/${key}/invoke.js"></script>
 </body></html>`;
-  return (
-    <iframe
-      title="Advertisement"
-      srcDoc={srcDoc}
-      style={{ border: 0, width: '100%', maxWidth: width, height }}
-      scrolling="no"
-      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-    />
-  );
+  return <AutoHeightFrame srcDoc={srcDoc} initialHeight={height} maxWidth={width} />;
 };
 
 /**
@@ -253,19 +339,13 @@ const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
 const MonetagBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
   const tag = normalizeMonetagTag(str(settings()[`monetag_zone_${slot}`]));
   if (!tag) return null;
-  const fallback = ADSTERRA_FORMAT[slot];
   const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;display:flex;justify-content:center;align-items:flex-start;overflow:hidden}</style></head><body>
 <script type="text/javascript" src="${tag.src}" data-zone="${tag.zone}" async data-cfasync="false"></script>
 </body></html>`;
-  return (
-    <iframe
-      title="Advertisement"
-      srcDoc={srcDoc}
-      style={{ border: 0, width: '100%', maxWidth: fallback.width, height: fallback.height, minHeight: 90 }}
-      scrolling="no"
-      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-    />
-  );
+  // Native banner zones declare no fixed size: start the frame tiny and let
+  // the measurement grow it to the creative the zone actually serves
+  // (and collapse it back to nothing when the zone no-fills).
+  return <AutoHeightFrame srcDoc={srcDoc} initialHeight={50} />;
 };
 
 /**
@@ -304,7 +384,9 @@ export const AdsterraDirectLink: React.FC = () => {
  * - Honors the site's per-slot visibility toggles and the cookie consent
  *   state (ads load only after consent; marketing opt-out serves
  *   non-personalized AdSense).
- * - Reserves the slot height so ads never cause layout shift.
+ * - Content-driven sizing: no reserved heights, the rendered creative
+ *   (iframe, <ins>, native unit) determines the slot's height, and the
+ *   slot collapses entirely when a provider no-fills.
  * - Always labelled "Advertisement"; never styled to mimic UI elements.
  */
 export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', lazy = false }) => {
@@ -368,6 +450,26 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
   // All hooks must run before any early return so the hook order stays
   // stable across consent / toggle changes (conditional hooks corrupt
   // React's hook index and crash re-renders).
+  // No-fill collapse for AdSense: when Google marks the unit
+  // data-ad-status="unfilled", the <ins> itself is emptied but the slot
+  // label would keep floating above nothing. Watch the ins and remove the
+  // whole placement when Google says there is no ad.
+  const insRef = useRef<HTMLModElement>(null);
+  const [adsenseUnfilled, setAdUnfilled] = useState(false);
+  useEffect(() => {
+    if (adsenseUnfilled || !adsenseConfigured) return;
+    const ins = insRef.current;
+    if (!ins || typeof MutationObserver === 'undefined') return;
+    const mo = new MutationObserver(() => {
+      if (ins.getAttribute('data-ad-status') === 'unfilled') {
+        setAdUnfilled(true);
+        mo.disconnect();
+      }
+    });
+    mo.observe(ins, { attributes: true, attributeFilter: ['data-ad-status'] });
+    return () => mo.disconnect();
+  }, [adsenseConfigured, adsenseUnfilled]);
+
   useEffect(() => {
     if (!inView || pushedRef.current || !hasConsented || slotHiddenByToggle || !adsenseConfigured) return;
     pushedRef.current = true;
@@ -389,56 +491,56 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
   // slot. Consent only gates the adsbygoogle *activation push*, not the markup;
   // non-personalized ads are requested when marketing consent is absent.
 
-  const dims = SLOT_DIMENSIONS[slot];
+  const label = SLOT_LABEL[slot];
 
   if (!adsenseConfigured) {
     // No AdSense config for this slot  - provider chain per slot:
-    // Adsterra banner/native banner -> Monetag native banner -> reserved.
+    // Adsterra banner/native banner -> Monetag native banner -> nothing.
     // Every network honors its master switch; everything is consent-gated.
-    const fmt = ADSTERRA_FORMAT[slot];
     const adsterraMasterOn = settings().adsterra_active !== false;
     const monetagMasterOn = settings().monetag_active !== false;
     const monetagZone = normalizeMonetagTag(str(settings()[`monetag_zone_${slot}`]));
     const showAdsterra = adsterraKey && adsterraMasterOn && hasConsented;
     const showMonetag = !!monetagZone && monetagMasterOn && hasConsented;
+    // No provider configured (or no consent): render NOTHING at all.
+    // A label with no ad under it is just noise, and reserving a blank
+    // rectangle for an ad that will never come is the exact bug this
+    // component no longer tolerates.
+    if (!showAdsterra && !showMonetag) return null;
     return (
       <div
         ref={ref}
-        className={`flex flex-col items-center ${className}`}
-        style={{ minHeight: Math.max(dims.minHeight, fmt.height) }}
+        className={`flex flex-col items-center w-full ${className}`}
         data-ad-slot-family={slot}
         aria-label="Advertisement"
       >
-        <span className="text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-600 select-none mb-1">{dims.label}</span>
+        <span className="text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-600 select-none mb-1">{label}</span>
         {inView
           ? (showAdsterra
               ? <AdsterraBanner slot={slot} />
-              : showMonetag
-                ? <MonetagBanner slot={slot} />
-                : <div
-                    className="flex items-center justify-center rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 text-[10px] text-zinc-300 dark:text-zinc-600 select-none"
-                    style={{ width: fmt.width, height: fmt.height }}
-                    data-ad-slot-reserved="true"
-                  >
-                    Reserved ad space
-                  </div>)
-          : <div style={{ width: fmt.width, height: fmt.height }} />}
+              : <MonetagBanner slot={slot} />)
+          : // Lazy placeholder: a tiny neutral strip while the slot
+            // approaches the viewport - never a full-size blank box.
+            <div style={{ width: '100%', minHeight: 50 }} aria-hidden="true" />}
       </div>
     );
   }
 
+  // AdSense marked this unit unfilled: no creative, no reserved space.
+  if (adsenseUnfilled) return null;
+
   return (
     <div
       ref={ref}
-      className={`flex flex-col items-center ${className}`}
-      style={{ minHeight: dims.minHeight }}
+      className={`flex flex-col items-center w-full ${className}`}
       data-ad-slot-family={slot}
       aria-label="Advertisement"
     >
       <span className="text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-600 select-none mb-1">
-        {dims.label}
+        {label}
       </span>
       <ins
+        ref={insRef}
         className="adsbygoogle"
         style={{ display: 'block', width: '100%', maxWidth: slot === 'sidebar' ? '300px' : '970px' }}
         data-ad-client={publisherId}

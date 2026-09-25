@@ -108,13 +108,13 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
     expect(pushes[0]).toEqual({}); // personalization request  - no NPA flag
   });
 
-  it('renders a visible reserved ad space when no provider is configured (crawlable slot, no layout shift)', () => {
+  it('renders nothing at all when no provider is configured (no reserved blank area)', () => {
+    // No provider for the slot: the placement must collapse completely
+    // instead of reserving a blank rectangle (no-fill collapse rule).
     const { container } = renderPlacement();
-    const slot = container.querySelector('[data-ad-slot-family="header"]');
-    expect(slot).not.toBeNull();
-    expect(slot?.getAttribute('aria-label')).toBe('Advertisement');
-    expect(container.querySelector('[data-ad-slot-reserved="true"]')).not.toBeNull();
-    expect(container.textContent).toContain('Reserved ad space');
+    expect(container.querySelector('[data-ad-slot-family]')).toBeNull();
+    expect(container.querySelector('[data-ad-slot-reserved="true"]')).toBeNull();
+    expect(container.textContent).not.toContain('Reserved ad space');
   });
 
   it('honors the per-slot visibility toggle (banner_header_enabled=false)', () => {
@@ -200,12 +200,13 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
     heartsync.site_settings.adsterra_url_header = '';
   });
 
-  it('falls back to the reserved placeholder when a pasted value contains no valid key', () => {
+  it('collapses the slot when a pasted value contains no valid key', () => {
     heartsync.site_settings.adsterra_key_header = '<script>alert("no key here")</script>';
     const { container } = renderPlacement();
     act(() => { screen.getByTestId('grant').click(); });
     expect(container.querySelector('iframe')).toBeNull();
-    expect(container.querySelector('[data-ad-slot-reserved="true"]')).not.toBeNull();
+    expect(container.querySelector('[data-ad-slot-reserved="true"]')).toBeNull();
+    expect(container.querySelector('[data-ad-slot-family]')).toBeNull();
   });
 
   it('ignores an invalid Adsterra key (wrong shape = no ad, not a broken iframe)', () => {
@@ -235,7 +236,9 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
     const { container } = renderPlacement();
     act(() => { screen.getByTestId('grant').click(); });
     expect(container.querySelector('iframe[title="Advertisement"]')).toBeNull();
-    expect(container.querySelector('[data-ad-slot-reserved="true"]')).not.toBeNull();
+    // No other provider configured: the whole slot collapses, no reserved box.
+    expect(container.querySelector('[data-ad-slot-reserved="true"]')).toBeNull();
+    expect(container.querySelector('[data-ad-slot-family]')).toBeNull();
   });
 
   it('honors a pasted snippet with non-default dimensions (native banner size, e.g. 320x50)', () => {
