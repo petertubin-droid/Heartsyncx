@@ -70,6 +70,17 @@ const AutoHeightFrame: React.FC<{ srcDoc: string; initialHeight: number; maxWidt
                 : 0
             )
           );
+          // Native banner creatives position some of their tiles absolutely
+          // and lay others out as images that finish loading seconds after
+          // the markup lands - scrollHeight alone under-reports both (this is
+          // the "native ads never show full height" bug, verified live: the
+          // same zone that measured 205px via scrollHeight was really 614px
+          // tall). Take the furthest bottom edge of EVERY rendered descendant
+          // as the floor for the frame height.
+          body.querySelectorAll<HTMLElement>('*').forEach((el) => {
+            const r = el.getBoundingClientRect();
+            if (r.bottom > h) h = Math.ceil(r.bottom);
+          });
         }
       } catch {
         // Cross-origin document (should not happen with our srcdoc):
@@ -92,14 +103,19 @@ const AutoHeightFrame: React.FC<{ srcDoc: string; initialHeight: number; maxWidt
       }
     };
     iframe.addEventListener('load', start);
-    // Providers inject creatives well after load; re-check a few times so a
-    // late fill resizes the frame and a never-fill collapses it.
-    const timers = [400, 1200, 3000, 6000].map((ms) => window.setTimeout(measure, ms));
+    // Providers inject creatives well after load (verified live: an Adsterra
+    // native banner fills between 5-10s and keeps growing as its images
+    // finish, long after any fixed timer schedule). Poll continuously for
+    // 30s so late fills resize the frame and a never-fill collapses it; the
+    // MutationObserver above covers any change after that.
+    const poll = window.setInterval(measure, 500);
+    const pollStop = window.setTimeout(() => window.clearInterval(poll), 30000);
     return () => {
       stopped = true;
       iframe.removeEventListener('load', start);
       mo?.disconnect();
-      timers.forEach(clearTimeout);
+      window.clearInterval(poll);
+      window.clearTimeout(pollStop);
     };
   }, [srcDoc]);
   return (

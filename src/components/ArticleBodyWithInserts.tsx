@@ -175,9 +175,14 @@ export default function ArticleBodyWithInserts({
   }, [content, inserts]);
 
   // AUTOMATIC IN-ARTICLE AD DENSITY (admin toggle: in_article_ads_auto_enabled).
-  // Word-count-driven, AdSense content-ratio best practice:
-  //   < 2000 words -> 3 units | 2000-4000 -> 4 units | > 4000 -> 5 units
-  // Units are spaced evenly between paragraphs (never the first or last block).
+  // Word-count-driven density, deliberately conservative because in-article
+  // units are TALL (an Adsterra native banner is ~600px at article width -
+  // a wall of 4-5 of them reads as spam and buries the writing):
+  //   < 1200 words -> 2 units | 1200-3000 -> 3 units | > 3000 -> 4 units
+  // Units are spaced evenly through the MIDDLE 60% of the article (between
+  // 20% and 80% of blocks). The old clamp (blocks.length - 2) let short
+  // articles stack units in the last two paragraphs right next to the
+  // article_bottom slot - the reported "too many ad slots at the bottom".
   // NOTE: this hook MUST run unconditionally, before the empty-content early
   // return below. It previously sat after that return, so an article that
   // renders with zero content blocks skipped this useMemo entirely while a
@@ -188,12 +193,16 @@ export default function ArticleBodyWithInserts({
     if (!blocks || blocks.length <= 1) return [] as number[];
     const autoEnabled = (heartsync.site_settings as Record<string, unknown>).in_article_ads_auto_enabled !== false;
     const words = (content || '').trim().split(/\s+/).filter(Boolean).length;
-    const count = !autoEnabled ? 1 : words > 4000 ? 5 : words >= 2000 ? 4 : 3;
+    const count = !autoEnabled ? 1 : words > 3000 ? 4 : words >= 1200 ? 3 : 2;
+    const firstAllowed = Math.max(1, Math.floor(blocks.length * 0.2));
+    const lastAllowed = Math.max(firstAllowed, Math.floor(blocks.length * 0.8));
     const out: number[] = [];
     for (let i = 1; i <= count; i++) {
-      const idx = Math.floor((blocks.length * i) / (count + 1));
-      const clamped = Math.max(1, Math.min(blocks.length - 2, idx));
-      if (!out.includes(clamped)) out.push(clamped);
+      // Even spacing inside the allowed middle zone.
+      const idx = Math.floor(firstAllowed + ((lastAllowed - firstAllowed) * i) / (count + 1));
+      // Never stack two units back-to-back (possible on very short articles
+      // where the middle zone is only a few blocks wide).
+      if (!out.includes(idx) && (out.length === 0 || idx - out[out.length - 1] >= 2)) out.push(idx);
     }
     return out;
   }, [blocks, content]);
