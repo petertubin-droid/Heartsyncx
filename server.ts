@@ -3913,7 +3913,7 @@ async function upsertResilient(client: any, table: string, payload: any, logPref
   throw new Error(`${table} upsert: too many schema mismatches`);
 }
 
-async function syncStateToSupabase(newState: any, dbClient?: any) {
+async function syncStateToSupabase(newState: any, dbClient?: any, opts: { reader?: boolean } = {}) {
   const supabase = dbClient || getSupabaseClient();
   if (!supabase) return;
 
@@ -3947,6 +3947,17 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     try {
       if (Array.isArray(newState.posts) && newState.posts.length > 0) {
+        if (opts.reader) {
+          // Reader saves update ONLY engagement columns per id; every other
+          // column (title, status, flags...) keeps its admin-set value.
+          await upsertResilient(supabase, 'posts',
+            newState.posts.map((post: any) => ({
+              id: post.id,
+              views: Number(post.views) || 0,
+              likes: Number(post.likes) || 0
+            }))
+          );
+        } else {
         await upsertResilient(supabase, 'posts',
           newState.posts.map((post: any) => ({
             id: post.id,
@@ -3974,6 +3985,7 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
             // dedicated addPost/updatePost paths, which DO carry content.
           }))
         );
+        }
       }
     } catch (e: any) { console.warn('Supabase posts sync warning:', e.message); }
 
@@ -4186,6 +4198,10 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
 
     if (Array.isArray(newState.ad_zones) && newState.ad_zones.length > 0) {
       try {
+        if (opts.reader) {
+          // Clicks/impressions are cache-only (not table columns); zone
+          // config must never be written from a reader save.
+        } else {
         // Live ad_zones table actually has: id, name, location, is_active,
         // code_snippet, created_at. The old payload used slot/pricing/active/
         // code_template/size_label/impressions/clicks - every one of them
@@ -4200,6 +4216,7 @@ async function syncStateToSupabase(newState: any, dbClient?: any) {
             created_at: zone.created_at || new Date().toISOString()
           }))
         );
+        }
       } catch (e: any) { console.warn('Supabase ad_zones sync warning:', e.message); }
     }
 
@@ -5167,7 +5184,52 @@ async function _legacySqlSyncBypass() {
 */
 
 // Save state back securely (Always writes to Supabase & disk)
-async function saveServerCacheState(newState: any, dbClient?: any) {
+// Reader saves (X-Save-Mode: reader) carry engagement data only. Merge them
+// so a stale reader tab can never regress admin-owned rows:
+// - posts/ad_zones: per-id, taking ONLY engagement fields from the incoming
+//   row (views/likes/reactions, clicks/impressions); config stays cached.
+// - comments/subscribers: union per id so rows added by other tabs after
+//   this tab's snapshot are never dropped from the cache.
+// Rows that exist only in the incoming payload never enter the cache when a
+// field filter is active (readers cannot mint new config rows).
+function mergeReaderSection(cachedArr: any[], incomingArr: any[], fields?: string[]): any[] {
+  const idOf = (r: any) => String(r?.id ?? r?.email ?? '');
+  const out = Array.isArray(cachedArr) ? cachedArr.slice() : [];
+  const idx = new Map(out.map((r: any, i: number) => [idOf(r), i]));
+  for (const row of (Array.isArray(incomingArr) ? incomingArr : [])) {
+    const key = idOf(row);
+    const i = idx.get(key);
+    if (i === undefined) {
+      if (!fields) { out.push(row); idx.set(key, out.length - 1); }
+      continue;
+    }
+    if (fields) {
+      const picked: Record<string, unknown> = {};
+      for (const f of fields) if (row?.[f] !== undefined) picked[f] = row[f];
+      out[i] = { ...out[i], ...picked };
+    } else {
+      out[i] = row;
+    }
+  }
+  return out;
+}
+
+async function saveServerCacheState(newState: any, dbClient?: any, opts: { reader?: boolean } = {}) {
+  // Reader saves get the engagement-only merges above before touching the cache.
+  if (opts.reader && serverCacheState) {
+    if (Array.isArray(newState.posts) && Array.isArray(serverCacheState.posts)) {
+      newState.posts = mergeReaderSection(serverCacheState.posts, newState.posts, ['views', 'likes', 'reactions']);
+    }
+    if (Array.isArray(newState.ad_zones) && Array.isArray(serverCacheState.ad_zones)) {
+      newState.ad_zones = mergeReaderSection(serverCacheState.ad_zones, newState.ad_zones, ['clicks', 'impressions']);
+    }
+    if (Array.isArray(newState.comments) && Array.isArray(serverCacheState.comments)) {
+      newState.comments = mergeReaderSection(serverCacheState.comments, newState.comments);
+    }
+    if (Array.isArray(newState.subscribers) && Array.isArray(serverCacheState.subscribers)) {
+      newState.subscribers = mergeReaderSection(serverCacheState.subscribers, newState.subscribers);
+    }
+  }
   // Merge per-key instead of wholesale replacement: reader-side light saves
   // (article views, ad clicks) intentionally omit admin-owned sections like
   // site_settings. Replacing the cache wholesale would serve a settings-less
@@ -5178,7 +5240,7 @@ async function saveServerCacheState(newState: any, dbClient?: any) {
   lastModifiedDate = new Date();
   lastSupabaseFetchTime = Date.now();
 
-  await syncStateToSupabase(newState, dbClient);
+  await syncStateToSupabase(newState, dbClient, opts);
   
   
 }
@@ -6245,8 +6307,12 @@ app.post('/api/state', adminAuthMiddleware, async (req: Request, res: Response) 
         };
       }
     }
-    // Route DB writes through the admin's own session so RLS admin policies apply
-    await saveServerCacheState(newState, getAdminDbClient(req));
+    // Route DB writes through the admin's own session so RLS admin policies apply.
+    // X-Save-Mode: reader marks engagement-only saves (views, ad clicks,
+    // comments, newsletter signups) which get restricted merges; anything
+    // else is an admin save merged per-key.
+    const readerSave = (req.headers['x-save-mode'] || '') === 'reader';
+    await saveServerCacheState(newState, getAdminDbClient(req), { reader: readerSave });
     res.json({ success: true, message: 'State synchronized successfully with backend and database.' });
   } catch (err: any) {
     console.error('❌ Failed to synchronize state to database:', err);

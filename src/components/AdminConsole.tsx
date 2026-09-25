@@ -863,7 +863,7 @@ export default function AdminConsole({
           if (data.tags) heartsync.tags = data.tags;
           if (data.podcasts) heartsync.podcasts = data.podcasts;
           if (data.rss_feeds) heartsync.rss_feeds = data.rss_feeds;
-          heartsync.saveState();
+          heartsync.saveState(false, { sections: ['posts', 'categories', 'site_settings', 'comments', 'subscribers', 'authors', 'pages', 'tags', 'podcasts', 'rss_feeds'] });
 
           setPosts([...heartsync.posts]);
           setCategories([...heartsync.categories]);
@@ -1332,21 +1332,21 @@ export default function AdminConsole({
   useEffect(() => {
     if (tags) {
       heartsync.tags = tags;
-      heartsync.saveState();
+      heartsync.saveState(false, { sections: ['tags'] });
     }
   }, [tags]);
 
   useEffect(() => {
     if (podcasts) {
       heartsync.podcasts = podcasts;
-      heartsync.saveState();
+      heartsync.saveState(false, { sections: ['podcasts'] });
     }
   }, [podcasts]);
 
   useEffect(() => {
     if (rssFeeds) {
       heartsync.rss_feeds = rssFeeds;
-      heartsync.saveState();
+      heartsync.saveState(false, { sections: ['rss_feeds'] });
     }
   }, [rssFeeds]);
 
@@ -1366,7 +1366,7 @@ export default function AdminConsole({
     if (campaigns && campaigns.length > 0) {
       heartsync.sponsorship_campaigns = campaigns;
       heartsync.campaigns = campaigns;
-      heartsync.saveState();
+      heartsync.saveState(false, { sections: ['sponsorship_campaigns', 'campaigns'] });
     }
   }, [campaigns]);
 
@@ -2091,7 +2091,7 @@ export default function AdminConsole({
         avatar_url: data.avatar_url,
         bio: data.bio
       };
-      heartsync.saveState();
+      heartsync.saveState(false, { localOnly: true });
     }
 
     // Dynamic synchronization with local staffUsers state and localStore list
@@ -2497,7 +2497,7 @@ export default function AdminConsole({
         avatar_url: staffData.avatar,
         bio: staffData.bio
       };
-      heartsync.saveState();
+      heartsync.saveState(false, { localOnly: true });
     }
 
     // Always synchronize to authors list to maintain consistent author profile information everywhere
@@ -3365,7 +3365,7 @@ export default function AdminConsole({
                         }
 
                         heartsync.logAction('Traffic Sync', `Injected actual real-time reader pageviews and likes metrics to ${randomSelections.length} published articles.`);
-                        heartsync.saveState();
+                        heartsync.saveState(false, { sections: ['posts', 'analytics'], reader: true });
                         
                         setAnalytics(heartsync.getLiveAnalytics());
                         setPosts([...heartsync.posts]);
@@ -4913,7 +4913,7 @@ export default function AdminConsole({
                                   };
                                   const currentQuizzes = heartsync.quizzes || [];
                                   heartsync.quizzes = [savedQuiz, ...currentQuizzes];
-                                  heartsync.saveState();
+                                  heartsync.saveState(false, { sections: ['quizzes'] });
                                   triggerToast(`Dynamic quiz generated successfully for article!`);
                                   setShowAutoGenerator(false);
                                 } else {
@@ -5093,7 +5093,7 @@ export default function AdminConsole({
                                 heartsync.quizzes = [payload, ...cur];
                               }
 
-                              heartsync.saveState();
+                              heartsync.saveState(false, { sections: ['quizzes'] });
                               triggerToast(editingQuiz ? 'Interactive quiz modified successfully.' : 'New interactive quiz successfully added.');
                               setShowQuizForm(false);
                             }}
@@ -5150,7 +5150,7 @@ export default function AdminConsole({
                                     onClick={() => {
                                       if (confirm('Delete this interactive quiz forever?')) {
                                         heartsync.quizzes = (heartsync.quizzes || []).filter(q => q.id !== qz.id);
-                                        heartsync.saveState();
+                                        heartsync.saveState(false, { sections: ['quizzes'] });
                                         triggerToast('Quiz module deleted.');
                                       }
                                     }}
@@ -5318,7 +5318,7 @@ export default function AdminConsole({
                             const updatedTags = [...tags, nt];
                             setTags(updatedTags);
                             heartsync.tags = updatedTags;
-                            heartsync.saveState();
+                            heartsync.saveState(false, { sections: ['tags'] });
                             setNewTagName('');
                             triggerToast('Taxonomy Tag deployed successfully.');
                           }}
@@ -5346,7 +5346,7 @@ export default function AdminConsole({
                                 const updatedTags = tags.filter(tagItem => tagItem.id !== t.id);
                                 setTags(updatedTags);
                                 heartsync.tags = updatedTags;
-                                heartsync.saveState();
+                                heartsync.saveState(false, { sections: ['tags'] });
                                 triggerToast('Taxonomy Tag disconnected.');
                               }}
                               className="p-1 px-2.5 hover:text-rose-500 rounded-lg text-[10px] font-bold border border-zinc-200 dark:border-zinc-800"
@@ -5428,7 +5428,7 @@ export default function AdminConsole({
                             const updatedPods = [...podcasts, newPod];
                             setPodcasts(updatedPods);
                             heartsync.podcasts = updatedPods;
-                            heartsync.saveState();
+                            heartsync.saveState(false, { sections: ['podcasts'] });
                             setNewPodTitle('');
                             setNewPodHost('');
                             setShowCreatePod(false);
@@ -5462,7 +5462,7 @@ export default function AdminConsole({
                                 const up = podcasts.map(p => p.id === pod.id ? { ...p, status: p.status === 'Active' ? 'Paused' : 'Active' } : p);
                                 setPodcasts(up);
                                 heartsync.podcasts = up;
-                                heartsync.saveState();
+                                heartsync.saveState(false, { sections: ['podcasts'] });
                                 triggerToast('Status changes applied.');
                               }}
                               className="px-2.5 py-1.5 border hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-[10px] font-bold"
@@ -5474,7 +5474,7 @@ export default function AdminConsole({
                                 const up = podcasts.filter(p => p.id !== pod.id);
                                 setPodcasts(up);
                                 heartsync.podcasts = up;
-                                heartsync.saveState();
+                                heartsync.saveState(false, { sections: ['podcasts'] });
                                 triggerToast('Podcast decoupled.');
                               }}
                               className="p-1.5 border border-zinc-200 dark:border-zinc-800 hover:text-red-500 rounded-xl"
@@ -5693,7 +5693,7 @@ export default function AdminConsole({
                                   const updatedFeeds = rssFeeds.filter(f => f.id !== feed.id);
                                   setRssFeeds(updatedFeeds);
                                   heartsync.rss_feeds = updatedFeeds;
-                                  heartsync.saveState();
+                                  heartsync.saveState(false, { sections: ['rss_feeds'] });
                                   triggerToast(`Feed server '${feed.name}' disconnected from curation workspace.`);
                                 }}
                                 className="p-1 px-2 border border-zinc-150 dark:border-zinc-800 hover:bg-red-500/10 hover:text-red-500 text-zinc-400 rounded-lg shrink-0 cursor-pointer"
@@ -5766,7 +5766,7 @@ export default function AdminConsole({
                               const updatedFeeds = [...rssFeeds, wire];
                               setRssFeeds(updatedFeeds);
                               heartsync.rss_feeds = updatedFeeds;
-                              heartsync.saveState();
+                              heartsync.saveState(false, { sections: ['rss_feeds'] });
                               setNewRssName('');
                               setNewRssUrl('');
                               triggerToast(`Connection validated! Channel '${newRssName}' added to servers mapping.`);
@@ -6050,7 +6050,7 @@ export default function AdminConsole({
                                         const updatedPosts = [newPost, ...posts];
                                         setPosts(updatedPosts);
                                         heartsync.posts = updatedPosts;
-                                        heartsync.saveState();
+                                        heartsync.saveState(false, { sections: ['posts'] });
                                         triggerToast(`Post pre-compiled and published! Article '${newPost.title}' co-authored live via Gemini is now live inside Heartsync!`);
                                       })
                                       .catch(err => {

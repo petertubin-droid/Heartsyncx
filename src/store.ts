@@ -2059,7 +2059,7 @@ export class HeartsyncStore {
     };
   }
 
-  public async saveState(forceImmediate: boolean = false, opts: { light?: boolean } = {}): Promise<any> {
+  public async saveState(forceImmediate: boolean = false, opts: { light?: boolean; sections?: string[]; reader?: boolean; localOnly?: boolean } = {}): Promise<any> {
     if (this._isInsideSaveState) return this._activeSavePromise ?? null;
     this._isInsideSaveState = true;
     try {
@@ -2078,6 +2078,17 @@ export class HeartsyncStore {
 
     // Notify React listeners for immediate optimistic UI feedback
     this.onStateChangeCallbacks.forEach(cb => cb());
+
+    // localOnly: persist to localStorage + refresh UI, but never POST the
+    // state. Used by auth flows, bookmarks, vault/journal entries and other
+    // actions whose data either is not a server state section or persists
+    // through dedicated endpoints. A full sync here is how a stale or
+    // pre-hydration tab used to wipe freshly saved server settings.
+    if (opts.localOnly) {
+      this.isSaving = false;
+      this.onStateChangeCallbacks.forEach(cb => cb());
+      return null;
+    }
 
     // Push state update to the server with automatic retry and exponential backoff
     const runStateSyncWithRetry = async (retries = 3, delay = 1000): Promise<any> => {
@@ -2099,7 +2110,7 @@ export class HeartsyncStore {
         // (ad networks flipping back off, 2026-09-25 incident). A light
         // save syncs only reader-generated data; the server skips any
         // section absent from the payload.
-        const payload: Record<string, unknown> = {
+        let payload: Record<string, unknown> = {
             posts: this.posts,
             categories: this.categories,
             comments: this.comments,
@@ -2128,7 +2139,17 @@ export class HeartsyncStore {
             email_campaigns: this.email_campaigns,
             email_templates: this.email_templates
         };
-        if (opts.light) {
+        if (opts.sections) {
+          // Scoped save: ship ONLY the sections this action actually mutated.
+          // Absent sections are skipped server-side (per-key merge), so a
+          // stale tab can no longer revert settings or content it never
+          // touched (2026-09-25 audit).
+          const scoped: Record<string, unknown> = {};
+          for (const k of opts.sections) {
+            if (k in payload) scoped[k] = (payload as Record<string, unknown>)[k];
+          }
+          payload = scoped as typeof payload;
+        } else if (opts.light) {
           for (const k of [
             'site_settings', 'pn_settings', 'audit_logs', 'media_library',
             'authors', 'pages', 'plans', 'subscriptions', 'payments',
@@ -2139,8 +2160,11 @@ export class HeartsyncStore {
         }
         const response = await fetch('/api/state', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
+            // Reader saves get engagement-only merges server-side; admin
+            // scoped saves are merged per-key like before.
+            ...(opts.reader || opts.light ? { 'X-Save-Mode': 'reader' } : {}),
             ...authHeaders
           },
           body: JSON.stringify(payload)
@@ -2228,22 +2252,13 @@ export class HeartsyncStore {
       email_templates: this.email_templates
     };
 
-    try {
-      const url = '/api/state';
-      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-        navigator.sendBeacon(url, blob);
-      } else {
-        fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          keepalive: true
-        }).catch(err => console.warn('Flush state sync failed:', err));
-      }
-    } catch (e) {
-      console.warn('Error flushing state on unload:', e);
-    }
+    // (2026-09-25 audit) No-op. This flush used to POST the FULL state on
+    // every tab unload, but the endpoint requires a Bearer authorization
+    // header, which neither sendBeacon nor this keepalive fetch could ever
+    // attach, so the request always died 401. Shipping a tab's whole
+    // (possibly stale) snapshot on unload is also exactly the class of
+    // write that reverts admin settings, so it stays removed.
+    void payload;
   }
 
   public subscribe(cb: () => void) {
@@ -2282,7 +2297,7 @@ export class HeartsyncStore {
       timestamp: new Date().toISOString()
     };
     this.audit_logs.unshift(newLog);
-    this.saveState(false, { light: true });
+    this.saveState(false, { localOnly: true }); // audit row persists via the direct insert below
 
     if (this.supabase) {
       // Live audit_logs columns: id, action, user_id, details (JSONB),
@@ -2519,7 +2534,7 @@ export class HeartsyncStore {
 
         // Add to media bank
         this.media_library.unshift(mediaItem);
-        this.saveState(false, { light: true });
+        this.saveState(false, { sections: ['media_library'] });
         this.logAction('Uploaded Media file (Supabase Bucket)', file.name);
         return fileUrl;
       } catch (err) {
@@ -2548,7 +2563,7 @@ export class HeartsyncStore {
       };
 
       this.media_library.unshift(mediaItem);
-      this.saveState(false, { light: true });
+      this.saveState(false, { sections: ['media_library'] });
       this.logAction('Uploaded Media file (Local Base64)', file.name);
       return base64Url;
     } catch (readErr) {
@@ -2567,7 +2582,7 @@ export class HeartsyncStore {
       };
       
       this.media_library.unshift(mediaItem);
-      this.saveState(false, { light: true });
+        this.saveState(false, { sections: ['media_library'] });
       return localUrl;
     }
     } finally {
@@ -2601,7 +2616,7 @@ export class HeartsyncStore {
       }
       return m;
     });
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['media_library'] });
   }
 
   public deleteMediaFile(url: string) {
@@ -2611,7 +2626,7 @@ export class HeartsyncStore {
     });
     const fallbackCover = 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=800';
     this.posts = this.posts.map(p => p.featured_image === url ? { ...p, featured_image: fallbackCover } : p);
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['media_library'] });
     this.logAction('Removed Media File', url);
 
     if (this.supabase) {
@@ -2631,7 +2646,7 @@ export class HeartsyncStore {
       }
     });
     this.posts = this.posts.map(p => p.featured_image === oldUrl ? { ...p, featured_image: newUrl } : p);
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['media_library'] });
     this.logAction('Updated Media File URL', `${oldUrl} -> ${newUrl}`);
 
     if (this.supabase) {
@@ -2653,7 +2668,7 @@ export class HeartsyncStore {
       tags: ['external']
     };
     this.media_library.unshift(mediaItem);
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['media_library'] });
     this.logAction('Registered External Media URL', url);
   }
 
@@ -2705,7 +2720,7 @@ export class HeartsyncStore {
 
     this.posts.unshift(expandedPost);
     this.logAction('Created Article', expandedPost.title);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['posts'] });
     return expandedPost;
   }
 
@@ -2754,7 +2769,7 @@ export class HeartsyncStore {
       const idx = this.posts.findIndex(x => x.id === mapped.id || x.slug === mapped.slug);
       if (idx !== -1) this.posts[idx] = { ...this.posts[idx], ...mapped };
       else this.posts.unshift(mapped);
-      this.saveState(false, { light: true });
+      this.saveState(false, { localOnly: true }); // body cache is client-side only
       this.triggerUpdate();
       return this.posts.find(x => x.slug === mapped.slug) || mapped;
     } catch {
@@ -2771,7 +2786,7 @@ export class HeartsyncStore {
       if (!data || !data.content) return null;
       const idx = this.posts.findIndex(p => p.id === post.id || p.slug === post.slug);
       if (idx !== -1) this.posts[idx] = { ...this.posts[idx], ...data };
-      this.saveState(false, { light: true });
+      this.saveState(false, { localOnly: true }); // body cache is client-side only
       this.triggerUpdate();
       return this.posts[idx] || { ...post, ...data };
     } catch {
@@ -2830,7 +2845,7 @@ export class HeartsyncStore {
 
     this.posts = updatedPosts;
     this.logAction('Edited Article', `ID: ${id}`);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['posts'] });
   }
 
   public async deletePost(id: string) {
@@ -2846,7 +2861,7 @@ export class HeartsyncStore {
 
     this.posts = this.posts.filter(p => p.id !== id);
     this.logAction('Removed Article', post?.title || id);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['posts'] });
   }
 
   public async updatePostBulkStatus(ids: string[], status: Post['status']) {
@@ -2865,7 +2880,7 @@ export class HeartsyncStore {
       return p;
     });
     this.logAction('Bulk Updated Articles', `${ids.length} items to ${status}`);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['posts'] });
   }
 
   public async deletePostsBulk(ids: string[]) {
@@ -2879,7 +2894,7 @@ export class HeartsyncStore {
 
     this.posts = this.posts.filter(p => !ids.includes(p.id));
     this.logAction('Bulk Deleted Articles', `${ids.length} items modified`);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['posts'] });
   }
 
   // CATEGORY OPERATIONS SYSTEM (FEATURE 3)
@@ -2922,7 +2937,7 @@ export class HeartsyncStore {
 
     this.categories.unshift(newCat);
     this.logAction('Created Category', name);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['categories'] });
     return newCat;
   }
 
@@ -2957,7 +2972,7 @@ export class HeartsyncStore {
       return c;
     });
     this.logAction('Edited Category', `ID: ${id}`);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['categories'] });
   }
 
   public async deleteCategory(id: string) {
@@ -2971,7 +2986,7 @@ export class HeartsyncStore {
 
     this.categories = this.categories.filter(c => c.id !== id);
     this.logAction('Removed Category', id);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['categories'] });
   }
 
   // ENGAGEMENT FUNCTIONS
@@ -2993,7 +3008,7 @@ export class HeartsyncStore {
     if (this.analytics) {
       this.analytics.total_likes += 1;
     }
-    this.saveState(false, { light: true }); // Saves state locally and triggers React UI listeners instantly
+    this.saveState(false, { localOnly: true }); // engagement persists via the RPC below
 
     const updatedPost = this.posts.find(p => p.id === id);
     const newLikes = updatedPost ? updatedPost.likes : prevLikes + 1;
@@ -3036,7 +3051,7 @@ export class HeartsyncStore {
       if (this.analytics) {
         this.analytics.total_likes = prevTotalLikes;
       }
-      this.saveState(false, { light: true });
+      this.saveState(false, { localOnly: true });
       this.notifyToast(`Failed to record like in database: ${errorDetails}`, 'error');
     }
   }
@@ -3050,7 +3065,7 @@ export class HeartsyncStore {
       }
       return p;
     });
-    this.saveState(false, { light: true });
+    this.saveState(false, { localOnly: true }); // engagement persists via the RPC below
 
     if (this.supabase) {
       this.supabase.rpc('increment_post_engagement', { p_post_id: id, p_reaction_key: String(reaction), p_views_delta: 1 }).then(({ error }: any) => {
@@ -3097,7 +3112,14 @@ export class HeartsyncStore {
       }
     }
 
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['analytics'], reader: true });
+    // Views persist through the atomic engagement RPC (posts no longer ship
+    // from reader saves); the state sync above is analytics-only.
+    if (this.supabase) {
+      this.supabase.rpc('increment_post_engagement', { p_post_id: id, p_views_delta: 1 }).then(({ error }: any) => {
+        if (error) console.warn('View persistence failed:', error.message);
+      });
+    }
 
     if (this.supabase) {
       this.supabase.rpc('increment_post_engagement', { p_post_id: id, p_views_delta: 1 }).then(({ error }: any) => {
@@ -3121,7 +3143,7 @@ export class HeartsyncStore {
       this.bookmarks = this.bookmarks.filter(b => b !== id);
     }
 
-    this.saveState(false, { light: true }); // Triggers UI update instantly across all components
+    this.saveState(false, { localOnly: true }); // local bookshelf only
 
     // 2. DATABASE PERSISTENCE & CONFIRMATION
     let success = true;
@@ -3182,7 +3204,7 @@ export class HeartsyncStore {
     } else {
       // Revert optimistic update on database failure
       this.bookmarks = previousBookmarks;
-      this.saveState(false, { light: true });
+      this.saveState(false, { localOnly: true });
       this.notifyToast(`Failed to sync bookmark to database: ${errorDetails}`, 'error');
     }
   }
@@ -3230,7 +3252,7 @@ export class HeartsyncStore {
       created_at: new Date().toISOString()
     };
     this.vaultItems = [item, ...this.vaultItems];
-    this.saveState(false, { light: true });
+    this.saveState(false, { localOnly: true });
     this.onStateChangeCallbacks.forEach((cb) => cb());
     if (this.supabase) {
       this.supabase.from('love_vault_items').insert([item]).then(({ error }) => {
@@ -3241,7 +3263,7 @@ export class HeartsyncStore {
 
   public deleteVaultItem(id: string): void {
     this.vaultItems = this.vaultItems.filter((v) => v.id !== id);
-    this.saveState(false, { light: true });
+    this.saveState(false, { localOnly: true });
     this.onStateChangeCallbacks.forEach((cb) => cb());
     if (this.supabase) {
       this.supabase.from('love_vault_items').delete().eq('id', id).then(({ error }) => {
@@ -3262,7 +3284,7 @@ export class HeartsyncStore {
       created_at: new Date().toISOString()
     };
     this.journalEntries = [entry, ...this.journalEntries];
-    this.saveState(false, { light: true });
+    this.saveState(false, { localOnly: true });
     this.onStateChangeCallbacks.forEach((cb) => cb());
     this.notifyToast('Journal entry saved to your private LoveVault.', 'success');
     if (this.supabase) {
@@ -3274,7 +3296,7 @@ export class HeartsyncStore {
 
   public deleteJournalEntry(id: string): void {
     this.journalEntries = this.journalEntries.filter((j) => j.id !== id);
-    this.saveState(false, { light: true });
+    this.saveState(false, { localOnly: true });
     this.onStateChangeCallbacks.forEach((cb) => cb());
     if (this.supabase) {
       this.supabase.from('journal_entries').delete().eq('id', id).then(({ error }) => {
@@ -3307,7 +3329,7 @@ export class HeartsyncStore {
 
     this.comments.push(newComment);
     this.logAction('Added Comment', `On post ${postId}`);
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['comments'], reader: true });
 
     if (isApproved) {
       this.notifyToast('Your reflection has been posted.', 'success');
@@ -3339,7 +3361,7 @@ export class HeartsyncStore {
       }
       return c;
     });
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['comments'] });
 
     if (this.supabase) {
       const match = this.comments.find(c => c.id === id);
@@ -3359,7 +3381,7 @@ export class HeartsyncStore {
     }
     this.comments = this.comments.filter(c => c.id !== id);
     this.logAction('Deleted Comment', `ID ${id}`);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['comments'] });
   }
 
   public subscribeNewsletter(email: string, source: 'footer' | 'popup' | 'dedicated_page' = 'footer') {
@@ -3376,7 +3398,7 @@ export class HeartsyncStore {
     
     this.subscribers.push(subscriber);
     this.logAction('Newsletter Subscriber Added', email);
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['subscribers'], reader: true });
 
     if (this.supabase) {
       this.supabase.from('subscribers').insert([subscriber]).then();
@@ -3399,7 +3421,7 @@ export class HeartsyncStore {
   public async removeSubscriber(email: string): Promise<boolean> {
     this.subscribers = this.subscribers.filter(s => s.email.toLowerCase() !== email.toLowerCase());
     this.logAction('Newsletter Subscriber Removed', email);
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['subscribers'] });
 
     if (this.supabase) {
       try {
@@ -3437,7 +3459,7 @@ export class HeartsyncStore {
     // Await the save (join the one logAction just started) so callers
     // like the ad-sync button read a committed database before their
     // read-back, and their syncError checks see the real outcome.
-    await this.saveState(false, { light: true });
+    await this.saveState(false, { sections: ['site_settings'] });
 
     if (urlChanged || keyChanged) {
       this.initSupabaseConnection();
@@ -3460,7 +3482,7 @@ export class HeartsyncStore {
     };
     this.authors.push(newAuthor);
     this.logAction('Created Author', newAuthor.name);
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['authors'] });
     if (this.supabase) {
       const dbPayload = {
         id: toDbUUID(newAuthor.id),
@@ -3482,7 +3504,7 @@ export class HeartsyncStore {
     if (updated) {
       this.logAction('Updated Author', updated.name);
     }
-    this.saveState(false, { light: true });
+    this.saveState(false, { sections: ['authors'] });
     if (this.supabase) {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
@@ -3502,7 +3524,7 @@ export class HeartsyncStore {
     // Soft delete preferred for articles linkage fallback
     this.authors = this.authors.map(a => a.id === id ? { ...a, is_deleted: true } : a);
     this.logAction('Deleted Author (Soft)', `ID ${id}`);
-    this.saveState();
+    this.saveState(false, { sections: ['authors'] });
     if (this.supabase) {
       this.supabase.from('profiles').update({ role: 'deleted_author' }).eq('id', toDbUUID(id)).then(({ error }) => {
         if (error) console.warn('Supabase author soft-delete failed:', error);
@@ -3521,7 +3543,7 @@ export class HeartsyncStore {
     };
     this.pages.push(newPage);
     this.logAction('Created Page', newPage.title);
-    this.saveState();
+    this.saveState(false, { sections: ['pages'] });
     if (this.supabase) {
       this.supabase.from('pages').insert([newPage]).then(({ error }) => {
         if (error) console.warn('Supabase page insert failed:', error);
@@ -3537,7 +3559,7 @@ export class HeartsyncStore {
     if (updated) {
       this.logAction('Updated Page', updated.title);
     }
-    this.saveState();
+    this.saveState(false, { sections: ['pages'] });
     if (this.supabase) {
       this.supabase.from('pages').update(withTS).eq('id', id).then(({ error }) => {
         if (error) console.warn('Supabase page update failed:', error);
@@ -3555,7 +3577,7 @@ export class HeartsyncStore {
     }
     this.pages = this.pages.map(p => p.id === id ? { ...p, is_deleted: true, updated_at: new Date().toISOString() } : p);
     this.logAction('Deleted Page (Soft)', `ID ${id}`);
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['pages'] });
   }
 
   public getLiveAnalytics(): AnalyticsSummary {
@@ -3628,7 +3650,7 @@ export class HeartsyncStore {
     this.audit_logs = [];
 
     this.logAction('Analytics Reset', 'All dashboard views, likes, subscribers, comments, and article-specific metrics were cleared');
-    await this.saveState(true);
+    await this.saveState(true, { sections: ['analytics', 'posts', 'ad_zones', 'subscribers', 'comments', 'audit_logs'] });
 
     if (this.supabase) {
       try {
@@ -3677,7 +3699,7 @@ export class HeartsyncStore {
     const zone = this.ad_zones.find(z => z.id === adId);
     if (zone) {
       zone.clicks = (zone.clicks || 0) + 1;
-      this.saveState(false, { light: true });
+      this.saveState(false, { sections: ['ad_zones'], reader: true });
     }
   }
 
@@ -3692,7 +3714,7 @@ export class HeartsyncStore {
     if (!exists) {
       this.plans.push(plan);
       this.logAction('Plan Created', `Tier ${plan.name} at Monthly $${plan.price_monthly}`);
-      this.saveState();
+      this.saveState(false, { sections: ['plans'] });
     }
   }
 
@@ -3705,13 +3727,13 @@ export class HeartsyncStore {
       }
       return p;
     });
-    this.saveState();
+    this.saveState(false, { sections: ['plans'] });
   }
 
   public deleteSubscriptionPlan(id: string) {
     this.plans = this.plans.filter(p => p.id !== id);
     this.logAction('Plan Deleted', `Tier ID ${id}`);
-    this.saveState();
+    this.saveState(false, { sections: ['plans'] });
   }
 
   public async registerNewUser(name: string, email: string, password?: string): Promise<{ success: boolean; user?: User; error?: string; needsEmailConfirmation?: boolean }> {
@@ -3784,7 +3806,7 @@ export class HeartsyncStore {
         } catch (_) {
           // Profile sync is best-effort; the auth listener will retry on the SIGNED_IN event
         }
-        this.saveState();
+        this.saveState(false, { localOnly: true }); // auth state only
       }
 
       this.logAction('User Registered via Supabase Auth', normalizedEmail);
@@ -3908,7 +3930,7 @@ export class HeartsyncStore {
 
       this.current_user = mappedUser;
       this.logAction('User Login via Supabase Auth', cleanEmail);
-      this.saveState();
+      this.saveState(false, { localOnly: true }); // auth state only
       this.triggerUpdate();
 
       return { success: true, user: mappedUser };
@@ -3926,7 +3948,7 @@ export class HeartsyncStore {
       }
       return u;
     });
-    this.saveState();
+    this.saveState(false, { sections: ['all_users'] });
   }
 
   public updateUserPremiumRole(userId: string, role: 'admin' | 'author' | 'reader') {
@@ -3938,7 +3960,7 @@ export class HeartsyncStore {
       }
       return u;
     });
-    this.saveState();
+    this.saveState(false, { sections: ['all_users'] });
   }
 
   public createPremiumUserSubscription(userId: string, planId: string, billingCycle: 'monthly' | 'yearly', gateway: 'stripe' | 'paystack' | 'flutterwave', amount: number, durationMonths: number = 1) {
@@ -3979,7 +4001,7 @@ export class HeartsyncStore {
     this.payments.unshift(newPayment);
 
     this.logAction('Subscription Activated', `User ID ${userId} enrolled in ${planName}`);
-    this.saveState();
+    this.saveState(false, { sections: ['subscriptions'] });
   }
 
   public cancelUserSubscription(userId: string) {
@@ -3990,13 +4012,13 @@ export class HeartsyncStore {
       return s;
     });
     this.logAction('Subscription Cancelled', `User ID ${userId}`);
-    this.saveState();
+    this.saveState(false, { sections: ['subscriptions'] });
   }
 
   public setGlobalLock(lock: boolean) {
     this.global_premium_locked = lock;
     this.logAction('Admin Settings Command', `Global Lock toggled to ${lock}`);
-    this.saveState();
+    this.saveState(false, { sections: ['global_premium_locked'] });
   }
 
   public createDirectPayment(userId: string, amount: number, gateway: string, planName: string, status: 'succeeded' | 'failed') {
@@ -4012,7 +4034,7 @@ export class HeartsyncStore {
     (newPayment as any).plan_name = planName;
 
     this.payments.unshift(newPayment);
-    this.saveState();
+    this.saveState(false, { sections: ['payments'] });
   }
 
   public getSQLSchema(): string {
@@ -4288,17 +4310,17 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
   public addPlan(plan: Plan) {
     this.plans.push(plan);
     this.logAction('Created Subscription Plan', plan.name);
-    this.saveState();
+    this.saveState(false, { sections: ['plans'] });
   }
   public updatePlan(id: string, updates: Partial<Plan>) {
     this.plans = this.plans.map(p => p.id === id ? { ...p, ...updates } : p);
     this.logAction('Updated Subscription Plan', id);
-    this.saveState();
+    this.saveState(false, { sections: ['plans'] });
   }
   public deletePlan(id: string) {
     this.plans = this.plans.filter(p => p.id !== id);
     this.logAction('Deleted Subscription Plan', id);
-    this.saveState();
+    this.saveState(false, { sections: ['plans'] });
   }
 
   // --- MEMBERS MANAGEMENT ---
@@ -4311,7 +4333,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
       this.current_user = { ...this.current_user, ...updates };
     }
     this.logAction('Updated Member Metadata', id);
-    this.saveState();
+    this.saveState(false, { sections: ['all_users'] });
   }
   public suspendMember(id: string) {
     this.updateMember(id, { is_suspended: true });
@@ -4335,7 +4357,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
       is_trial: sub.is_trial ?? false
     });
     this.logAction('Active Subscription Generated', `Sub ID: ${sub.id}`);
-    this.saveState();
+    this.saveState(false, { sections: ['subscriptions'] });
   }
   public updateSubscription(id: string, updates: Partial<Subscription>) {
     this.subscriptions = this.subscriptions.map(s => {
@@ -4352,7 +4374,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
       return s;
     });
     this.logAction('Subscription Upgraded', id);
-    this.saveState();
+    this.saveState(false, { sections: ['subscriptions'] });
   }
   public cancelSubscription(id: string) {
     const sub = this.subscriptions.find(s => s.id === id);
@@ -4368,7 +4390,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
   public addPayment(pay: Payment) {
     this.payments.push(pay);
     this.logAction('Billing Processed', `Amount ${pay.amount}`);
-    this.saveState();
+    this.saveState(false, { sections: ['payments'] });
   }
 
   // --- RSS FEEDS ---
@@ -4381,17 +4403,17 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
     };
     this.rss_feeds.push(newFeed);
     this.logAction('Created RSS Feed', feed.name);
-    this.saveState();
+    this.saveState(false, { sections: ['rss_feeds'] });
   }
   public updateRssFeed(id: string, updates: Partial<{ name: string; url: string; last_imported_at: string }>) {
     this.rss_feeds = this.rss_feeds.map(f => f.id === id ? { ...f, ...updates } : f);
     this.logAction('Updated RSS Feed', id);
-    this.saveState();
+    this.saveState(false, { sections: ['rss_feeds'] });
   }
   public deleteRssFeed(id: string) {
     this.rss_feeds = this.rss_feeds.filter(f => f.id !== id);
     this.logAction('Deleted RSS Feed', id);
-    this.saveState();
+    this.saveState(false, { sections: ['rss_feeds'] });
   }
 
   // --- WEBHOOK TARGETS ---
@@ -4405,19 +4427,19 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
     };
     this.webhook_targets.push(newTarget);
     this.logAction('Created Webhook Target', target.name || target.url);
-    this.saveState();
+    this.saveState(false, { sections: ['webhook_targets'] });
   }
   public deleteWebhookTarget(id: string) {
     this.webhook_targets = this.webhook_targets.filter(w => w.id !== id);
     this.logAction('Deleted Webhook Target', id);
-    this.saveState();
+    this.saveState(false, { sections: ['webhook_targets'] });
   }
 
   // --- GLOBAL PREMIUM LOCK STATE ---
   public toggleGlobalPremiumLock(locked: boolean) {
     this.global_premium_locked = locked;
     this.logAction('Toggled Global Premium Seal', locked ? 'Locked' : 'Unlocked');
-    this.saveState();
+    this.saveState(false, { sections: ['global_premium_locked'] });
   }
 
   // --- AUTHENTICATION (SIGN UP / SIGN IN / LOGOUT) ---
@@ -4433,7 +4455,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
     this.all_users.push(newUser);
     this.current_user = newUser;
     this.logAction('Registered Member Account', name);
-    this.saveState();
+    this.saveState(false, { sections: ['all_users'] });
     return newUser;
   }
 
@@ -4450,7 +4472,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
         role: role === 'admin' ? 'admin' : matched.role
       };
       this.logAction('Logged in Member', matched.name);
-      this.saveState();
+      this.saveState(false, { localOnly: true }); // auth state only
       return this.current_user;
     }
 
@@ -4465,7 +4487,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
     };
     this.all_users.push(newUser);
     this.current_user = newUser;
-    this.saveState();
+    this.saveState(false, { localOnly: true }); // auth state only
     return newUser;
   }
 
@@ -4474,7 +4496,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
     this.logAction('Logged out Member', 'Guest Session');
     this.clearCachedAdminData();
     this.loadState();
-    this.saveState(true);
+    this.saveState(true, { localOnly: true }); // auth state only
     if (this.supabase) {
       this.supabase.auth.signOut().catch(err => {
         console.warn('⚡ Supabase network signOut warning:', err.message);
@@ -4528,7 +4550,10 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
   }
 
   public async onAdminLoginSuccess() {
-    this.saveState(true);
+    // NEVER full-save here: the store still holds the pre-login
+    // (possibly default/empty) snapshot; shipping it would wipe freshly
+    // saved server state (the settings-reset class).
+    this.saveState(true, { localOnly: true });
     await this.loadServerState();
     if (this.supabase) {
       await this.syncWithSupabase();
@@ -4625,7 +4650,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
     };
 
     this.chat_messages.push(newMessage);
-    this.saveState();
+    this.saveState(false, { localOnly: true }); // chat rows persist via direct upserts
 
     if (this.supabase) {
       try {
@@ -4681,7 +4706,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
             conv.status = 'open';
             conv.updated_at = new Date().toISOString();
           }
-          this.saveState();
+          this.saveState(false, { localOnly: true }); // chat rows persist via direct upserts
           this.triggerUpdate();
           
           try {
@@ -4703,7 +4728,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
     this.chat_conversations = this.chat_conversations.map(c => 
       c.id === id ? { ...c, status, updated_at: new Date().toISOString() } : c
     );
-    this.saveState();
+    this.saveState(false, { localOnly: true });
 
     if (this.supabase) {
       try {
@@ -4721,7 +4746,7 @@ CREATE POLICY "Anyone can access messages" ON public.chat_messages FOR ALL USING
   public async deleteConversation(id: string): Promise<void> {
     this.chat_conversations = this.chat_conversations.filter(c => c.id !== id);
     this.chat_messages = this.chat_messages.filter(m => m.conversation_id !== id);
-    this.saveState();
+    this.saveState(false, { localOnly: true });
 
     if (this.supabase) {
       try {
