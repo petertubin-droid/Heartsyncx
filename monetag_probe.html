@@ -1,0 +1,29 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Monetag zone probe</title>
+<style>body{font-family:monospace;margin:10px}.box{border:2px solid #333;margin:10px 0;padding:8px;min-height:60px}iframe{width:100%;border:1px dashed #999}#log{white-space:pre-wrap;background:#eee;padding:8px}</style>
+</head><body>
+<h3>Monetag zone rendering probe</h3>
+<div class="box" id="A"><b>A: iframe sandbox, zone 275352 (HeartSyncx per-slot pattern)</b><br>
+<iframe id="fa" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin" style="height:250px" srcdoc='<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;overflow:hidden}</style></head><body><script src="https://alwingulla.com/275352/tag.min.js" data-zone="275352" async data-cfasync="false"></script></body></html>'></iframe></div>
+<div class="box" id="B"><b>B: iframe sandbox, zone 11734901 (in-page push zone)</b><br>
+<iframe id="fb" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin" style="height:250px" srcdoc='<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;overflow:hidden}</style></head><body><script src="https://alwingulla.com/11734901/tag.min.js" data-zone="11734901" async data-cfasync="false"></script></body></html>'></iframe></div>
+<div class="box" id="C"><b>C: direct in-body, zone 275352</b><div id="c-slot"></div>
+<script>var s=document.createElement('script');s.src='https://alwingulla.com/275352/tag.min.js';s.setAttribute('data-zone','275352');s.async=true;document.getElementById('c-slot').appendChild(s);</script></div>
+<div class="box" id="D"><b>D: direct in-body, zone 11734901</b><div id="d-slot"></div>
+<script>var s2=document.createElement('script');s2.src='https://alwingulla.com/11734901/tag.min.js';s2.setAttribute('data-zone','11734901');s2.async=true;document.getElementById('d-slot').appendChild(s2);</script></div>
+<div id="log">measuring...</div>
+<script>
+function h(id){var e=document.getElementById(id);return e?e.getBoundingClientRect().height:0}
+function fh(id){var f=document.getElementById(id);try{var b=f.contentDocument&&f.contentDocument.body;return b?(b.innerHTML.length+'ch/'+Math.ceil(b.getBoundingClientRect().height)+'px'):('no-doc')}catch(e){return 'x-origin'}}
+setTimeout(function(){
+  var lines=[
+   'A (iframe 275352): '+fh('fa'),
+   'B (iframe 11734901): '+fh('fb'),
+   'C (body 275352) slot height: '+h('c-slot')+'px, children: '+document.getElementById('c-slot').childElementCount,
+   'D (body 11734901) slot height: '+h('d-slot')+'px, children: '+document.getElementById('d-slot').childElementCount,
+   'body scripts total: '+document.querySelectorAll('script[src*="a11ybar"],script[src*="alwingulla"],script[src*="3nbf4"]').length,
+   'iframes on page: '+document.querySelectorAll('iframe').length
+  ];
+  document.getElementById('log').textContent=lines.join('\n');
+},15000);
+</script>
+</body></html>
