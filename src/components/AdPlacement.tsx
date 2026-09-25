@@ -54,6 +54,8 @@ const AutoHeightFrame: React.FC<{ srcDoc: string; initialHeight: number; maxWidt
     if (!iframe) return;
     let stopped = false;
     let mo: MutationObserver | null = null;
+    let ro: ResizeObserver | null = null;
+    const imgListeners: Array<{ el: HTMLImageElement; fn: () => void }> = [];
     const measure = () => {
       if (stopped) return;
       let h = 0;
@@ -90,30 +92,83 @@ const AutoHeightFrame: React.FC<{ srcDoc: string; initialHeight: number; maxWidt
       h = Math.min(Math.max(h, 0), 1200);
       setHeight((prev) => (Math.abs(prev - h) > 4 ? h : prev));
     };
+    // Watch every <img> in the creative directly: on a slow connection
+    // (verified live: a native banner grid whose images were still loading
+    // past 30s on a throttled mobile connection froze at the pre-image
+    // height forever, showing one image tile with the rest of the grid
+    // clipped) the ONLY reliable signal that an image finished loading is
+    // its own 'load'/'error' event - a MutationObserver never fires for it
+    // (the <img> tag was already in the DOM; only its rendered size
+    // changed), and any fixed poll window can end before a slow image
+    // resolves.
+    const watchImages = (root: ParentNode) => {
+      root.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
+        if (img.complete) return;
+        const fn = () => measure();
+        img.addEventListener('load', fn);
+        img.addEventListener('error', fn);
+        imgListeners.push({ el: img, fn });
+      });
+    };
     const start = () => {
       measure();
       try {
-        const body = iframe.contentDocument?.body;
+        const doc = iframe.contentDocument;
+        const body = doc?.body;
         if (body) {
-          mo = new MutationObserver(measure);
+          watchImages(body);
+          mo = new MutationObserver((records) => {
+            measure();
+            // New nodes can carry their own <img> descendants (native
+            // banner grids often inject whole cards at once); watch those
+            // too so a late image inside a LATE-inserted card still
+            // triggers a remeasure.
+            records.forEach((rec) => {
+              rec.addedNodes.forEach((node) => {
+                if (node instanceof HTMLImageElement) {
+                  if (!node.complete) {
+                    const fn = () => measure();
+                    node.addEventListener('load', fn);
+                    node.addEventListener('error', fn);
+                    imgListeners.push({ el: node, fn });
+                  }
+                } else if (node instanceof Element) {
+                  watchImages(node);
+                }
+              });
+            });
+          });
           mo.observe(body, { childList: true, subtree: true, attributes: true });
+          // ResizeObserver fires on every layout size change to body for
+          // as long as the frame lives - no fixed timeout to outrun, so a
+          // creative that only finishes rendering long after load (slow
+          // network, staggered image loads) still grows the frame the
+          // moment its real size changes.
+          if (typeof ResizeObserver !== 'undefined') {
+            ro = new ResizeObserver(() => measure());
+            ro.observe(body);
+          }
         }
       } catch {
         // Measurement already ran; the timed re-checks below cover late fills.
       }
     };
     iframe.addEventListener('load', start);
-    // Providers inject creatives well after load (verified live: an Adsterra
-    // native banner fills between 5-10s and keeps growing as its images
-    // finish, long after any fixed timer schedule). Poll continuously for
-    // 30s so late fills resize the frame and a never-fill collapses it; the
-    // MutationObserver above covers any change after that.
+    // Belt-and-suspenders short poll for the first few seconds (covers
+    // browsers without ResizeObserver and any measurement race right after
+    // load); ResizeObserver + per-image load listeners above are the real
+    // fix for late fills on slow connections and have no expiry.
     const poll = window.setInterval(measure, 500);
-    const pollStop = window.setTimeout(() => window.clearInterval(poll), 30000);
+    const pollStop = window.setTimeout(() => window.clearInterval(poll), 8000);
     return () => {
       stopped = true;
       iframe.removeEventListener('load', start);
       mo?.disconnect();
+      ro?.disconnect();
+      imgListeners.forEach(({ el, fn }) => {
+        el.removeEventListener('load', fn);
+        el.removeEventListener('error', fn);
+      });
       window.clearInterval(poll);
       window.clearTimeout(pollStop);
     };
