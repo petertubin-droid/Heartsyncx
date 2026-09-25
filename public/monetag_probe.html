@@ -1,0 +1,14 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Monetag probe 2</title>
+<style>body{font-family:monospace;margin:10px}#log{white-space:pre-wrap;background:#eee;padding:8px;font-size:11px}</style>
+</head><body>
+<h3>Monetag probe 2</h3>
+<iframe id="fa" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin" style="width:100%;height:300px" srcdoc='<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;overflow:hidden}</style></head><body><script src="https://alwingulla.com/275352/tag.min.js" data-zone="275352" async data-cfasync="false"></script></body></html>'></iframe>
+<iframe id="fb" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin" style="width:100%;height:300px" srcdoc='<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;overflow:hidden}</style></head><body><script src="https://alwingulla.com/11734901/tag.min.js" data-zone="11734901" async data-cfasync="false"></script></body></html>'></iframe>
+<div id="log">measuring (25s)...</div>
+<script>
+function dump(id){var f=document.getElementById(id);try{var d=f.contentDocument,b=d&&d.body;if(!b)return 'no-doc';
+ var frames=[].map.call(d.querySelectorAll('iframe'),function(x){var r=x.getBoundingClientRect();return 'iframe['+Math.round(r.width)+'x'+Math.round(r.height)+' @'+Math.round(r.top+window.scrollY)+']'});
+ return 'innerH='+b.innerHTML.replace(/\s+/g,' ').slice(0,500)+' || frames: '+frames.join(', ');}catch(e){return 'ERR '+e.message}}
+setTimeout(function(){document.getElementById('log').textContent='ZONE 275352:\n'+dump('fa')+'\n\nZONE 11734901:\n'+dump('fb');},25000);
+</script>
+</body></html>
