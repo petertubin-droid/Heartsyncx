@@ -854,6 +854,10 @@ export class HeartsyncStore {
   }
 
   private _isInsideSaveState = false;
+  // The promise of the save currently in flight, so concurrent callers
+  // (logAction inside updateSettings, the admin console awaiting saveState)
+  // join the SAME save instead of racing it or silently no-oping.
+  private _activeSavePromise: Promise<any> | null = null;
   public supabase: SupabaseClient | null = null;
   public authLoading: boolean = true;
   public isGlobalLoading: boolean = false;
@@ -1602,7 +1606,7 @@ export class HeartsyncStore {
         if (templatesData && Array.isArray(templatesData)) this.email_templates = templatesData;
       } catch (_) {}
 
-      this.saveState();
+      this.saveState(false, { light: true });
       console.log('🔄 Extracted & replicated production-grade Supabase database state.');
     } catch (err) {
       console.warn('Failed to resolve dynamic cloud state from Supabase indexes.', err);
@@ -2055,8 +2059,8 @@ export class HeartsyncStore {
     };
   }
 
-  public async saveState(forceImmediate: boolean = false): Promise<any> {
-    if (this._isInsideSaveState) return null;
+  public async saveState(forceImmediate: boolean = false, opts: { light?: boolean } = {}): Promise<any> {
+    if (this._isInsideSaveState) return this._activeSavePromise ?? null;
     this._isInsideSaveState = true;
     try {
       try {
@@ -2088,13 +2092,14 @@ export class HeartsyncStore {
           } catch (_) {}
         }
 
-        const response = await fetch('/api/state', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            ...authHeaders
-          },
-          body: JSON.stringify({
+        // Reader-side actions (article views, ad clicks, reactions,
+        // comments, newsletter signups) must never ship admin-owned
+        // config sections: a tab whose store snapshot predates the latest
+        // admin-console save would silently revert those settings
+        // (ad networks flipping back off, 2026-09-25 incident). A light
+        // save syncs only reader-generated data; the server skips any
+        // section absent from the payload.
+        const payload: Record<string, unknown> = {
             posts: this.posts,
             categories: this.categories,
             comments: this.comments,
@@ -2122,7 +2127,23 @@ export class HeartsyncStore {
             webhook_logs: this.webhook_logs,
             email_campaigns: this.email_campaigns,
             email_templates: this.email_templates
-          })
+        };
+        if (opts.light) {
+          for (const k of [
+            'site_settings', 'pn_settings', 'audit_logs', 'media_library',
+            'authors', 'pages', 'plans', 'subscriptions', 'payments',
+            'all_users', 'global_premium_locked', 'podcasts', 'rss_feeds',
+            'sponsorship_campaigns', 'campaigns', 'webhook_targets',
+            'webhook_logs', 'email_campaigns', 'email_templates'
+          ]) delete payload[k];
+        }
+        const response = await fetch('/api/state', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            ...authHeaders
+          },
+          body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -2163,9 +2184,11 @@ export class HeartsyncStore {
       }
     };
 
-    return runStateSyncWithRetry();
+    this._activeSavePromise = runStateSyncWithRetry();
+    return await this._activeSavePromise;
     } finally {
       this._isInsideSaveState = false;
+      this._activeSavePromise = null;
     }
   }
 
@@ -2259,7 +2282,7 @@ export class HeartsyncStore {
       timestamp: new Date().toISOString()
     };
     this.audit_logs.unshift(newLog);
-    this.saveState();
+    this.saveState(false, { light: true });
 
     if (this.supabase) {
       // Live audit_logs columns: id, action, user_id, details (JSONB),
@@ -2496,7 +2519,7 @@ export class HeartsyncStore {
 
         // Add to media bank
         this.media_library.unshift(mediaItem);
-        this.saveState();
+        this.saveState(false, { light: true });
         this.logAction('Uploaded Media file (Supabase Bucket)', file.name);
         return fileUrl;
       } catch (err) {
@@ -2525,7 +2548,7 @@ export class HeartsyncStore {
       };
 
       this.media_library.unshift(mediaItem);
-      this.saveState();
+      this.saveState(false, { light: true });
       this.logAction('Uploaded Media file (Local Base64)', file.name);
       return base64Url;
     } catch (readErr) {
@@ -2544,7 +2567,7 @@ export class HeartsyncStore {
       };
       
       this.media_library.unshift(mediaItem);
-      this.saveState();
+      this.saveState(false, { light: true });
       return localUrl;
     }
     } finally {
@@ -2578,7 +2601,7 @@ export class HeartsyncStore {
       }
       return m;
     });
-    this.saveState();
+    this.saveState(false, { light: true });
   }
 
   public deleteMediaFile(url: string) {
@@ -2588,7 +2611,7 @@ export class HeartsyncStore {
     });
     const fallbackCover = 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=800';
     this.posts = this.posts.map(p => p.featured_image === url ? { ...p, featured_image: fallbackCover } : p);
-    this.saveState();
+    this.saveState(false, { light: true });
     this.logAction('Removed Media File', url);
 
     if (this.supabase) {
@@ -2608,7 +2631,7 @@ export class HeartsyncStore {
       }
     });
     this.posts = this.posts.map(p => p.featured_image === oldUrl ? { ...p, featured_image: newUrl } : p);
-    this.saveState();
+    this.saveState(false, { light: true });
     this.logAction('Updated Media File URL', `${oldUrl} -> ${newUrl}`);
 
     if (this.supabase) {
@@ -2630,7 +2653,7 @@ export class HeartsyncStore {
       tags: ['external']
     };
     this.media_library.unshift(mediaItem);
-    this.saveState();
+    this.saveState(false, { light: true });
     this.logAction('Registered External Media URL', url);
   }
 
@@ -2731,7 +2754,7 @@ export class HeartsyncStore {
       const idx = this.posts.findIndex(x => x.id === mapped.id || x.slug === mapped.slug);
       if (idx !== -1) this.posts[idx] = { ...this.posts[idx], ...mapped };
       else this.posts.unshift(mapped);
-      this.saveState();
+      this.saveState(false, { light: true });
       this.triggerUpdate();
       return this.posts.find(x => x.slug === mapped.slug) || mapped;
     } catch {
@@ -2748,7 +2771,7 @@ export class HeartsyncStore {
       if (!data || !data.content) return null;
       const idx = this.posts.findIndex(p => p.id === post.id || p.slug === post.slug);
       if (idx !== -1) this.posts[idx] = { ...this.posts[idx], ...data };
-      this.saveState();
+      this.saveState(false, { light: true });
       this.triggerUpdate();
       return this.posts[idx] || { ...post, ...data };
     } catch {
@@ -2970,7 +2993,7 @@ export class HeartsyncStore {
     if (this.analytics) {
       this.analytics.total_likes += 1;
     }
-    this.saveState(); // Saves state locally and triggers React UI listeners instantly
+    this.saveState(false, { light: true }); // Saves state locally and triggers React UI listeners instantly
 
     const updatedPost = this.posts.find(p => p.id === id);
     const newLikes = updatedPost ? updatedPost.likes : prevLikes + 1;
@@ -3013,7 +3036,7 @@ export class HeartsyncStore {
       if (this.analytics) {
         this.analytics.total_likes = prevTotalLikes;
       }
-      this.saveState();
+      this.saveState(false, { light: true });
       this.notifyToast(`Failed to record like in database: ${errorDetails}`, 'error');
     }
   }
@@ -3027,7 +3050,7 @@ export class HeartsyncStore {
       }
       return p;
     });
-    this.saveState();
+    this.saveState(false, { light: true });
 
     if (this.supabase) {
       this.supabase.rpc('increment_post_engagement', { p_post_id: id, p_reaction_key: String(reaction), p_views_delta: 1 }).then(({ error }: any) => {
@@ -3074,7 +3097,7 @@ export class HeartsyncStore {
       }
     }
 
-    this.saveState();
+    this.saveState(false, { light: true });
 
     if (this.supabase) {
       this.supabase.rpc('increment_post_engagement', { p_post_id: id, p_views_delta: 1 }).then(({ error }: any) => {
@@ -3098,7 +3121,7 @@ export class HeartsyncStore {
       this.bookmarks = this.bookmarks.filter(b => b !== id);
     }
 
-    this.saveState(); // Triggers UI update instantly across all components
+    this.saveState(false, { light: true }); // Triggers UI update instantly across all components
 
     // 2. DATABASE PERSISTENCE & CONFIRMATION
     let success = true;
@@ -3159,7 +3182,7 @@ export class HeartsyncStore {
     } else {
       // Revert optimistic update on database failure
       this.bookmarks = previousBookmarks;
-      this.saveState();
+      this.saveState(false, { light: true });
       this.notifyToast(`Failed to sync bookmark to database: ${errorDetails}`, 'error');
     }
   }
@@ -3207,7 +3230,7 @@ export class HeartsyncStore {
       created_at: new Date().toISOString()
     };
     this.vaultItems = [item, ...this.vaultItems];
-    this.saveState();
+    this.saveState(false, { light: true });
     this.onStateChangeCallbacks.forEach((cb) => cb());
     if (this.supabase) {
       this.supabase.from('love_vault_items').insert([item]).then(({ error }) => {
@@ -3218,7 +3241,7 @@ export class HeartsyncStore {
 
   public deleteVaultItem(id: string): void {
     this.vaultItems = this.vaultItems.filter((v) => v.id !== id);
-    this.saveState();
+    this.saveState(false, { light: true });
     this.onStateChangeCallbacks.forEach((cb) => cb());
     if (this.supabase) {
       this.supabase.from('love_vault_items').delete().eq('id', id).then(({ error }) => {
@@ -3239,7 +3262,7 @@ export class HeartsyncStore {
       created_at: new Date().toISOString()
     };
     this.journalEntries = [entry, ...this.journalEntries];
-    this.saveState();
+    this.saveState(false, { light: true });
     this.onStateChangeCallbacks.forEach((cb) => cb());
     this.notifyToast('Journal entry saved to your private LoveVault.', 'success');
     if (this.supabase) {
@@ -3251,7 +3274,7 @@ export class HeartsyncStore {
 
   public deleteJournalEntry(id: string): void {
     this.journalEntries = this.journalEntries.filter((j) => j.id !== id);
-    this.saveState();
+    this.saveState(false, { light: true });
     this.onStateChangeCallbacks.forEach((cb) => cb());
     if (this.supabase) {
       this.supabase.from('journal_entries').delete().eq('id', id).then(({ error }) => {
@@ -3284,7 +3307,7 @@ export class HeartsyncStore {
 
     this.comments.push(newComment);
     this.logAction('Added Comment', `On post ${postId}`);
-    this.saveState();
+    this.saveState(false, { light: true });
 
     if (isApproved) {
       this.notifyToast('Your reflection has been posted.', 'success');
@@ -3316,7 +3339,7 @@ export class HeartsyncStore {
       }
       return c;
     });
-    this.saveState();
+    this.saveState(false, { light: true });
 
     if (this.supabase) {
       const match = this.comments.find(c => c.id === id);
@@ -3353,7 +3376,7 @@ export class HeartsyncStore {
     
     this.subscribers.push(subscriber);
     this.logAction('Newsletter Subscriber Added', email);
-    this.saveState();
+    this.saveState(false, { light: true });
 
     if (this.supabase) {
       this.supabase.from('subscribers').insert([subscriber]).then();
@@ -3376,7 +3399,7 @@ export class HeartsyncStore {
   public async removeSubscriber(email: string): Promise<boolean> {
     this.subscribers = this.subscribers.filter(s => s.email.toLowerCase() !== email.toLowerCase());
     this.logAction('Newsletter Subscriber Removed', email);
-    this.saveState();
+    this.saveState(false, { light: true });
 
     if (this.supabase) {
       try {
@@ -3411,7 +3434,10 @@ export class HeartsyncStore {
 
     this.site_settings = { ...this.site_settings, ...newSettings };
     this.logAction('Configuration Saved', 'Global Site Settings updated');
-    this.saveState();
+    // Await the save (join the one logAction just started) so callers
+    // like the ad-sync button read a committed database before their
+    // read-back, and their syncError checks see the real outcome.
+    await this.saveState(false, { light: true });
 
     if (urlChanged || keyChanged) {
       this.initSupabaseConnection();
@@ -3434,7 +3460,7 @@ export class HeartsyncStore {
     };
     this.authors.push(newAuthor);
     this.logAction('Created Author', newAuthor.name);
-    this.saveState();
+    this.saveState(false, { light: true });
     if (this.supabase) {
       const dbPayload = {
         id: toDbUUID(newAuthor.id),
@@ -3456,7 +3482,7 @@ export class HeartsyncStore {
     if (updated) {
       this.logAction('Updated Author', updated.name);
     }
-    this.saveState();
+    this.saveState(false, { light: true });
     if (this.supabase) {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
@@ -3651,7 +3677,7 @@ export class HeartsyncStore {
     const zone = this.ad_zones.find(z => z.id === adId);
     if (zone) {
       zone.clicks = (zone.clicks || 0) + 1;
-      this.saveState();
+      this.saveState(false, { light: true });
     }
   }
 

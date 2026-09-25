@@ -7052,10 +7052,19 @@ export default function AdminConsole({
                           monetag_zone_article_bottom: (siteSettings as Record<string, string>).monetag_zone_article_bottom || ''
                         };
                         setSiteSettings(updatedSettings);
-                        heartsync.updateSettings(updatedSettings);
                         
-                        // Run real database synchronization write and authoritative read-back
-                        await heartsync.saveState();
+                        // updateSettings merges into the store and now awaits its
+                        // own saveState POST (previously the save was fire-and-forget
+                        // and the explicit await below hit the re-entrancy guard,
+                        // resolving instantly - the read-back then raced the write
+                        // and re-poisoned the store with pre-save values). Check
+                        // syncError so an expired session can't masquerade as a
+                        // successful sync.
+                        await heartsync.updateSettings(updatedSettings);
+                        if (heartsync.syncError) {
+                          triggerToast('Ad settings NOT saved: ' + heartsync.syncError);
+                          return;
+                        }
                         await heartsync.loadServerState();
                         triggerToast('Commercial Ad Providers (AdSense, Monetag, Adsterra) successfully synced to database!');
                       }}

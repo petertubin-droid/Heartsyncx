@@ -5168,7 +5168,12 @@ async function _legacySqlSyncBypass() {
 
 // Save state back securely (Always writes to Supabase & disk)
 async function saveServerCacheState(newState: any, dbClient?: any) {
-  serverCacheState = newState;
+  // Merge per-key instead of wholesale replacement: reader-side light saves
+  // (article views, ad clicks) intentionally omit admin-owned sections like
+  // site_settings. Replacing the cache wholesale would serve a settings-less
+  // state from GET /api/state for the whole TTL window (ads blinking off);
+  // merging keeps absent sections at their last-known cached value.
+  serverCacheState = { ...(serverCacheState || {}), ...newState };
   stateETag = `w/etag-${Date.now()}`;
   lastModifiedDate = new Date();
   lastSupabaseFetchTime = Date.now();
