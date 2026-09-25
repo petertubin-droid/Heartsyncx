@@ -13,7 +13,7 @@
 <div id="log">measuring...</div>
 <script>
 function h(id){var e=document.getElementById(id);return e?e.getBoundingClientRect().height:0}
-function fh(id){var f=document.getElementById(id);try{var b=f.contentDocument&&f.contentDocument.body;return b?(b.innerHTML.length+'ch/'+Math.ceil(b.getBoundingClientRect().height)+'px'):('no-doc')}catch(e){return 'x-origin'}}
+function fh(id){var f=document.getElementById(id);try{var b=f.contentDocument&&f.contentDocument.body;return b?(b.innerHTML.length+'ch/'+Math.ceil(b.getBoundingClientRect().height)+'px :: '+b.innerHTML.replace(/\s+/g,' ').slice(0,400)):('no-doc')}catch(e){return 'x-origin'}}
 setTimeout(function(){
   var lines=[
    'A (iframe 275352): '+fh('fa'),
