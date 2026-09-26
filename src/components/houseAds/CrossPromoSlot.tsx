@@ -2,7 +2,7 @@
  *
  *  Admin > Ad Monetization > Cross-Site Promo controls:
  *   - cross_promo_enabled    master switch
- *   - cross_promo_format     'card' | 'banner' | 'native' | 'interstitial'
+ *   - cross_promo_format     'display' | 'card' | 'banner' | 'native' | 'interstitial'
  *   - cross_promo_base_url   the FRELUX origin. CHANGEABLE: when Frelux
  *                             moves to its custom domain the admin edits
  *                             one field here and every unit follows.
@@ -29,8 +29,18 @@ import { trackEvent } from '../../lib/analytics';
 import { FRELUX_PROMO_DESTINATIONS } from '../HousePromo';
 
 export const DEFAULT_CROSS_PROMO_BASE_URL = 'https://freluxtools.netlify.app';
+
+/** Frelux's real site identity, used by the single-image Display format:
+ *  its own logo (not a per-feature icon) and the actual description from
+ *  Frelux's own index.html <meta name="description"> - one honest,
+ *  site-level ad instead of a rotating grid of feature links. */
+const FRELUX_SITE = {
+  name: 'Frelux',
+  logoPath: '/logo-mark.png',
+  description: 'Free online construction estimation platform: paint, screeding, tile and POP ceiling calculators, plus cost estimators and an AI color assistant for Nigerian building projects.',
+};
 const INTERSTITIAL_FLAG = 'hs_cross_promo_interstitial_shown';
-export type CrossPromoFormat = 'card' | 'banner' | 'native' | 'interstitial';
+export type CrossPromoFormat = 'display' | 'card' | 'banner' | 'native' | 'interstitial';
 
 /** A third-party partner promo, admin-managed (External Partner Promos in
  *  the Cross-Site Promo admin tab). Stored in site_settings.external_promos. */
@@ -41,6 +51,10 @@ export interface ExternalPromo {
   url: string;
   blurb: string;
   owner_name?: string;
+  /** Absolute logo/og:image URL, shown in the single-image Display
+   *  format. The admin "AI Assistant" (Generate from URL) fills this
+   *  automatically from the target page's og:image. */
+  logo_url?: string;
 }
 
 /* Standard programmatic-ad chrome colors (AdSense conventions):
@@ -84,6 +98,9 @@ export interface PromoItem {
   bigHeadline: string;
   /** Interstitial body. */
   bigBody: string;
+  /** Absolute logo/creative image URL for the single-image Display
+   *  format. Falls back to the icon+gradient tile when absent. */
+  logo?: string;
 }
 
 /** Normalize an admin-entered origin: add https:// when missing, strip a
@@ -121,6 +138,7 @@ export function buildPromoItems(settings: Record<string, unknown> = {}): PromoIt
     pitch: 'Fast, accurate, no sign-up needed.',
     bigHeadline: 'Building in Nigeria? Know exactly what your project needs.',
     bigBody: 'Free construction calculators, cost estimates and practical guides from the Frelux team.',
+    logo: `${base}${FRELUX_SITE.logoPath}`,
   }));
 
   const rawList = Array.isArray(settings.external_promos) ? (settings.external_promos as ExternalPromo[]) : [];
@@ -141,10 +159,60 @@ export function buildPromoItems(settings: Record<string, unknown> = {}): PromoIt
         pitch: `Sponsored by ${((p.owner_name || '').trim() || hostOf(url))}.`,
         bigHeadline: p.label,
         bigBody: p.blurb || `A message from our partner ${((p.owner_name || '').trim() || hostOf(url))}.`,
+        logo: (p.logo_url || '').trim() || undefined,
       };
     });
 
   return [...frelux, ...external];
+}
+
+/** Build the rotation for the single-image Display format: ONE
+ *  site-level Frelux item (real logo, real site description, links to
+ *  the homepage) instead of the 5 per-feature destinations, plus every
+ *  enabled external partner (each shown with its own logo when the
+ *  admin/AI-assistant supplied one, otherwise a neutral globe tile).
+ *  Exported for tests and the admin preview. */
+export function buildDisplayPromoItems(settings: Record<string, unknown> = {}): PromoItem[] {
+  const base = normalizeBaseUrl(settings.cross_promo_base_url as string | undefined);
+  const freluxSite: PromoItem = {
+    id: 'frelux-site',
+    label: FRELUX_SITE.name,
+    url: base,
+    domain: hostOf(base),
+    path: '/',
+    blurb: FRELUX_SITE.description,
+    site: 'frelux',
+    owner: 'Frelux',
+    ...DEST_CREATIVES[0],
+    pitch: 'Fast, accurate, no sign-up needed.',
+    bigHeadline: 'Building in Nigeria? Know exactly what your project needs.',
+    bigBody: FRELUX_SITE.description,
+    logo: `${base}${FRELUX_SITE.logoPath}`,
+  };
+
+  const rawList = Array.isArray(settings.external_promos) ? (settings.external_promos as ExternalPromo[]) : [];
+  const external: PromoItem[] = rawList
+    .filter((p) => p && p.enabled !== false && (p.url || '').trim() && (p.label || '').trim())
+    .map((p) => {
+      const url = (p.url || '').trim().match(/^https?:\/\//i) ? (p.url || '').trim() : `https://${(p.url || '').trim()}`;
+      return {
+        id: p.id || `ext-${hostOf(url)}`,
+        label: p.label,
+        url,
+        domain: hostOf(url),
+        path: url,
+        blurb: p.blurb || `Sponsored partner: ${hostOf(url)}.`,
+        site: 'external' as const,
+        owner: (p.owner_name || '').trim() || hostOf(url),
+        ...EXTERNAL_CREATIVE,
+        pitch: `Sponsored by ${((p.owner_name || '').trim() || hostOf(url))}.`,
+        bigHeadline: p.label,
+        bigBody: p.blurb || `A message from our partner ${((p.owner_name || '').trim() || hostOf(url))}.`,
+        logo: (p.logo_url || '').trim() || undefined,
+      };
+    });
+
+  return [freluxSite, ...external];
 }
 
 function trackClick(dest: PromoItem, source: string) {
@@ -192,6 +260,57 @@ const CtaButton: React.FC<{ dest: PromoItem; source: string; label?: string; big
     {label}
   </button>
 );
+
+/** Display: a single, honest image-style ad unit — small "Advertisement"
+ *  label, one real logo/creative image, one headline + real description,
+ *  one CTA. No grid, no rotating link rows: exactly ONE destination per
+ *  render, matching how a real AdSense/Adsterra image ad looks. */
+const DisplayAd: React.FC<{ items: PromoItem[]; slotIndex: number; source: string }> = ({ items, slotIndex, source }) => {
+  const d = items[slotIndex % items.length];
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showLogo = Boolean(d.logo) && !logoFailed;
+  return (
+    <div className={`my-6 overflow-hidden ${AD_CONTAINER}`}>
+      <div className="flex items-center justify-center gap-1.5 pt-2 pb-1.5">
+        <span className="text-[9px] font-bold uppercase tracking-widest text-[#5f6368] dark:text-[#9aa0a6]">Advertisement</span>
+        <AdChoices />
+      </div>
+      <button
+        type="button"
+        onClick={() => go(d, source)}
+        aria-label={d.label}
+        className={`relative w-full h-36 sm:h-44 flex items-center justify-center cursor-pointer ${showLogo ? 'bg-zinc-50 dark:bg-zinc-950' : `bg-gradient-to-br ${d.gradient}`}`}
+      >
+        {showLogo ? (
+          <img
+            src={d.logo}
+            alt={d.label}
+            loading="lazy"
+            onError={() => setLogoFailed(true)}
+            className="max-h-16 sm:max-h-20 max-w-[70%] w-auto object-contain"
+          />
+        ) : (
+          <d.icon className="w-10 h-10 text-white/90" />
+        )}
+        <AdBadge by={d.owner} className="absolute top-2 right-2" />
+      </button>
+      <div className="px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[#dadce0] dark:border-[#3c4043]">
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={() => go(d, source)}
+            className={`text-left text-sm sm:text-base font-bold ${HEADLINE} hover:underline cursor-pointer block`}
+          >
+            {d.label}
+          </button>
+          <span className={`text-[11px] ${DISPLAY_URL}`}>{d.domain}</span>
+          <p className={`mt-0.5 text-xs ${AD_BODY} line-clamp-2`}>{d.blurb}</p>
+        </div>
+        <CtaButton dest={d} source={source} />
+      </div>
+    </div>
+  );
+};
 
 /** Banner: responsive display ad (headline + URL + body + CTA) with an
  *  AdSense-style link-unit row of 3 rotating destinations underneath. */
@@ -397,7 +516,14 @@ const CrossPromoSlot: React.FC<{
 }> = ({ slotIndex = 0, source = 'heartsyncx' }) => {
   const s = (heartsync.site_settings || {}) as Record<string, unknown>;
   if (s.cross_promo_enabled === false) return null;
-  const format = (s.cross_promo_format as CrossPromoFormat) || 'card';
+  const format = (s.cross_promo_format as CrossPromoFormat) || 'display';
+
+  if (format === 'display') {
+    const displayItems = buildDisplayPromoItems(s);
+    if (displayItems.length === 0) return null;
+    return <DisplayAd items={displayItems} slotIndex={slotIndex} source={`${source}_display_${slotIndex}`} />;
+  }
+
   const items = buildPromoItems(s);
   if (items.length === 0) return null;
 

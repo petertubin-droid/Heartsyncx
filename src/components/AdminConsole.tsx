@@ -7133,11 +7133,12 @@ export default function AdminConsole({
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Display Format</label>
                           <select
-                            value={(heartsync.site_settings as Record<string, unknown>).cross_promo_format as string || 'card'}
+                            value={(heartsync.site_settings as Record<string, unknown>).cross_promo_format as string || 'display'}
                             onChange={(e) => heartsync.updateSettings({ cross_promo_format: e.target.value })}
                             className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500"
                           >
-                            <option value="card">Card (rich grid of section links - default)</option>
+                            <option value="display">Display (single real-logo image ad - recommended)</option>
+                            <option value="card">Card (rich grid of section links)</option>
                             <option value="banner">Banner (slim strip, 3 rotating links)</option>
                             <option value="native">Native (quiet in-feed text unit)</option>
                             <option value="interstitial">Interstitial (full-screen overlay, once per session)</option>
@@ -15962,7 +15963,7 @@ export default function AdminConsole({
  *  not per keystroke. */
 const ExternalPartnerPromosEditor: React.FC = () => {
   const stored = ((heartsync.site_settings as Record<string, unknown>).external_promos as {
-    id?: string; enabled?: boolean; label?: string; url?: string; blurb?: string; owner_name?: string;
+    id?: string; enabled?: boolean; label?: string; url?: string; blurb?: string; owner_name?: string; logo_url?: string;
   }[]) || [];
   const [rows, setRows] = useState(stored.length > 0 ? stored.map((r) => ({
     id: r.id || `ext-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -15971,8 +15972,45 @@ const ExternalPartnerPromosEditor: React.FC = () => {
     url: r.url || '',
     blurb: r.blurb || '',
     owner_name: r.owner_name || '',
+    logo_url: r.logo_url || '',
   })) : []);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [aiUrl, setAiUrl] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+
+  /** AI Assistant: paste any URL, fetch+read its real title, description
+   *  and og:image server-side, optionally sharpen the copy with Gemini,
+   *  and drop a fully-filled partner row in for the admin to review. */
+  const runAiAssistant = async () => {
+    const target = aiUrl.trim();
+    if (!target) return;
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const res = await adminFetch('/api/gemini/ad-from-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: target }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error || 'Could not generate an ad from that URL.');
+      setRows((prev) => [...prev, {
+        id: `ext-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        enabled: true,
+        label: body.label || '',
+        url: body.url || target,
+        blurb: body.blurb || '',
+        owner_name: body.owner_name || '',
+        logo_url: body.logo_url || '',
+      }]);
+      setAiUrl('');
+    } catch (err: any) {
+      setAiError(err?.message || 'Something went wrong reaching that URL.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const setRow = (id: string, patch: Partial<typeof rows[number]>) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -15980,7 +16018,7 @@ const ExternalPartnerPromosEditor: React.FC = () => {
   const addRow = () =>
     setRows((prev) => [...prev, {
       id: `ext-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      enabled: true, label: '', url: '', blurb: '', owner_name: '',
+      enabled: true, label: '', url: '', blurb: '', owner_name: '', logo_url: '',
     }]);
 
   const save = async () => {
@@ -15999,6 +16037,35 @@ const ExternalPartnerPromosEditor: React.FC = () => {
           <p className="text-[10px] text-zinc-400 mt-0.5">Let outside website owners advertise in the same promo slots. Entries rotate alongside the Frelux links; disabled entries are hidden.</p>
         </div>
         <span className="text-[10px] text-zinc-400">{rows.length} partner{rows.length === 1 ? '' : 's'}</span>
+      </div>
+
+      {/* AI Assistant: paste a URL, get a filled-in partner row back
+          (real title/description/logo, sharpened by Gemini when
+          configured) instead of typing every field by hand. */}
+      <div className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-900/40 space-y-2">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+          <Wand2 className="w-3 h-3" /> AI Assistant — create an ad from a URL
+        </label>
+        <div className="flex gap-2">
+          <input
+            value={aiUrl}
+            onChange={(e) => setAiUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !aiLoading) runAiAssistant(); }}
+            placeholder="https://partner-site.com"
+            disabled={aiLoading}
+            className="flex-1 bg-white dark:bg-zinc-900 border border-indigo-200 dark:border-indigo-900/60 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={runAiAssistant}
+            disabled={aiLoading || !aiUrl.trim()}
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold cursor-pointer flex items-center gap-1.5"
+          >
+            {aiLoading ? 'Analyzing…' : <><Wand2 className="w-3 h-3" /> Generate</>}
+          </button>
+        </div>
+        <p className="text-[10px] text-indigo-700/70 dark:text-indigo-400/60">Reads the page's real title, description and logo, and adds a partner row below for you to review before saving.</p>
+        {aiError && <p className="text-[10px] font-semibold text-rose-500">{aiError}</p>}
       </div>
 
       {rows.length === 0 && (
@@ -16024,7 +16091,7 @@ const ExternalPartnerPromosEditor: React.FC = () => {
               className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs"
             />
           </div>
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2">
             <input
               value={r.url}
               onChange={(e) => setRow(r.id, { url: e.target.value })}
@@ -16032,12 +16099,20 @@ const ExternalPartnerPromosEditor: React.FC = () => {
               className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs font-mono"
             />
           </div>
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2">
             <input
               value={r.blurb}
               onChange={(e) => setRow(r.id, { blurb: e.target.value })}
               placeholder="Short description shown under the headline"
               className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs"
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <input
+              value={r.logo_url}
+              onChange={(e) => setRow(r.id, { logo_url: e.target.value })}
+              placeholder="Logo/image URL (Display format)"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs font-mono"
             />
           </div>
           <div className="lg:col-span-2 flex gap-1.5">

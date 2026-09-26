@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import CrossPromoSlot, {
   buildPromoItems,
+  buildDisplayPromoItems,
   normalizeBaseUrl,
   DEFAULT_CROSS_PROMO_BASE_URL,
 } from '../houseAds/CrossPromoSlot';
@@ -107,6 +108,60 @@ describe('CrossPromoSlot rendering', () => {
     // Frelux display URLs now show the custom domain (absolute link URLs
     // are covered by the buildPromoItems tests above).
     expect(container.textContent).toContain('frelux.com');
+    heartsync.site_settings = prev;
+  });
+
+  it('builds ONE site-level Frelux item for the Display format, with the real logo and real description', () => {
+    const items = buildDisplayPromoItems({ ...baseSettings, cross_promo_base_url: 'https://frelux.com' });
+    const frelux = items.filter((i) => i.site === 'frelux');
+    // Exactly one Frelux item — the site itself, not five feature links.
+    expect(frelux.length).toBe(1);
+    expect(frelux[0].id).toBe('frelux-site');
+    expect(frelux[0].label).toBe('Frelux');
+    expect(frelux[0].url).toBe('https://frelux.com');
+    expect(frelux[0].logo).toBe('https://frelux.com/logo-mark.png');
+    // The real site description from Frelux's own index.html.
+    expect(frelux[0].blurb).toContain('construction estimation');
+    // External partners follow with their own logos.
+    const items2 = buildDisplayPromoItems({
+      ...baseSettings,
+      external_promos: [
+        { id: 'ext-1', enabled: true, label: 'Partner', url: 'https://partner.example', blurb: 'B', logo_url: 'https://partner.example/logo.png' },
+      ],
+    });
+    expect(items2.length).toBe(2);
+    expect(items2[1].logo).toBe('https://partner.example/logo.png');
+    // Disabled/incomplete partners stay out.
+    const items3 = buildDisplayPromoItems({
+      ...baseSettings,
+      external_promos: [{ id: 'ext-x', enabled: false, label: 'X', url: 'https://x.example' }],
+    });
+    expect(items3.length).toBe(1);
+  });
+
+  it('renders the Display format as a SINGLE unit with the Frelux logo image, not a 3-row grid', () => {
+    const prev = heartsync.site_settings;
+    heartsync.site_settings = { cross_promo_enabled: true, cross_promo_format: 'display' } as unknown as typeof heartsync.site_settings;
+    const { container } = render(<CrossPromoSlot slotIndex={0} />);
+    // The "Advertisement" label of the single-unit format.
+    expect(container.textContent).toContain('Advertisement');
+    // The real Frelux logo is rendered as an image against the default base URL.
+    const img = container.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute('src')).toBe(`${DEFAULT_CROSS_PROMO_BASE_URL}/logo-mark.png`);
+    // Real site description is present.
+    expect(container.textContent).toContain('construction estimation');
+    // One unit, not the recommendation-card grid of three tiles.
+    expect(container.querySelectorAll('[class*="grid"]').length).toBe(0);
+    heartsync.site_settings = prev;
+  });
+
+  it('defaults to the single Display format when no format is set', () => {
+    const prev = heartsync.site_settings;
+    heartsync.site_settings = { cross_promo_enabled: true } as unknown as typeof heartsync.site_settings;
+    const { container } = render(<CrossPromoSlot slotIndex={0} />);
+    expect(container.textContent).toContain('Advertisement');
+    expect(container.querySelector('img')).not.toBeNull();
     heartsync.site_settings = prev;
   });
 

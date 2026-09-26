@@ -1717,6 +1717,139 @@ Make the output feel deeply empathetic, practical, modern, and human-written. In
   }
 });
 
+// 1.24. AD ASSISTANT - "create an ad from a URL" for Cross-Site House
+// Promos' External Partner Promos. Admin pastes a partner's URL; the
+// server fetches it (SSRF-guarded), pulls its real title/description/
+// og:image, and (when Gemini is configured) sharpens the copy into a
+// short ad headline + blurb. Falls back to the raw extracted meta tags
+// when Gemini is unavailable so the tool still works without an API key.
+function isBlockedAdAssistantHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return true;
+  if (h === '0.0.0.0' || h === '::1' || h === '[::1]') return true;
+  // IPv4 literal private/loopback/link-local ranges.
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 127 || a === 10 || a === 169 && b === 254 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return true;
+  }
+  return false;
+}
+
+app.post('/api/gemini/ad-from-url', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const raw = String(req.body?.url || '').trim();
+  if (!raw) {
+    res.status(400).json({ error: 'A URL is required.' });
+    return;
+  }
+  // A URL that already carries a non-http(s) scheme is invalid, not a
+  // bare host to prefix (ftp://x must not become https://ftp://x).
+  const schemeMatch = raw.match(/^[a-z][a-z0-9+.-]*:/i);
+  if (schemeMatch && !/^https?:/i.test(schemeMatch[0])) {
+    res.status(400).json({ error: 'Only http:// and https:// URLs are supported.' });
+    return;
+  }
+  const target = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(target);
+  } catch {
+    res.status(400).json({ error: 'That is not a valid URL.' });
+    return;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    res.status(400).json({ error: 'Only http:// and https:// URLs are supported.' });
+    return;
+  }
+  if (isBlockedAdAssistantHost(parsed.hostname)) {
+    res.status(400).json({ error: 'That host cannot be fetched.' });
+    return;
+  }
+
+  let html = '';
+  try {
+    const fetchRes = await fetch(parsed.toString(), {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HeartsyncAdAssistant/1.0)' },
+      signal: AbortSignal.timeout(8000),
+      redirect: 'follow'
+    });
+    if (!fetchRes.ok) {
+      res.status(502).json({ error: `That site responded with ${fetchRes.status}. Double-check the URL.` });
+      return;
+    }
+    html = await fetchRes.text();
+  } catch (err: any) {
+    res.status(502).json({ error: `Could not reach that URL: ${err?.message || 'network error'}.` });
+    return;
+  }
+
+  const pick = (re: RegExp): string => {
+    const m = html.match(re);
+    if (!m) return '';
+    return m[1]
+      .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .trim();
+  };
+  const title = pick(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
+    || pick(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)
+    || pick(/<title[^>]*>([^<]+)<\/title>/i);
+  const description = pick(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)
+    || pick(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i)
+    || pick(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+    || pick(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+  let ogImage = pick(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+    || pick(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (ogImage) {
+    try { ogImage = new URL(ogImage, parsed).toString(); } catch { ogImage = ''; }
+  }
+  if (!ogImage) {
+    // Favicon fallback so the Display format always has something to show.
+    const iconHref = pick(/<link[^>]+rel=["'](?:shortcut icon|icon|apple-touch-icon)["'][^>]+href=["']([^"']+)["']/i)
+      || pick(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["'](?:shortcut icon|icon|apple-touch-icon)["']/i);
+    if (iconHref) {
+      try { ogImage = new URL(iconHref, parsed).toString(); } catch { ogImage = ''; }
+    }
+  }
+
+  const host = parsed.hostname.replace(/^www\./, '');
+  let label = title || host;
+  let blurb = description || '';
+  const ownerName = host;
+
+  const ai = await getGeminiClient();
+  if (ai && (title || description)) {
+    try {
+      const prompt = `You write short, honest first-party ad copy for a house-ad slot on a website. Given this page's real title and description, return ONLY a JSON object with exactly two string fields: "label" (a clear ad headline, max 60 characters, no clickbait, no emoji, no quotation marks) and "blurb" (one factual supporting sentence, max 110 characters). Do not invent claims not supported by the source text.
+Page title: "${title || 'Unknown'}"
+Page description: "${description || 'Unknown'}"
+Page domain: "${host}"`;
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: { temperature: 0.4, responseMimeType: 'application/json' }
+      });
+      const text = (response.text || '').trim();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsedCopy = JSON.parse(jsonMatch[0]);
+        if (parsedCopy.label && typeof parsedCopy.label === 'string') label = parsedCopy.label.slice(0, 80);
+        if (parsedCopy.blurb && typeof parsedCopy.blurb === 'string') blurb = parsedCopy.blurb.slice(0, 160);
+      }
+    } catch (err) {
+      console.warn('Ad-assistant Gemini copy generation failed, using extracted meta tags:', err);
+    }
+  }
+
+  res.json({
+    label: label || host,
+    blurb: blurb || `Visit ${host}.`,
+    url: parsed.toString(),
+    owner_name: ownerName,
+    logo_url: ogImage || ''
+  });
+});
+
 // 1.25. Dynamic Article Summarizer
 // ============================================================================
 // AI ADVICE ENGINE  - the reader-facing relational guide (HeartSync Copilot)
