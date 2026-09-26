@@ -11,6 +11,7 @@ import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { getArticleSeoData } from './src/utils/seoArticleData';
 import { HEARTSYNC_ARTICLE_SEO } from './src/utils/data/articles';
 import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig, isServiceRoleKey } from './src/lib/supabaseConfig';
+import { resolveHasAdmins, shouldBlockSetupRegister } from './src/lib/setupPresence';
 import { Resend } from 'resend';
 
 // Load environmental parameters (both .env and .env.local)
@@ -5524,14 +5525,16 @@ app.get('/api/setup/status', async (req: Request, res: Response) => {
       const { data: adminRows, error } = await svc.from('profiles')
         .select('id').in('role', ADMIN_ROLE_VALUES).limit(1);
       if (!error) {
-        res.json({ hasAdmins: !!(adminRows && adminRows.length > 0) });
+        // BOTH channels count (2026-09-26): the cache admin is the same admin
+        // login/sync-profile authorizes the console with. Consulting only
+        // the DB made an elected owner look admin-less and re-offered the
+        // First-Run Setup Wizard on every admin visit.
+        res.json({ hasAdmins: resolveHasAdmins(!!(adminRows && adminRows.length > 0), serverCacheState) });
         return;
       }
     }
   } catch (_) { /* fall through to cache-based answer */ }
-  const cacheHasAdmins = ((serverCacheState && serverCacheState.admin_users) || []).length > 0
-    || ((serverCacheState && serverCacheState.profiles) || []).some((p: any) => ADMIN_ROLE_VALUES.includes(p?.role));
-  res.json({ hasAdmins: !!cacheHasAdmins });
+  res.json({ hasAdmins: resolveHasAdmins(false, serverCacheState) });
 });
 
 app.post('/api/setup/register', async (req: Request, res: Response) => {
@@ -5573,7 +5576,13 @@ app.post('/api/setup/register', async (req: Request, res: Response) => {
       existingAdmin = existingAdminRows[0];
     }
 
-    if (existingAdmin && existingAdmin.email && existingAdmin.email.toLowerCase() !== cleanEmail) {
+    // 2026-09-26: the wizard must also respect the CACHE channel. Previously
+    // only the DB admin was checked, so when the owner was admin via the
+    // persisted state cache (election path) a stranger could open the wizard
+    // - which status re-offered on every visit - and mint a SECOND admin.
+    // Owner recovery stays possible: registering with the existing admin's
+    // own email is allowed (password reset below).
+    if (shouldBlockSetupRegister(existingAdmin?.email, serverCacheState, cleanEmail)) {
       res.status(403).json({ error: 'An administrator account already exists. Setup wizard is permanently disabled.' });
       return;
     }
@@ -5989,8 +5998,13 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
       });
       if (profileMirrorErr) console.warn('Profile mirror upsert warning:', profileMirrorErr.message);
     }
-    if (promoteToAdmin) {
-      // Persist the elected first admin authoritatively (service role):
+    if (isAdmin) {
+      // Persist ANY recognized admin authoritatively (service role): the
+      // elected first admin AND admins recognized via the state cache. The
+      // cache-only election previously left profiles.role unset in the DB,
+      // so /api/setup/status saw a site without any admin and re-offered
+      // the setup wizard forever. This upsert is idempotent and converges
+      // the DB on the owner's next login.
       // profiles.role is never client-writable, so the promotion must go
       // through the server-side privileged client, same as the setup wizard.
       const svc = getServiceRoleSupabase();
