@@ -7159,6 +7159,22 @@ export default function AdminConsole({
                         </div>
                       </div>
 
+                      {/* Frelux destination URL — editable for the upcoming
+                          custom-domain move (one field, every unit follows). */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Frelux Site URL</label>
+                        <input
+                          type="text"
+                          value={((heartsync.site_settings as Record<string, unknown>).cross_promo_base_url as string) || ''}
+                          placeholder="https://freluxtools.netlify.app"
+                          onChange={(e) => heartsync.updateSettings({ cross_promo_base_url: e.target.value })}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                        <p className="text-[10px] text-zinc-400">Where the Frelux promo links point. Leave empty to use the default (freluxtools.netlify.app). Update this once Frelux moves to its custom domain and every promo link across the site changes instantly.</p>
+                      </div>
+
+                      <ExternalPartnerPromosEditor />
+
                       <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
                         <strong>Placement map:</strong> Article pages - mid-article + after the last block. Homepage - after the About section and after the Newsletter section.
                         The matching Heartsyncx promos on Frelux are configured separately in the Frelux admin.
@@ -15938,3 +15954,128 @@ export default function AdminConsole({
     </div>
   );
 }
+
+/** Admin editor for site_settings.external_promos — third-party partner
+ *  promos mixed into the cross-promo rotation. External web owners buy a
+ *  slot here: label, absolute URL, blurb and owner name per entry. The
+ *  list only persists on the explicit Save button (one settings write),
+ *  not per keystroke. */
+const ExternalPartnerPromosEditor: React.FC = () => {
+  const stored = ((heartsync.site_settings as Record<string, unknown>).external_promos as {
+    id?: string; enabled?: boolean; label?: string; url?: string; blurb?: string; owner_name?: string;
+  }[]) || [];
+  const [rows, setRows] = useState(stored.length > 0 ? stored.map((r) => ({
+    id: r.id || `ext-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    enabled: r.enabled !== false,
+    label: r.label || '',
+    url: r.url || '',
+    blurb: r.blurb || '',
+    owner_name: r.owner_name || '',
+  })) : []);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  const setRow = (id: string, patch: Partial<typeof rows[number]>) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+
+  const addRow = () =>
+    setRows((prev) => [...prev, {
+      id: `ext-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      enabled: true, label: '', url: '', blurb: '', owner_name: '',
+    }]);
+
+  const save = async () => {
+    await heartsync.updateSettings({
+      external_promos: rows.filter((r) => r.label.trim() || r.url.trim()),
+    });
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 2000);
+  };
+
+  return (
+    <div className="space-y-2 border border-zinc-200 dark:border-zinc-850 rounded-2xl p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">External Partner Promos</label>
+          <p className="text-[10px] text-zinc-400 mt-0.5">Let outside website owners advertise in the same promo slots. Entries rotate alongside the Frelux links; disabled entries are hidden.</p>
+        </div>
+        <span className="text-[10px] text-zinc-400">{rows.length} partner{rows.length === 1 ? '' : 's'}</span>
+      </div>
+
+      {rows.length === 0 && (
+        <p className="text-[11px] text-zinc-400 italic py-2">No partner promos yet. Click "Add partner" when an external advertiser comes on board.</p>
+      )}
+
+      {rows.map((r) => (
+        <div key={r.id} className="grid grid-cols-1 lg:grid-cols-12 gap-2 items-start p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-150 dark:border-zinc-850">
+          <label className="lg:col-span-1 flex items-center gap-1.5 pt-2 cursor-pointer" title="Enabled">
+            <input
+              type="checkbox"
+              checked={r.enabled}
+              onChange={(e) => setRow(r.id, { enabled: e.target.checked })}
+              className="w-4 h-4 text-emerald-500 rounded cursor-pointer"
+            />
+            <span className="text-[9px] font-bold uppercase text-zinc-400">On</span>
+          </label>
+          <div className="lg:col-span-3">
+            <input
+              value={r.label}
+              onChange={(e) => setRow(r.id, { label: e.target.value })}
+              placeholder="Headline, e.g. Buy building materials online"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs"
+            />
+          </div>
+          <div className="lg:col-span-3">
+            <input
+              value={r.url}
+              onChange={(e) => setRow(r.id, { url: e.target.value })}
+              placeholder="https://partner-site.com"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs font-mono"
+            />
+          </div>
+          <div className="lg:col-span-3">
+            <input
+              value={r.blurb}
+              onChange={(e) => setRow(r.id, { blurb: e.target.value })}
+              placeholder="Short description shown under the headline"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs"
+            />
+          </div>
+          <div className="lg:col-span-2 flex gap-1.5">
+            <input
+              value={r.owner_name}
+              onChange={(e) => setRow(r.id, { owner_name: e.target.value })}
+              placeholder="Ads by (name)"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => setRows((prev) => prev.filter((x) => x.id !== r.id))}
+              className="shrink-0 px-2 py-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200/60 dark:border-rose-900/40 text-xs font-bold cursor-pointer"
+              title="Remove this partner promo"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          type="button"
+          onClick={addRow}
+          className="px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
+        >
+          + Add partner
+        </button>
+        <button
+          type="button"
+          onClick={save}
+          className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer"
+        >
+          Save partner promos
+        </button>
+        {savedFlash && <span className="text-[10px] font-bold text-emerald-600">Saved ✓</span>}
+      </div>
+    </div>
+  );
+};

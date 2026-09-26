@@ -16,6 +16,8 @@ import React from 'react';
 import { ArrowRight, BookOpen, Calculator, Clock, ExternalLink } from 'lucide-react';
 import { Post } from '../types';
 import { trackEvent } from '../lib/analytics';
+import { heartsync } from '../store';
+import { normalizeBaseUrl } from './houseAds/CrossPromoSlot';
 
 /** In-article house ad for another Heartsyncx article. */
 export const ArticlePromoCard: React.FC<{
@@ -76,7 +78,12 @@ export const FRELUX_PROMO_DESTINATIONS: { label: string; path: string; blurb: st
   { label: 'Pro-Connect', path: '/pro-connect', blurb: 'Hire verified building pros near you' },
 ];
 
-export const FreluxCrossPromo: React.FC = () => (
+export const FreluxCrossPromo: React.FC = () => {
+  // Sister-site origin follows the admin-configured base URL so the move
+  // to a custom domain is a single field edit (Ad Monetization > Cross-Site
+  // Promo > Frelux Site URL).
+  const base = normalizeBaseUrl((heartsync.site_settings as Record<string, unknown> | undefined)?.cross_promo_base_url as string | undefined);
+  return (
   <div className="my-8 p-5 sm:p-6 rounded-2xl bg-zinc-900 dark:bg-zinc-950 text-white border border-zinc-800 shadow-lg text-left relative overflow-hidden">
     <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
     <div className="flex items-center gap-2 mb-2.5 text-emerald-400 font-bold text-xs uppercase tracking-widest font-sans border-b border-zinc-800 pb-2.5">
@@ -84,7 +91,7 @@ export const FreluxCrossPromo: React.FC = () => (
       <span>From our sister site</span>
     </div>
     <a
-      href="https://freluxtools.netlify.app/"
+      href={`${base}/`}
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => trackEvent('cross_promo_click', { target_site: 'frelux', source: 'heartsyncx_article', destination: 'home' })}
@@ -101,7 +108,7 @@ export const FreluxCrossPromo: React.FC = () => (
       {FRELUX_PROMO_DESTINATIONS.map((d) => (
         <a
           key={d.path}
-          href={`https://freluxtools.netlify.app${d.path}`}
+          href={`${base}${d.path}`}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => trackEvent('cross_promo_click', { target_site: 'frelux', source: 'heartsyncx_article', destination: d.path })}
@@ -116,4 +123,5 @@ export const FreluxCrossPromo: React.FC = () => (
       ))}
     </div>
   </div>
-);
+  );
+};

@@ -666,7 +666,6 @@ export const AdPlacement: React.FC<AdPlacementProps> = ({ slot, className = '', 
         <div
           ref={ref}
           className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 ${className}`}
-          style={{ minHeight: SLOT_DIMENSIONS.footer.minHeight }}
           data-ad-slot-family={slot}
           aria-label="Sponsored links"
         >

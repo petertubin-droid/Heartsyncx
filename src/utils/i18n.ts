@@ -7,7 +7,7 @@
 // Previously this module pinned the whole site to English: getSavedLanguage
 // returned 'en' regardless of storage, saveLanguage persisted 'en', and
 // isRTL always returned false. That made the dictionary dead weight.
-import { readVisitorPref, writeVisitorPref } from '../store';
+import { readVisitorPref, writeVisitorPref, heartsync } from '../store';
 import { latinDictionaries } from './data/dictionary-latin';
 import { afroasiaDictionaries } from './data/dictionary-afroasia';
 import { africanDictionaries } from './data/dictionary-african';
