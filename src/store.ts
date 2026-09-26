@@ -1747,7 +1747,11 @@ export class HeartsyncStore {
     this.ad_zones = defaultAdZones;
     this.subscribers = [];
     this.quizzes = [];
-    this.site_settings = DEFAULT_SETTINGS;
+    // Shallow-copy at boot: site_settings is mutated constantly by the
+    // admin console and tests - sharing the DEFAULT_SETTINGS reference
+    // let those mutations corrupt the module-level default (and any
+    // fresh-boot expectations read from it).
+    this.site_settings = { ...DEFAULT_SETTINGS };
     
 
     this.pn_settings = {};
