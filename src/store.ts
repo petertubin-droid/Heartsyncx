@@ -738,7 +738,10 @@ function toCleanSupabasePost(post: any) {
     featured_image: post.featured_image || '',
     read_time: Number(post.read_time) || 5,
     category_id: post.category_id,
-    author_id: toDbUUID(post.author_id),
+    // posts.author_id is a plain TEXT id matching public.authors(id) - NOT a UUID.
+    // Hashing it with toDbUUID produced fake UUIDs that violated the
+    // posts_author_id_fkey and blocked every publish (2026-09-26 incident).
+    author_id: post.author_id || null,
     tags: Array.isArray(post.tags) ? post.tags : [],
     likes: Number(post.likes) || 0,
     reactions: post.reactions || { love: 0, insightful: 0, support: 0, warmth: 0 },
@@ -790,7 +793,8 @@ function toCleanSupabasePostUpdate(updates: any) {
       if (k === 'read_time' || k === 'likes' || k === 'views') {
         cleaned[k] = Number(updates[k]);
       } else if (k === 'author_id') {
-        cleaned[k] = toDbUUID(updates[k]);
+        // Plain text id matching public.authors(id); never hashed (FK fix).
+        cleaned[k] = updates[k] || null;
       } else {
         cleaned[k] = updates[k];
       }
@@ -811,7 +815,10 @@ function toBasicSupabasePost(post: any) {
     featured_image: post.featured_image || '',
     read_time: Number(post.read_time) || 5,
     category_id: post.category_id,
-    author_id: toDbUUID(post.author_id),
+    // posts.author_id is a plain TEXT id matching public.authors(id) - NOT a UUID.
+    // Hashing it with toDbUUID produced fake UUIDs that violated the
+    // posts_author_id_fkey and blocked every publish (2026-09-26 incident).
+    author_id: post.author_id || null,
     tags: Array.isArray(post.tags) ? post.tags : [],
     likes: Number(post.likes) || 0,
     reactions: post.reactions || { love: 0, insightful: 0, support: 0, warmth: 0 },
@@ -836,7 +843,8 @@ function toBasicSupabasePostUpdate(updates: any) {
       if (k === 'read_time' || k === 'likes' || k === 'views') {
         cleaned[k] = Number(updates[k]);
       } else if (k === 'author_id') {
-        cleaned[k] = toDbUUID(updates[k]);
+        // Plain text id matching public.authors(id); never hashed (FK fix).
+        cleaned[k] = updates[k] || null;
       } else {
         cleaned[k] = updates[k];
       }
@@ -1377,20 +1385,24 @@ export class HeartsyncStore {
 
       // 4. Fetch Authors (Mapped securely to profiles table to prevent schema errors)
       try {
-        const { data: authorsData, error: authErr } = await this.supabase.from('profiles').select('*');
+        // The author catalog is public.authors (the table posts.author_id
+        // references). profiles is the auth-account table with UUID ids -
+        // sourcing authors from it produced author_id values that could
+        // never satisfy the posts foreign key.
+        const { data: authorsData, error: authErr } = await this.supabase.from('authors').select('id,name,email,bio,avatar,role,is_active,created_at');
         if (authErr) {
-          console.warn('Supabase fetch profiles/authors warning:', authErr);
+          console.warn('Supabase fetch authors warning:', authErr);
         } else {
           if (authorsData && authorsData.length > 0) {
             this.authors = authorsData.map((p: any) => ({
               id: fromDbUUID(p.id),
               name: p.name || 'Anonymous User',
-              avatar_url: p.avatar_url || '',
+              avatar_url: p.avatar || '',
               bio: p.bio || '',
               role_tag: p.role === 'admin' ? 'Administrator' : 'Relationship Advisor',
               role: p.role || 'author',
               social_links: {},
-              is_deleted: p.role === 'deleted_author'
+              is_deleted: p.is_active === false
             }));
           }
           
@@ -2675,6 +2687,9 @@ export class HeartsyncStore {
     // security-critical difference: a contentless edit must never ship
     // `content: ''` (that wiped article bodies once, 2026-09-24 incident).
     const payload = existingId ? toCleanSupabasePostUpdate(post) : toCleanSupabasePost(post);
+    // Display name for author-row provisioning on the server; the publish
+    // endpoints read it as body.author_name (not a DB column).
+    (payload as any).author_name = (post as any).author_name || this.current_user?.name || '';
     const token = await this.getAdminSessionToken();
     let res: Response;
     try {
@@ -2693,8 +2708,20 @@ export class HeartsyncStore {
       let { error } = existingId
         ? await this.supabase.from('posts').update(dbPayload).eq('id', existingId)
         : await this.supabase.from('posts').insert([dbPayload]);
+      // FK violation: the author row does not exist in public.authors. The
+      // post must still publish (authorship is nullable, ON DELETE SET NULL),
+      // so retry once without author_id instead of failing the publish.
+      if (error && (error.code === '23503' || /foreign key/i.test(error.message || '')) && dbPayload.author_id !== undefined) {
+        const noAuthorPayload: any = { ...dbPayload };
+        delete noAuthorPayload.author_id;
+        const fkRetry = existingId
+          ? await this.supabase.from('posts').update(noAuthorPayload).eq('id', existingId)
+          : await this.supabase.from('posts').insert([noAuthorPayload]);
+        error = fkRetry.error;
+      }
       if (error && (error.message?.includes('column') || error.code === '42703' || error.code === 'PGRST204')) {
         const basicPayload = toBasicSupabasePost(post);
+        if (error.code === '23503' || /foreign key/i.test(error.message || '')) delete basicPayload.author_id;
         const retryRes = existingId
           ? await this.supabase.from('posts').update(basicPayload).eq('id', existingId)
           : await this.supabase.from('posts').insert([basicPayload]);
@@ -2725,7 +2752,9 @@ export class HeartsyncStore {
       featured_image: postInput.featured_image || 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200',
       read_time: postInput.read_time || Math.max(1, Math.ceil((postInput.content || '').split(' ').length / 220)),
       category_id: postInput.category_id || (this.categories[0]?.id || 'cat-1'),
-      author_id: this.current_user?.id || '',
+      // The editor's Author Profile selection wins; the signed-in admin is
+      // only the fallback (previously the selection was silently dropped).
+      author_id: postInput.author_id || this.current_user?.id || '',
       tags: postInput.tags || ['wellness'],
       likes: 0,
       reactions: { love: 0, insightful: 0, support: 0, warmth: 0 },
@@ -3506,16 +3535,21 @@ export class HeartsyncStore {
     this.authors.push(newAuthor);
     this.logAction('Created Author', newAuthor.name);
     this.saveState(false, { sections: ['authors'] });
+    // Authors live in public.authors (posts.author_id is a TEXT FK to it).
+    // The old write targeted public.profiles with a hashed fake UUID id,
+    // which violated profiles' auth.users FK and silently failed - so the
+    // author row never existed and publishing then tripped the posts FK.
     if (this.supabase) {
       const dbPayload = {
-        id: toDbUUID(newAuthor.id),
-        email: `${newAuthor.id}@heartsync.com`,
+        id: newAuthor.id,
         name: newAuthor.name,
-        avatar_url: newAuthor.avatar_url || '',
+        email: (newAuthor as any).email || `${newAuthor.id}@heartsync.com`,
         bio: newAuthor.bio || '',
-        role: 'author'
+        avatar: newAuthor.avatar_url || '',
+        role: newAuthor.role || 'Author',
+        is_active: true
       };
-      this.supabase.from('profiles').insert([dbPayload]).then(({ error }) => {
+      this.supabase.from('authors').insert([dbPayload]).then(({ error }) => {
         if (error) console.warn('Supabase author insert failed:', error);
       });
     }
@@ -3531,12 +3565,12 @@ export class HeartsyncStore {
     if (this.supabase) {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
-      if (updates.avatar_url !== undefined) dbUpdates.avatar_url = updates.avatar_url;
+      if (updates.avatar_url !== undefined) dbUpdates.avatar = updates.avatar_url;
       if (updates.bio !== undefined) dbUpdates.bio = updates.bio;
       if (updates.role !== undefined) dbUpdates.role = updates.role;
-      
+
       if (Object.keys(dbUpdates).length > 0) {
-        this.supabase.from('profiles').update(dbUpdates).eq('id', toDbUUID(id)).then(({ error }) => {
+        this.supabase.from('authors').update(dbUpdates).eq('id', id).then(({ error }) => {
           if (error) console.warn('Supabase author update failed:', error);
         });
       }
@@ -3549,7 +3583,9 @@ export class HeartsyncStore {
     this.logAction('Deleted Author (Soft)', `ID ${id}`);
     this.saveState(false, { sections: ['authors'] });
     if (this.supabase) {
-      this.supabase.from('profiles').update({ role: 'deleted_author' }).eq('id', toDbUUID(id)).then(({ error }) => {
+      // Soft delete via is_active=false keeps posts.author_id intact
+      // (the FK is ON DELETE SET NULL, so a hard delete would orphan rows).
+      this.supabase.from('authors').update({ is_active: false }).eq('id', id).then(({ error }) => {
         if (error) console.warn('Supabase author soft-delete failed:', error);
       });
     }

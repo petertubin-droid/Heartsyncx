@@ -3970,7 +3970,7 @@ async function loadStateFromSupabase(): Promise<any> {
       // boot payload (RLS already restricts rows to approved comments for
       // the anon-key server client).
       queryWithTimeout(supabase.from('comments').select('id,post_id,author_name,content,is_approved,parent_id,created_at')),
-      queryWithTimeout(supabase.from('profiles').select('id,full_name,avatar_url,bio,website,role,created_at,updated_at')),
+      queryWithTimeout(supabase.from('authors').select('id,name,email,bio,avatar,role,is_active,created_at')),
       queryWithTimeout(supabase.from('pages').select('*')),
       queryWithTimeout(supabase.from('quizzes').select('*')),
       queryWithTimeout(supabase.from('site_settings').select('*').eq('id', 'singleton').maybeSingle()),
@@ -4016,15 +4016,18 @@ async function loadStateFromSupabase(): Promise<any> {
       }));
     }
     if (!authorsRes.error && authorsRes.data) {
+      // Author catalog from public.authors (posts.author_id FK target).
+      // Reading profiles instead leaked auth-account UUIDs in as author ids,
+      // which could never satisfy the posts foreign key.
       state.authors = authorsRes.data.map((p: any) => ({
         id: fromDbUUID(p.id),
-        name: p.full_name || p.name || 'Anonymous User',
-        avatar_url: p.avatar_url || '',
+        name: p.name || 'Anonymous User',
+        avatar_url: p.avatar || '',
         bio: p.bio || '',
-        role_tag: p.role === 'admin' ? 'Administrator' : 'Clinical Advisor',
+        role_tag: p.role === 'admin' ? 'Administrator' : 'Relationship Advisor',
         role: p.role || 'author',
         social_links: {},
-        is_deleted: p.role === 'deleted_author'
+        is_deleted: p.is_active === false
       }));
     }
     if (!pagesRes.error && pagesRes.data) {
@@ -4909,21 +4912,23 @@ async function _legacySqlSyncBypass() {
         try {
           await client.query(`
             INSERT INTO public.authors (
-              id, name, avatar_url, bio, role, is_deleted
-            ) VALUES ($1, $2, $3, $4, $5, $6)
+              id, name, email, bio, avatar, role, is_active
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (id) DO UPDATE SET
               name = EXCLUDED.name,
-              avatar_url = EXCLUDED.avatar_url,
+              email = EXCLUDED.email,
               bio = EXCLUDED.bio,
+              avatar = EXCLUDED.avatar,
               role = EXCLUDED.role,
-              is_deleted = EXCLUDED.is_deleted
+              is_active = EXCLUDED.is_active
           `, [
             a.id,
             a.name,
-            a.avatar_url || '',
+            a.email || `${a.id}@heartsync.com`,
             a.bio || '',
-            a.role || 'Clinical Advisor',
-            a.is_deleted ?? false
+            a.avatar_url || '',
+            a.role || 'Author',
+            (a.is_deleted ?? false) === false
           ]);
         } catch (authorErr: any) {
           console.warn(`⚠️ Warning syncing authors table entry for ${a.id}:`, authorErr.message || authorErr);
@@ -6505,6 +6510,37 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
 // doing nothing while the editor believed the save succeeded. These endpoints
 // authenticate the admin session, then write through the admin's own DB
 // client so RLS admin policies govern the write.
+/** Resolve a post's author_id against the real author catalog.
+ *  public.posts.author_id is a TEXT foreign key -> public.authors(id) -
+ *  NOT a UUID column. Legacy code hashed non-UUID ids into fake UUIDs,
+ *  which could never match a row and violated posts_author_id_fkey on
+ *  every publish (2026-09-26 incident, "insert or update on table posts
+ *  violates foreign key constraint").
+ *  - a valid, existing author id passes through as-is (plain text);
+ *  - a missing id is PROVISIONED as a new authors row so publishing is
+ *    never blocked on author bookkeeping;
+ *  - if provisioning fails, returns null so the nullable FK (ON DELETE
+ *    SET NULL) lets the article still go live.
+ */
+async function resolveAuthorId(db: any, rawAuthorId: any, fallbackName?: any): Promise<string | null> {
+  const candidate = typeof rawAuthorId === 'string' ? rawAuthorId.trim() : '';
+  if (!candidate) return null;
+  const { data: existing } = await db.from('authors').select('id, name').eq('id', candidate).maybeSingle();
+  if (existing) return candidate;
+  const derivedName = (typeof fallbackName === 'string' && fallbackName.trim())
+    || candidate.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+    || 'Staff Author';
+  const { error: insErr } = await db.from('authors').insert({
+    id: candidate,
+    name: derivedName,
+    role: 'Author',
+    is_active: true
+  });
+  if (!insErr) return candidate;
+  console.warn('Could not provision author row for id "' + candidate + '":', insErr.message || insErr);
+  return null;
+}
+
 const POST_WRITE_COLUMNS = [
   'id','title','slug','excerpt','content','status','publish_date','featured_image',
   'read_time','category_id','author_id','tags','likes','reactions','views',
@@ -6537,12 +6573,15 @@ app.post('/api/posts', adminAuthMiddleware, async (req: Request, res: Response) 
     const db = getAdminDbClient(req) || getSupabaseClient();
     if (!db) { res.status(503).json({ error: 'Database is not configured.' }); return; }
     const payload = pickPostColumns(body, POST_WRITE_COLUMNS);
-    payload.author_id = toDbUUID(body.author_id);
+    const resolvedAuthor = await resolveAuthorId(db, body.author_id, body.author_name);
+    if (resolvedAuthor) payload.author_id = resolvedAuthor;
+    else delete payload.author_id; // nullable FK (ON DELETE SET NULL) - publish anyway
     if (!payload.slug) payload.slug = String(body.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     let { data, error } = await db.from('posts').insert([payload]).select('id, slug, title, status').single();
     if (error && (error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message || ''))) {
       const basic = pickPostColumns(body, POST_BASIC_COLUMNS);
-      basic.author_id = toDbUUID(body.author_id);
+      if (payload.author_id) basic.author_id = payload.author_id;
+      else delete basic.author_id;
       basic.slug = payload.slug as string;
       const retry = await db.from('posts').insert([basic]).select('id, slug, title, status').single();
       data = retry.data; error = retry.error;
@@ -6563,12 +6602,17 @@ app.put('/api/posts/:id', adminAuthMiddleware, async (req: Request, res: Respons
     const db = getAdminDbClient(req) || getSupabaseClient();
     if (!db) { res.status(503).json({ error: 'Database is not configured.' }); return; }
     const payload = pickPostColumns(body, POST_WRITE_COLUMNS.filter((k) => k !== 'id'));
-    if (body.author_id !== undefined && body.author_id !== null) payload.author_id = toDbUUID(body.author_id);
+    if (body.author_id !== undefined && body.author_id !== null) {
+      const resolved = await resolveAuthorId(db, body.author_id, body.author_name);
+      if (resolved) payload.author_id = resolved;
+      else delete payload.author_id; // unresolvable: keep the stored author
+    }
     if (Object.keys(payload).length === 0) { res.status(400).json({ error: 'No updatable fields supplied.' }); return; }
     let { data, error } = await db.from('posts').update(payload).eq('id', id).select('id, slug, title, status').single();
     if (error && (error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message || ''))) {
       const basic = pickPostColumns(body, POST_BASIC_COLUMNS.filter((k) => k !== 'id'));
-      if (body.author_id !== undefined && body.author_id !== null) basic.author_id = toDbUUID(body.author_id);
+      if (payload.author_id) basic.author_id = payload.author_id;
+      else delete basic.author_id;
       const retry = await db.from('posts').update(basic).eq('id', id).select('id, slug, title, status').single();
       data = retry.data; error = retry.error;
     }
@@ -7743,9 +7787,9 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
       }
 
       const { data: dbAuthors } = await client
-        .from('profiles')
+        .from('authors')
         .select('id')
-        .neq('role', 'deleted_author');
+        .eq('is_active', true);
       if (dbAuthors && Array.isArray(dbAuthors)) {
         authors = dbAuthors;
       }

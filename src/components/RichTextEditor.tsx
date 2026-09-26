@@ -45,7 +45,9 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
   const [slug, setSlug] = useState(post?.slug || '');
   const [content, setContent] = useState(post?.content || '');
   const [categoryId, setCategoryId] = useState(post?.category_id || (categories[0] && categories[0].id) || '');
-  const [authorId, setAuthorId] = useState(post?.author_id || 'peter-tubin');
+  // Default to the configured author catalog's first entry; 'peter-tubin'
+  // is the seeded fallback so a fresh install can publish immediately.
+  const [authorId, setAuthorId] = useState(post?.author_id || getAuthors()[0]?.id || 'peter-tubin');
   const [excerpt, setExcerpt] = useState(post?.excerpt || '');
   const [status, setStatus] = useState<'draft' | 'published'>(post?.status as any || 'draft');
   const [featuredImage, setFeaturedImage] = useState(post?.featured_image || '');
