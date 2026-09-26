@@ -27,6 +27,24 @@ const SLOT_LABEL: Record<SlotFamily, string> = {
 };
 
 /**
+ * Realistic starting height for a native-banner iframe (Adsterra classic/
+ * native.js units, Monetag native banner). Native-banner scripts read their
+ * OWN containing document's size at init to decide their layout (how much
+ * room they have for the image + title card); starting the frame at a
+ * starved handful of pixels hands them a near-zero viewport before our own
+ * measurement has run even once, and the script self-constrains its layout
+ * to that tiny space rather than its real card size - growing OUR outer
+ * iframe afterwards can't undo a layout the script already committed to
+ * (verified live, Sep 26 2026: an in-article native banner rendered a
+ * squashed, symmetrically-cropped slice of its creative image with no
+ * title at all). This value matches the card CSS the network itself ships
+ * (~340px max-width, a 75% padding-top image box plus a 36px title strip
+ * lands around 300px), so the script never sees a starved viewport. The
+ * real measurement below still shrinks the frame to 0 on a genuine no-fill.
+ */
+const NATIVE_MIN_HEIGHT = 300;
+
+/**
  * Sandboxed ad iframe that sizes itself to the ACTUAL rendered creative.
  *
  * Fixed-height ad frames are the root cause of the "big blank area under
@@ -462,10 +480,10 @@ const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
   // actually serves; collapses when the zone no-fills.
   if (unit.native) {
     const containerDiv = unit.native === 'invoke' ? `<div id="container-${key}"></div>\n` : '';
-    const nativeSrcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;overflow:hidden}</style></head><body>
+    const nativeSrcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;overflow:hidden;min-height:${NATIVE_MIN_HEIGHT}px}</style></head><body>
 ${containerDiv}<script type="text/javascript" src="https://${unit.domain}/${key}/${unit.native}.js" async data-cfasync="false"></script>
 </body></html>`;
-    return <AutoHeightFrame srcDoc={nativeSrcDoc} initialHeight={50} />;
+    return <AutoHeightFrame srcDoc={nativeSrcDoc} initialHeight={NATIVE_MIN_HEIGHT} />;
   }
 
   const domain = adsterraDomainFromUrlField(str(settings()[`adsterra_url_${slot}`])) || unit.domain;
@@ -509,13 +527,15 @@ const MonetagBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
   // exactly what a native ad card needs. `img,div,a{max-width:100%}` is a
   // second guard so no individual creative element can force a horizontal
   // scrollbar/clip even if Monetag ever nests one wide element deeper.
-  const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;overflow:hidden}img,div,a{max-width:100%;box-sizing:border-box}</style></head><body>
+  const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;overflow:hidden;min-height:${NATIVE_MIN_HEIGHT}px}img,div,a{max-width:100%;box-sizing:border-box}</style></head><body>
 <script type="text/javascript" src="${tag.src}" data-zone="${tag.zone}" async data-cfasync="false"></script>
 </body></html>`;
-  // Native banner zones declare no fixed size: start the frame tiny and let
-  // the measurement grow it to the creative the zone actually serves
-  // (and collapse it back to nothing when the zone no-fills).
-  return <AutoHeightFrame srcDoc={srcDoc} initialHeight={50} />;
+  // Same starved-viewport fix as the Adsterra native banner above: give the
+  // zone's own script a realistic amount of room from the first paint
+  // instead of a starved height, so it never has a reason to self-constrain
+  // its layout. The real measurement still shrinks the frame to 0 on a
+  // genuine no-fill.
+  return <AutoHeightFrame srcDoc={srcDoc} initialHeight={NATIVE_MIN_HEIGHT} />;
 };
 
 /**
