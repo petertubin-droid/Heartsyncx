@@ -318,6 +318,8 @@ export interface SiteSettings {
   social_youtube_url?: string;
   /** TikTok profile URL shown in the footer social row and the article-page follow card. */
   social_tiktok_url?: string;
+  /** Google Analytics 4 measurement ID (G-XXXXXXXXXX). Consent-gated in ConsentProvider. */
+  ga_measurement_id?: string;
   related_block_enabled?: boolean;
   related_block_title?: string;
   related_block_count?: number;

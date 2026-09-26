@@ -64,6 +64,25 @@ export default defineConfig(({ mode }) => {
         ),
       ),
     },
+    build: {
+      // PERF (2026-09-26 audit): split the heavy vendors out of the entry
+      // chunk so a visitor landing on the homepage downloads the app shell
+      // without paying for the voice/TTS stack or the animation library
+      // until a route actually needs them.
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (!id.includes('node_modules')) return undefined;
+            if (/[\\/]node_modules[\\/](@remix-run|react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return 'vendor-react';
+            if (id.includes('@supabase')) return 'vendor-supabase';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (/[\\/]node_modules[\\/](motion|framer-motion)[\\/]/.test(id)) return 'vendor-motion';
+            if (id.includes('@elevenlabs')) return 'vendor-voice';
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify - file watching is disabled to prevent flickering during agent edits.

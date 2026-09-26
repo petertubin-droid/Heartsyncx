@@ -12,6 +12,8 @@ import ArticleBodyWithInserts from './ArticleBodyWithInserts';
 import { AdPlacement } from './AdPlacement';
 import ArticleTTS from './ArticleTTS';
 import { heartsync, getAuthors } from '../store';
+import { getArticleSeoData } from '../utils/seoArticleData';
+import { buildArticleJsonLd } from '../utils/articleJsonLd';
 import { Post, Author, Topic } from '../types';
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -91,6 +93,32 @@ export interface ArticlePageProps {
 export default function ArticlePage({
 activeArticle, articleBody, headings, markdownComponents, siteSettings, navigateTo, showToast, renderSidebar, handleReaction, submitComment, checkIsArticleLocked, unlockArticleInState, paragraphCountRef, publishedArticles, posts, categories, setActiveArticle, setCurrentTab, setTabArg, setLightboxImage, setAdTarget, setAdSecondsLeft, setAdStep, scrollPercent, activeHeadingId, newsletterSubscribed, setNewsletterSubscribed, newsletterEmail, setNewsletterEmail, copyFeedbackToast, setCopyFeedbackToast, shareMenuOpen, setShareMenuOpen, hasLiked, setHasLiked, comments, commentInput, setCommentInput, commentAuthorName, setCommentAuthorName, commentAuthorEmail, setCommentAuthorEmail, activeQuizIndex, setActiveQuizIndex, selectedAnswerIndex, setSelectedAnswerIndex, quizAnswerSubmitted, setQuizAnswerSubmitted, quizScore, setQuizScore, quizSessionFinished, setQuizSessionFinished, articlePaymentPortal, setArticlePaymentPortal, isPayingArticle, setIsPayingArticle, payCardNum, setPayCardNum, payEmail, setPayEmail, payExpiry, setPayExpiry, payCvc, setPayCvc
 }: ArticlePageProps) {
+              // SEO (2026-09-26 audit gap): NewsArticle + FAQPage structured data
+              // so Google can render rich results for every article. FAQ content
+              // comes from the per-topic SEO data set; the graph is rebuilt
+              // whenever the active article changes.
+              useEffect(() => {
+                if (!activeArticle?.title) return;
+                document.getElementById('heartsync-article-jsonld')?.remove();
+                const seo = getArticleSeoData(activeArticle.slug || '', activeArticle.title || '');
+                const graph = buildArticleJsonLd({
+                  article: activeArticle as unknown as Record<string, any>,
+                  siteName: siteSettings.site_name || 'Heartsyncx',
+                  siteUrl: typeof window !== 'undefined' ? window.location.origin : '',
+                  logoUrl: siteSettings.logo_url || '/logo.png',
+                  faq: seo.faq,
+                });
+                if (!graph) return undefined;
+                const script = document.createElement('script');
+                script.type = 'application/ld+json';
+                script.id = 'heartsync-article-jsonld';
+                script.textContent = JSON.stringify(graph);
+                document.head.appendChild(script);
+                return () => {
+                  document.getElementById('heartsync-article-jsonld')?.remove();
+                };
+              }, [activeArticle?.id, activeArticle?.title, siteSettings.site_name, siteSettings.logo_url]);
+
               // Wired article design settings (AdminConsole > Article Design)  - previously dead
               const artLayout = siteSettings.article_layout || 'standard';
               // Hero style drives both the header design and whether the legacy

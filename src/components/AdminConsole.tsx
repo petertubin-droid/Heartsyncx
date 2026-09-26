@@ -1143,6 +1143,7 @@ export default function AdminConsole({
   const [adsensePubId, setAdsensePubId] = useState(() => siteSettings.adsense_client_id || heartsync.site_settings.adsense_client_id || '');
   const [adsenseAutoCode, setAdsenseAutoCode] = useState(() => String(siteSettings.adsense_active ?? heartsync.site_settings.adsense_active ?? true));
   const [adsenseAutoScript, setAdsenseAutoScript] = useState(() => siteSettings.adsense_auto_script || heartsync.site_settings.adsense_auto_script || '');
+  const [gaMeasurementId, setGaMeasurementId] = useState(() => siteSettings.ga_measurement_id || heartsync.site_settings.ga_measurement_id || '');
   
   
   // NEW: Finer details for article and homepage ad layouts
@@ -1189,6 +1190,7 @@ export default function AdminConsole({
     adsterraActive,
     adsensePubId,
     adsenseAutoCode,
+    gaMeasurementId,
     bannerHeaderEnabled,
     bannerSidebarEnabled,
     bannerFooterEnabled,
@@ -1210,6 +1212,7 @@ export default function AdminConsole({
       setAdsterraActive((cur) => applyIfUntouched(cur, 'adsterraActive', (live.adsterra_active as boolean) ?? true));
       setAdsensePubId((cur) => applyIfUntouched(cur, 'adsensePubId', (live.adsense_client_id as string) ?? ''));
       setAdsenseAutoCode((cur) => applyIfUntouched(cur, 'adsenseAutoCode', String((live.adsense_active as boolean) ?? true)));
+      setGaMeasurementId((cur) => applyIfUntouched(cur, 'gaMeasurementId', (live.ga_measurement_id as string) ?? ''));
       setBannerHeaderEnabled((cur) => applyIfUntouched(cur, 'bannerHeaderEnabled', (live.banner_header_enabled as boolean) ?? true));
       setBannerSidebarEnabled((cur) => applyIfUntouched(cur, 'bannerSidebarEnabled', (live.banner_sidebar_enabled as boolean) ?? true));
       setBannerFooterEnabled((cur) => applyIfUntouched(cur, 'bannerFooterEnabled', (live.banner_footer_enabled as boolean) ?? true));
@@ -6558,6 +6561,19 @@ export default function AdminConsole({
                           />
                           <span className="text-[10px] text-zinc-400 block">Found in AdSense &gt; Account &gt; Settings &gt; Publisher ID.</span>
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+                            Google Analytics 4 Measurement ID
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="G-XXXXXXXXXX"
+                            value={gaMeasurementId}
+                            onChange={(e) => setGaMeasurementId(e.target.value)}
+                            className="w-full p-2.5 rounded-xl border bg-transparent font-mono"
+                          />
+                          <span className="text-[10px] text-zinc-400 block">Created in Google Analytics &gt; Admin &gt; Data streams. Injected only after analytics consent (Consent Mode v2).</span>
+                        </div>
 
                         <div className="space-y-1">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
@@ -7012,6 +7028,7 @@ export default function AdminConsole({
                         const updatedSettings = {
                           ...siteSettings,
                           adsense_client_id: adsensePubId,
+                          ga_measurement_id: gaMeasurementId,
                           adsense_active: adsenseAutoCode === 'true',
                           monetag_active: monetagActive,
                           monetag_zone_id: monetagZoneId,
