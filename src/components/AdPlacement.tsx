@@ -460,7 +460,23 @@ ${containerDiv}<script type="text/javascript" src="https://${unit.domain}/${key}
 const MonetagBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
   const tag = normalizeMonetagTag(str(settings()[`monetag_zone_${slot}`]));
   if (!tag) return null;
-  const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;display:flex;justify-content:center;align-items:flex-start;overflow:hidden}</style></head><body>
+  // ROOT CAUSE of "native ad shows only the image, never the title/description"
+  // (reported live on real phone browsers - our own sandboxed browser preview
+  // is not evidence either way, per the reporter): Monetag's native banner
+  // tag.min.js does NOT wrap its creative in one container - it appends the
+  // image, headline and description as SEPARATE sibling elements straight
+  // into <body>. `display:flex` (row, the default axis) laid those siblings
+  // out SIDE BY SIDE instead of stacked, and each flex item shrinks to its
+  // own content width (no stretch without an explicit width) rather than
+  // filling the frame - so the headline/description text was pushed out to
+  // the right of the narrow frame and sliced off by `overflow:hidden`. Only
+  // the image (the first, widest sibling) stayed inside the visible area.
+  // Plain block flow (matching the working Adsterra native.js frame just
+  // above) stacks every appended sibling full-width, top to bottom, which is
+  // exactly what a native ad card needs. `img,div,a{max-width:100%}` is a
+  // second guard so no individual creative element can force a horizontal
+  // scrollbar/clip even if Monetag ever nests one wide element deeper.
+  const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;overflow:hidden}img,div,a{max-width:100%;box-sizing:border-box}</style></head><body>
 <script type="text/javascript" src="${tag.src}" data-zone="${tag.zone}" async data-cfasync="false"></script>
 </body></html>`;
   // Native banner zones declare no fixed size: start the frame tiny and let

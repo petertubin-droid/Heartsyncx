@@ -268,6 +268,29 @@ describe('AdPlacement (policy-honest ad rendering)', () => {
     heartsync.site_settings.monetag_zone_header = '';
   });
 
+  it('does NOT lay the Monetag native banner out as a flex row (regression: title/description clipped, only the image showed)', () => {
+    // Root cause reproduced from a live-phone screenshot: Monetag's
+    // tag.min.js appends the image, headline and description as SEPARATE
+    // sibling elements straight into <body> - it does not wrap them in one
+    // container. `display:flex` (row) laid those siblings out SIDE BY SIDE,
+    // each shrunk to its own content width, so the headline/description
+    // were pushed outside the frame and sliced off by overflow:hidden -
+    // only the image (the widest sibling) stayed visible. Plain block flow
+    // stacks every appended sibling full-width, which is what a native ad
+    // card needs.
+    heartsync.site_settings.monetag_active = true;
+    heartsync.site_settings.monetag_zone_header = '284167';
+    const { container } = renderPlacement();
+    act(() => { screen.getByTestId('grant').click(); });
+    const srcDoc = (container.querySelector('iframe[title="Advertisement"]') as HTMLIFrameElement)?.getAttribute('srcdoc') || '';
+    expect(srcDoc).not.toContain('display:flex');
+    expect(srcDoc).not.toMatch(/justify-content/);
+    expect(srcDoc).not.toMatch(/align-items/);
+    // Guard so a single wide creative element still can't force overflow.
+    expect(srcDoc).toContain('max-width:100%');
+    heartsync.site_settings.monetag_zone_header = '';
+  });
+
   it('uses the account domain from the Monetag MultiTag snippet for bare zone ids', () => {
     heartsync.site_settings.monetag_active = true;
     heartsync.site_settings.monetag_script_code = '<script src="https://alwingulla.com/284167/tag.min.js" data-zone="284167" async data-cfasync="false"></script>';

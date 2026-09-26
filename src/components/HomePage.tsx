@@ -1875,11 +1875,16 @@ export default function HomePage({
                   // Slot families map to the admin console's per-slot provider
                   // config (AdSense unit id -> Adsterra banner -> Monetag),
                   // each behind its banner_*_enabled toggle, consent-gated.
-                  const AD_SLOT_AFTER_SECTION: Record<string, 'header' | 'in_article' | 'homepage' | 'article_bottom'> = {
+                  const AD_SLOT_AFTER_SECTION: Record<string, 'header' | 'in_article' | 'homepage' | 'article_bottom' | 'sidebar' | 'footer'> = {
                     hero: 'header',
                     trending: 'in_article',
                     categories: 'homepage',
-                    latest_articles: 'article_bottom'
+                    latest_articles: 'article_bottom',
+                    // Two more homepage sections now carry inventory too -
+                    // 'sidebar' and 'footer' were configurable in the admin
+                    // console but never actually placed anywhere on the page.
+                    featured_stories: 'sidebar',
+                    premium_articles: 'footer'
                   };
                   const adSlotAfter = AD_SLOT_AFTER_SECTION[sec.type];
                   return adSlotAfter ? (
