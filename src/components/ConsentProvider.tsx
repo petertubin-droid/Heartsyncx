@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { heartsync } from '../store';
+import { heartsync, readVisitorPref, writeVisitorPref } from '../store';
 import { isAdminLocation } from '../utils/adminArea';
 
 export interface CookiePreferences {
@@ -33,7 +33,7 @@ declare global {
 const getInitialConsentState = (): boolean => {
   if (typeof window === 'undefined') return false;
   try {
-    return !!heartsync.getLocalStorage('heartsync_cookie_consent', null);
+    return !!readVisitorPref<string | null>('heartsync_cookie_consent', null);
   } catch (e) {
     return false;
   }
@@ -48,8 +48,8 @@ const getInitialPreferences = (): CookiePreferences => {
   };
   if (typeof window === 'undefined') return defaults;
   try {
-    const storedConsent = heartsync.getLocalStorage('heartsync_cookie_consent', null);
-    const storedPrefs = heartsync.getLocalStorage('heartsync_cookie_preferences', null);
+    const storedConsent = readVisitorPref<string | null>('heartsync_cookie_consent', null);
+    const storedPrefs = readVisitorPref<object | null>('heartsync_cookie_preferences', null);
     if (storedPrefs && typeof storedPrefs === 'object' && 'necessary' in storedPrefs) {
       return { ...defaults, ...(storedPrefs as object) } as CookiePreferences;
     } else if (storedConsent === 'accepted') {
@@ -258,8 +258,8 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       marketing: true,
       functional: true,
     };
-    heartsync.setLocalStorage('heartsync_cookie_consent', 'accepted');
-    heartsync.setLocalStorage('heartsync_cookie_preferences', fullPrefs); // setLocalStorage stringifies  - passing a pre-stringified value double-encodes it and breaks reload restore
+    writeVisitorPref('heartsync_cookie_consent', 'accepted');
+    writeVisitorPref('heartsync_cookie_preferences', fullPrefs);
     document.cookie = "heartsync_cookie_consent=accepted; max-age=31536000; path=/; SameSite=Lax";
     
     setPreferences(fullPrefs);
@@ -277,8 +277,8 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       marketing: false,
       functional: false,
     };
-    heartsync.setLocalStorage('heartsync_cookie_consent', 'rejected');
-    heartsync.setLocalStorage('heartsync_cookie_preferences', minPrefs);
+    writeVisitorPref('heartsync_cookie_consent', 'rejected');
+    writeVisitorPref('heartsync_cookie_preferences', minPrefs);
     document.cookie = "heartsync_cookie_consent=rejected; max-age=31536000; path=/; SameSite=Lax";
     
     setPreferences(minPrefs);
@@ -289,8 +289,8 @@ export const ConsentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const savePreferences = (prefs: CookiePreferences) => {
     const consentValue = prefs.analytics && prefs.marketing && prefs.functional ? 'accepted' : 'custom';
-    heartsync.setLocalStorage('heartsync_cookie_consent', consentValue);
-    heartsync.setLocalStorage('heartsync_cookie_preferences', prefs);
+    writeVisitorPref('heartsync_cookie_consent', consentValue);
+    writeVisitorPref('heartsync_cookie_preferences', prefs);
     
     document.cookie = `heartsync_cookie_consent=${consentValue}; max-age=31536000; path=/; SameSite=Lax`;
     

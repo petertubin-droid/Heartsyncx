@@ -47,15 +47,8 @@ function truncate(s: string | undefined, max: number): string | undefined {
 
 function getSession(): string {
   if (session) return session;
-  try {
-    session = sessionStorage.getItem('hs_sentry_session') || '';
-    if (!session) {
-      session = `sess_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-      sessionStorage.setItem('hs_sentry_session', session);
-    }
-  } catch {
-    session = 'sess_unknown';
-  }
+  // Browser storage removal (2026-09-26): per-page-load session id in memory.
+  session = `sess_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   return session;
 }
 

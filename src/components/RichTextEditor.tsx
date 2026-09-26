@@ -160,6 +160,7 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
   // --- COMPILATION & UI HELPERS ---
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [previewTheme, setPreviewTheme] = useState<'light' | 'dark' | 'sepia'>('light');
 
   // Generate URL slug from title automatically
@@ -317,10 +318,13 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
       }
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setSaveError(err?.message || 'Saving failed. Please try again.');
       setSaveStatus('error');
+      return;
     }
+    setSaveError(null);
   };
 
   // AI Assistant trigger using server-side Gemini API proxy
@@ -452,6 +456,11 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
               <CheckCircle2 className="w-3.5 h-3.5" /> Changes Persisted
             </span>
           )}
+          {saveStatus === 'error' && saveError && (
+            <span className="flex items-center gap-1.5 text-xs text-rose-600 font-bold max-w-md" title={saveError}>
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" /> Save failed: {saveError.slice(0, 80)}{saveError.length > 80 ? '…' : ''}
+            </span>
+          )}
           
           <div className="flex rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-850">
             <button 
@@ -470,19 +479,11 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
 
           <button 
             onClick={() => handleFormSubmit()} 
-            className="px-4 py-2 bg-rose-550 hover:bg-rose-600 text-white text-xs font-black rounded-xl transition-all shadow-md hover:scale-[1.01] cursor-pointer flex items-center gap-1.5"
+            disabled={saveStatus === 'saving'}
+            className="px-4 py-2 bg-rose-550 hover:bg-rose-600 disabled:opacity-60 text-white text-xs font-black rounded-xl transition-all shadow-md hover:scale-[1.01] cursor-pointer flex items-center gap-1.5"
           >
-            <Send className="w-3.5 h-3.5" /> {status === 'published' ? 'Save Live Changes' : 'Save Draft'}
+            {saveStatus === 'saving' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} {status === 'published' ? 'Save Live Changes' : 'Save Draft'}
           </button>
-          {status !== 'published' && (
-            <button 
-              onClick={() => { setStatus('published'); handleFormSubmit('published'); }} 
-              title="Save this article with Published status so it goes live on the site immediately"
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-200/50 hover:scale-[1.01] cursor-pointer flex items-center gap-1.5"
-            >
-              <Globe className="w-3.5 h-3.5" /> Publish Live
-            </button>
-          )}
         </div>
       </header>
 

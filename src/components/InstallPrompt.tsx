@@ -11,7 +11,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 function wasRecentlyDismissed(): boolean {
   try {
-    const at = Number(localStorage.getItem(DISMISS_KEY) || 0);
+    const at = Number(installDismissedAt || 0);
     return Date.now() - at < RECHECK_AFTER_MS;
   } catch {
     return false;
@@ -53,7 +53,7 @@ export function InstallPrompt() {
 
   const dismiss = () => {
     setVisible(false);
-    try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch { /* private mode */ }
+    installDismissedAt = String(Date.now());
   };
 
   const install = async () => {
@@ -118,5 +118,8 @@ export function InstallPrompt() {
     </div>
   );
 }
+
+// Browser storage removal (2026-09-26): the dismiss is per page load.
+let installDismissedAt: string | null = null;
 
 export default InstallPrompt;

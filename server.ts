@@ -6019,6 +6019,88 @@ app.post('/api/auth/sync-profile', async (req: Request, res: Response) => {
 
 // Public: full single article by slug (content included)  - the per-article
 // counterpart of the projected boot state. Only published, non-draft rows.
+// ---------------------------------------------------------------------------
+// ADMIN PUBLISHING API (2026-09-26): article create/update with FULL content.
+// The browser-side Supabase client is no longer trusted with article writes -
+// it could be uninitialized or fail silently, which left the publish button
+// doing nothing while the editor believed the save succeeded. These endpoints
+// authenticate the admin session, then write through the admin's own DB
+// client so RLS admin policies govern the write.
+const POST_WRITE_COLUMNS = [
+  'id','title','slug','excerpt','content','status','publish_date','featured_image',
+  'read_time','category_id','author_id','tags','likes','reactions','views',
+  'seo_title','seo_description','keywords','allow_comments','is_premium','price',
+  'access_level','publish_at','tts_enabled','premium_access_type','unlock_duration',
+  'ad_provider','daily_unlock_limit','show_teaser','preview_paragraphs','blur_content',
+  'show_subscription_cta','editorial_summary','reflection_note','in_article_quote',
+  'in_article_quote_author','somatic_exercise_title','somatic_exercise_steps',
+  'reflection_prompt','faq','in_article_inserts'
+] as const;
+const POST_BASIC_COLUMNS = [
+  'id','title','slug','excerpt','content','status','publish_date','featured_image',
+  'read_time','category_id','author_id','tags','likes','views','seo_title',
+  'seo_description','allow_comments','is_premium','price'
+] as const;
+
+function pickPostColumns(body: any, columns: readonly string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const col of columns) {
+    if (body && body[col] !== undefined && body[col] !== null) out[col] = body[col];
+  }
+  return out;
+}
+
+app.post('/api/posts', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const body = req.body || {};
+    if (!body.title || !String(body.title).trim()) { res.status(400).json({ error: 'A post title is required.' }); return; }
+    if (!body.content || !String(body.content).trim()) { res.status(400).json({ error: 'Post content is required.' }); return; }
+    const db = getAdminDbClient(req) || getSupabaseClient();
+    if (!db) { res.status(503).json({ error: 'Database is not configured.' }); return; }
+    const payload = pickPostColumns(body, POST_WRITE_COLUMNS);
+    payload.author_id = toDbUUID(body.author_id);
+    if (!payload.slug) payload.slug = String(body.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    let { data, error } = await db.from('posts').insert([payload]).select('id, slug, title, status').single();
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message || ''))) {
+      const basic = pickPostColumns(body, POST_BASIC_COLUMNS);
+      basic.author_id = toDbUUID(body.author_id);
+      basic.slug = payload.slug as string;
+      const retry = await db.from('posts').insert([basic]).select('id, slug, title, status').single();
+      data = retry.data; error = retry.error;
+    }
+    if (error) { res.status(500).json({ error: 'Database insert failed: ' + (error.message || String(error)) }); return; }
+    lastSupabaseFetchTime = 0; // force the next /api/state to pick the new article up
+    res.json({ success: true, post: data });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to create post: ' + err.message });
+  }
+});
+
+app.put('/api/posts/:id', adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!id) { res.status(400).json({ error: 'A post id is required.' }); return; }
+    const body = req.body || {};
+    const db = getAdminDbClient(req) || getSupabaseClient();
+    if (!db) { res.status(503).json({ error: 'Database is not configured.' }); return; }
+    const payload = pickPostColumns(body, POST_WRITE_COLUMNS.filter((k) => k !== 'id'));
+    if (body.author_id !== undefined && body.author_id !== null) payload.author_id = toDbUUID(body.author_id);
+    if (Object.keys(payload).length === 0) { res.status(400).json({ error: 'No updatable fields supplied.' }); return; }
+    let { data, error } = await db.from('posts').update(payload).eq('id', id).select('id, slug, title, status').single();
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message || ''))) {
+      const basic = pickPostColumns(body, POST_BASIC_COLUMNS.filter((k) => k !== 'id'));
+      if (body.author_id !== undefined && body.author_id !== null) basic.author_id = toDbUUID(body.author_id);
+      const retry = await db.from('posts').update(basic).eq('id', id).select('id, slug, title, status').single();
+      data = retry.data; error = retry.error;
+    }
+    if (error) { res.status(500).json({ error: 'Database update failed: ' + (error.message || String(error)) }); return; }
+    lastSupabaseFetchTime = 0;
+    res.json({ success: true, post: data });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to update post: ' + err.message });
+  }
+});
+
 app.get('/api/posts/:slug', async (req: Request, res: Response) => {
   try {
     const slug = String(req.params.slug || '');

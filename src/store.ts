@@ -502,7 +502,7 @@ const isSupabaseConfiguredGlobally = (): boolean => {
     }
 
     let storedSettings: any = null;
-    const settingsStr = localStorage.getItem('hs_site_settings');
+    const settingsStr = virtualStorageMap.get('hs_site_settings');
     if (settingsStr) {
       storedSettings = JSON.parse(settingsStr);
     }
@@ -527,6 +527,29 @@ const isBlockedDatabaseCacheKey = (key: string): boolean => {
   ];
   return BLOCKED_KEYS.includes(key) || key.startsWith('pn_brand_') || key.startsWith('pn_');
 };
+
+// Browser-storage exceptions (2026-09-26): the ONLY app data still allowed
+// in window.localStorage. Cookie consent and the visitor/admin language
+// choice must survive a page reload (re-prompting on every visit breaks ad
+// consent and UX); Supabase manages its own auth session internally. ALL
+// site content and configuration now lives in the database only - the store
+// itself never touches window.localStorage anymore.
+export function readVisitorPref<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return JSON.parse(raw) as T;
+  } catch (_) {
+    return fallback;
+  }
+}
+export function writeVisitorPref(key: string, value: unknown): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (_) { /* quota/private mode - best effort */ }
+}
 
 // Global In-Memory Storage Map replacing physical browser localStorage
 export const virtualStorageMap: Map<string, string> = (() => {
@@ -558,15 +581,10 @@ const getLocalStorage = <T>(key: string, defaultValue: T): T => {
     if (isBlockedDatabaseCacheKey(key)) {
       return defaultValue;
     }
-    let stored: string | null = null;
-    if (typeof window !== 'undefined') {
-      try {
-        stored = window.localStorage.getItem(key);
-      } catch (_) {}
-    }
-    if (!stored) {
-      stored = virtualStorageMap.get(key) ?? null;
-    }
+    // Browser storage removal (2026-09-26): site data lives in the
+    // in-memory virtual map + the database. Nothing reads window.localStorage
+    // anymore; the map was seeded from it once at boot for migration.
+    const stored = virtualStorageMap.get(key) ?? null;
     if (!stored) return defaultValue;
     const parsed = JSON.parse(stored);
     
@@ -599,21 +617,11 @@ const setLocalStorage = <T>(key: string, value: T): void => {
     }
     if (value === null || value === undefined) {
       virtualStorageMap.delete(key);
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.removeItem(key);
-        } catch (_) {}
-      }
       return;
     }
-    const strVal = JSON.stringify(value);
-    virtualStorageMap.set(key, strVal);
-    
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(key, strVal);
-      } catch (_) {}
-    }
+    // Browser storage removal (2026-09-26): memory only - the database is
+    // the single source of truth, nothing persists to window.localStorage.
+    virtualStorageMap.set(key, JSON.stringify(value));
   } catch (error) {
     console.error('Error writing state to localStorage', error);
   }
@@ -942,58 +950,13 @@ export class HeartsyncStore {
   // Snapshotting the last good public /api/state payload and hydrating from
   // it on boot paints the current site instantly; the fresh /api/state call
   // then revalidates in the background.
-  private static readonly SERVER_STATE_SNAPSHOT_KEY = 'hs_server_state_snapshot_v1';
-  private static readonly SERVER_STATE_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 1 day
-
-  /** Paint the last known server state on boot instead of the seed catalog.
-   *  Public data only (posts/categories/authors/site_settings) - the same
-   *  payload the anonymous /api/state endpoint returns to every visitor. */
-  private hydrateFromServerStateSnapshot(): void {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = window.localStorage.getItem(HeartsyncStore.SERVER_STATE_SNAPSHOT_KEY);
-      if (!raw) return;
-      const snap = JSON.parse(raw);
-      if (!snap || typeof snap.saved_at !== 'number') return;
-      if (Date.now() - snap.saved_at > HeartsyncStore.SERVER_STATE_SNAPSHOT_MAX_AGE_MS) return;
-      if (Array.isArray(snap.posts) && snap.posts.length > 0) {
-        this.posts = snap.posts;
-        if (Array.isArray(snap.categories)) this.categories = snap.categories;
-        if (Array.isArray(snap.authors)) this.authors = snap.authors;
-        if (snap.site_settings && typeof snap.site_settings === 'object') {
-          this.site_settings = snap.site_settings;
-        }
-        console.log('🩶 Hydrated from last server-state snapshot (' + new Date(snap.saved_at).toISOString() + ') - seed catalog skipped.');
-      }
-    } catch {
-      // Corrupt/unreadable snapshot - fall through to the seed catalog.
-    }
-  }
-
-  /** Persist the last good /api/state response for the next boot's hydration.
-   *  Best-effort: quota failures are silently ignored. */
-  private saveServerStateSnapshot(data: any): void {
-    if (typeof window === 'undefined' || !data) return;
-    try {
-      window.localStorage.setItem(
-        HeartsyncStore.SERVER_STATE_SNAPSHOT_KEY,
-        JSON.stringify({
-          saved_at: Date.now(),
-          posts: data.posts,
-          categories: data.categories,
-          authors: data.authors,
-          site_settings: data.site_settings
-        })
-      );
-    } catch {
-      // localStorage quota exceeded or unavailable - hydration is a
-      // best-effort enhancement, never a hard requirement.
-    }
-  }
+  // Browser storage removal (2026-09-26): the server-state snapshot that
+  // used to live in window.localStorage is gone. The site paints from the
+  // bundled seed catalog and swaps to the authoritative /api/state payload
+  // when it arrives - the database is the only persistent store.
 
   constructor() {
     this.loadState();
-    this.hydrateFromServerStateSnapshot();
     this.initSupabaseConnection();
     this.loadServerState();
     if (typeof window !== 'undefined') {
@@ -2027,8 +1990,6 @@ export class HeartsyncStore {
           if (data.email_templates) this.email_templates = data.email_templates;
 
           // Snapshot this good response so the NEXT boot paints the
-          // current site instantly (see hydrateFromServerStateSnapshot).
-          this.saveServerStateSnapshot(data);
 
           // Notify React listeners for immediate update
           this.onStateChangeCallbacks.forEach(cb => cb());
@@ -2673,6 +2634,66 @@ export class HeartsyncStore {
   }
 
   // COMPREHENSIVE CRM POST OPERATIONS (PERSISTS IN SUPABASE)
+  /** Admin session bearer token for the server-side persistence API. */
+  private async getAdminSessionToken(): Promise<string | null> {
+    try {
+      if (this.supabase) {
+        const { data: { session } } = await this.supabase.auth.getSession();
+        if (session?.access_token) return session.access_token;
+      }
+    } catch (_) { /* fall through */ }
+    return null;
+  }
+
+  /**
+   * Persist a post's FULL content through the server API (POST /api/posts,
+   * PUT /api/posts/:id). The server writes with the admin's own session so
+   * RLS admin policies govern the write, and the article body lands in the
+   * database - the browser-side Supabase client is no longer trusted with
+   * the write (it can be uninitialized or fail silently, which left
+   * 'Publish' doing nothing). Falls back to the legacy direct client insert
+   * only when the endpoint is absent (local dev server).
+   */
+  private async persistPostToServer(post: any, existingId?: string): Promise<void> {
+    // Insert path maps the full post (content always present on a new post).
+    // Update path maps ONLY the fields the edit actually supplied - the
+    // security-critical difference: a contentless edit must never ship
+    // `content: ''` (that wiped article bodies once, 2026-09-24 incident).
+    const payload = existingId ? toCleanSupabasePostUpdate(post) : toCleanSupabasePost(post);
+    const token = await this.getAdminSessionToken();
+    let res: Response;
+    try {
+      res = await fetch(existingId ? `/api/posts/${encodeURIComponent(existingId)}` : '/api/posts', {
+        method: existingId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(payload)
+      });
+    } catch (err: any) {
+      throw new Error(`Could not reach the publishing API: ${err?.message || err}`);
+    }
+    if (res.status === 404) {
+      // Endpoint not deployed (local dev): legacy direct client insert.
+      if (!this.supabase) return;
+      const dbPayload = toCleanSupabasePost(post);
+      let { error } = existingId
+        ? await this.supabase.from('posts').update(dbPayload).eq('id', existingId)
+        : await this.supabase.from('posts').insert([dbPayload]);
+      if (error && (error.message?.includes('column') || error.code === '42703' || error.code === 'PGRST204')) {
+        const basicPayload = toBasicSupabasePost(post);
+        const retryRes = existingId
+          ? await this.supabase.from('posts').update(basicPayload).eq('id', existingId)
+          : await this.supabase.from('posts').insert([basicPayload]);
+        error = retryRes.error;
+      }
+      if (error) throw new Error(`Database write failed: ${error.message}`);
+      return;
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || data.details || `Publishing failed (HTTP ${res.status})`);
+    }
+  }
+
   public async addPost(postInput: Partial<Post>) {
     const slug = postInput.title 
       ? postInput.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -2703,20 +2724,7 @@ export class HeartsyncStore {
 
     const expandedPost = expandArticleContent(newPost);
 
-    if (this.supabase) {
-      const dbPayload = toCleanSupabasePost(expandedPost);
-      let { error } = await this.supabase.from('posts').insert([dbPayload]);
-      if (error && (error.message?.includes('column') || error.code === '42703' || error.code === 'PGRST204')) {
-        console.warn('Supabase posts table missing extended columns, retrying with basic payload:', error.message);
-        const basicPayload = toBasicSupabasePost(expandedPost);
-        const retryRes = await this.supabase.from('posts').insert([basicPayload]);
-        error = retryRes.error;
-      }
-      if (error) {
-        console.error('Supabase post registration failed:', error);
-        throw new Error(`Failed to create post in database: ${error.message}`);
-      }
-    }
+    await this.persistPostToServer(expandedPost);
 
     this.posts.unshift(expandedPost);
     this.logAction('Created Article', expandedPost.title);
@@ -2828,20 +2836,7 @@ export class HeartsyncStore {
       return p;
     });
 
-    if (this.supabase) {
-      const dbUpdates = toCleanSupabasePostUpdate(finalUpdates);
-      let { error } = await this.supabase.from('posts').update(dbUpdates).eq('id', id);
-      if (error && (error.message?.includes('column') || error.code === '42703' || error.code === 'PGRST204')) {
-        console.warn('Supabase posts table missing extended columns, retrying with basic updates:', error.message);
-        const basicUpdates = toBasicSupabasePostUpdate(finalUpdates);
-        const retryRes = await this.supabase.from('posts').update(basicUpdates).eq('id', id);
-        error = retryRes.error;
-      }
-      if (error) {
-        console.error('Supabase post update failed:', error);
-        throw new Error(`Failed to update post in database: ${error.message}`);
-      }
-    }
+    await this.persistPostToServer(finalUpdates as any, id);
 
     this.posts = updatedPosts;
     this.logAction('Edited Article', `ID: ${id}`);

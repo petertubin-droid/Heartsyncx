@@ -7,7 +7,7 @@
 // Previously this module pinned the whole site to English: getSavedLanguage
 // returned 'en' regardless of storage, saveLanguage persisted 'en', and
 // isRTL always returned false. That made the dictionary dead weight.
-import { heartsync } from '../store';
+import { readVisitorPref, writeVisitorPref } from '../store';
 import { latinDictionaries } from './data/dictionary-latin';
 import { afroasiaDictionaries } from './data/dictionary-afroasia';
 import { africanDictionaries } from './data/dictionary-african';
@@ -110,14 +110,14 @@ export function getTranslation(key: string, lang: Language = 'en'): string {
 
 // ---------------------------------------------------------------------------
 // Persistence. Keys: hs_lang (visitor choice), hs_enabled_languages (admin),
-// hs_default_language (admin). Values pass through heartsync.setLocalStorage
+// hs_default_language (admin). Values pass through writeVisitorPref
 // which stringifies internally - pre-stringifying would double-encode.
 // ---------------------------------------------------------------------------
 
 const readLangList = (key: string): Language[] | null => {
   try {
-    // heartsync.getLocalStorage JSON-parses internally.
-    const parsed = heartsync.getLocalStorage<unknown>(key, '');
+    // readVisitorPref JSON-parses internally.
+    const parsed = readVisitorPref<unknown>(key, '');
     if (!Array.isArray(parsed)) return null;
     const valid = parsed.filter(isLanguageCode);
     return valid.length ? valid : null;
@@ -128,14 +128,14 @@ const readLangList = (key: string): Language[] | null => {
 
 const writeLangList = (key: string, langs: Language[]): void => {
   try {
-    heartsync.setLocalStorage(key, langs);
+    writeVisitorPref(key, langs);
   } catch (e) {}
 };
 
 /** Visitor's saved language; falls back to the admin default, then 'en'. */
 export const getSavedLanguage = (): Language => {
   try {
-    const parsed = heartsync.getLocalStorage<unknown>('hs_lang', '');
+    const parsed = readVisitorPref<unknown>('hs_lang', '');
     if (isLanguageCode(parsed)) return parsed;
   } catch (e) {}
   const fallback = getSiteDefaultLanguage();
@@ -145,7 +145,7 @@ export const getSavedLanguage = (): Language => {
 export const saveLanguage = (lang: Language): void => {
   if (!isLanguageCode(lang)) return;
   try {
-    heartsync.setLocalStorage('hs_lang', lang);
+    writeVisitorPref('hs_lang', lang);
   } catch (e) {}
 };
 
@@ -164,7 +164,7 @@ export const setEnabledLanguages = (langs: Language[]): void => {
 
 export const getSiteDefaultLanguage = (): Language => {
   try {
-    const parsed = heartsync.getLocalStorage<unknown>('hs_default_language', '');
+    const parsed = readVisitorPref<unknown>('hs_default_language', '');
     if (isLanguageCode(parsed)) return parsed;
   } catch (e) {}
   return 'en';
@@ -173,6 +173,6 @@ export const getSiteDefaultLanguage = (): Language => {
 export const setSiteDefaultLanguage = (lang: Language): void => {
   if (!isLanguageCode(lang)) return;
   try {
-    heartsync.setLocalStorage('hs_default_language', lang);
+    writeVisitorPref('hs_default_language', lang);
   } catch (e) {}
 };

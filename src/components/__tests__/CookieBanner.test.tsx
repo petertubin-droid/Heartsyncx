@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import { ConsentProvider } from '../ConsentProvider';
 import { CookieBanner } from '../CookieBanner';
-import { heartsync } from '../../store';
+import { writeVisitorPref } from '../../store';
 
 const renderBanner = (onLearnMore = () => {}) =>
   render(
@@ -17,8 +17,8 @@ const BANNER = '[aria-label="Heartsync Cookie Consent"]';
 describe('CookieBanner (GDPR consent UI)', () => {
   beforeEach(() => {
     localStorage.clear();
-    heartsync.setLocalStorage('heartsync_cookie_consent', null);
-    heartsync.setLocalStorage('heartsync_cookie_preferences', null);
+    writeVisitorPref('heartsync_cookie_consent', null);
+    writeVisitorPref('heartsync_cookie_preferences', null);
   });
 
   it('shows the banner when no consent choice has been made', () => {
@@ -48,15 +48,15 @@ describe('CookieBanner (GDPR consent UI)', () => {
   });
 
   it('does not re-show the banner after a stored accepted choice', () => {
-    heartsync.setLocalStorage('heartsync_cookie_consent', 'accepted');
-    heartsync.setLocalStorage('heartsync_cookie_preferences', { necessary: true, analytics: true, marketing: true, functional: true });
+    writeVisitorPref('heartsync_cookie_consent', 'accepted');
+    writeVisitorPref('heartsync_cookie_preferences', { necessary: true, analytics: true, marketing: true, functional: true });
     renderBanner();
     expect(document.querySelector(BANNER)).toBeNull();
   });
 
   it('does not re-show the banner after a stored rejected choice', () => {
-    heartsync.setLocalStorage('heartsync_cookie_consent', 'rejected');
-    heartsync.setLocalStorage('heartsync_cookie_preferences', { necessary: true, analytics: false, marketing: false, functional: false });
+    writeVisitorPref('heartsync_cookie_consent', 'rejected');
+    writeVisitorPref('heartsync_cookie_preferences', { necessary: true, analytics: false, marketing: false, functional: false });
     renderBanner();
     expect(document.querySelector(BANNER)).toBeNull();
   });
@@ -87,8 +87,8 @@ describe('CookieBanner (GDPR consent UI)', () => {
   });
 
   it('the modal switches reflect the stored preferences on reopen (consistency)', async () => {
-    heartsync.setLocalStorage('heartsync_cookie_consent', 'custom');
-    heartsync.setLocalStorage('heartsync_cookie_preferences', { necessary: true, analytics: true, marketing: false, functional: false });
+    writeVisitorPref('heartsync_cookie_consent', 'custom');
+    writeVisitorPref('heartsync_cookie_preferences', { necessary: true, analytics: true, marketing: false, functional: false });
     renderBanner();
     // The floating manage-cookie button was removed in the declutter pass; the
     // Footer 'Cookie Settings' link is the reopen path and dispatches this event.

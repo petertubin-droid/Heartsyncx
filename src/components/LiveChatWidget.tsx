@@ -6,6 +6,11 @@ import { ChatMessage, ChatAttachment } from '../types';
 
 const EMOJIS = ['👋', '❤️', '😊', '🙏', '🙌', '💡', '🌱', '💬', '🔥', '🌸', '☀️'];
 
+// Browser storage removal (2026-09-26): guest chat identity is in-memory.
+let chatVisitorId: string | null = null;
+let chatGuestName: string | null = null;
+let chatGuestEmail: string | null = null;
+
 export default function LiveChatWidget() {
   const [storeState, setStoreState] = useState({
     site_settings: heartsync.site_settings,
@@ -69,12 +74,12 @@ export default function LiveChatWidget() {
     if (storeState.current_user) {
       setVisitorId(storeState.current_user.id);
     } else {
-      let storedId = typeof window !== 'undefined' ? sessionStorage.getItem('hs_chat_visitor_id') : null;
+      // Browser storage removal (2026-09-26): visitor identity lives in
+      // memory only; the database stores the conversation.
+      let storedId = chatVisitorId;
       if (!storedId) {
         storedId = `visitor-${Math.random().toString(36).substr(2, 9)}`;
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('hs_chat_visitor_id', storedId);
-        }
+        chatVisitorId = storedId;
       }
       setVisitorId(storedId);
     }
@@ -141,8 +146,8 @@ export default function LiveChatWidget() {
       name: storeState.current_user.name,
       email: storeState.current_user.email,
     } : {
-      name: (typeof window !== 'undefined' ? sessionStorage.getItem('hs_chat_visitor_name') : null) || undefined,
-      email: (typeof window !== 'undefined' ? sessionStorage.getItem('hs_chat_visitor_email') : null) || undefined
+      name: chatGuestName || undefined,
+      email: chatGuestEmail || undefined
     };
 
     setIsTyping(true);
@@ -164,11 +169,9 @@ export default function LiveChatWidget() {
     e.preventDefault();
     if (!offlineName.trim() || !offlineEmail.trim() || !offlineMsg.trim()) return;
 
-    // Save Guest Info in SessionStorage
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('hs_chat_visitor_name', offlineName);
-      sessionStorage.setItem('hs_chat_visitor_email', offlineEmail);
-    }
+    // Keep guest info for this page session in memory only.
+    chatGuestName = offlineName;
+    chatGuestEmail = offlineEmail;
 
     setIsTyping(true);
     // Create pending conversation with visitors email & details
