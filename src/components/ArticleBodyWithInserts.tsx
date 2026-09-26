@@ -4,13 +4,23 @@ import { Brain, Heart, CheckCircle2, BookOpen, ArrowRight, Lightbulb, Compass, S
 import { InArticleInsertsConfig, InArticleInsertItem } from '../types';
 import { preprocessMarkdownImages } from '../utils/markdownImage';
 import { AdPlacement } from './AdPlacement';
+import { ArticlePromoCard, FreluxCrossPromo } from './HousePromo';
 import { heartsync } from '../store';
+import { Post } from '../types';
 
 interface ArticleBodyWithInsertsProps {
   content: string;
   inserts?: InArticleInsertsConfig;
   markdownComponents?: any;
   className?: string;
+  /** House ads: in-article promotion of OTHER Heartsyncx articles.
+   *  First-party recommendations, not ad-network units - no consent gate.
+   *  Expects up to 2 picked articles (caller excludes the current one). */
+  promoArticles?: Post[];
+  /** Opens a promo article by slug (SPA navigation). */
+  onOpenPromoArticle?: (slug: string) => void;
+  /** Single cross-site slot: FRELUX PROJECT CALC advertised here. */
+  showFreluxPromo?: boolean;
 }
 
 export function RenderInsertCard({ insert }: { insert: InArticleInsertItem }) {
@@ -133,6 +143,9 @@ export default function ArticleBodyWithInserts({
   content,
   inserts,
   markdownComponents,
+  promoArticles,
+  onOpenPromoArticle,
+  showFreluxPromo,
   className = "markdown-body prose dark:prose-invert max-w-none text-zinc-850 dark:text-zinc-200 leading-relaxed space-y-5"
 }: ArticleBodyWithInsertsProps) {
   // Split content into paragraph blocks
@@ -207,6 +220,30 @@ export default function ArticleBodyWithInserts({
     return out;
   }, [blocks, content]);
 
+  // HOUSE PROMO POSITIONS: the two internal article-promo slots sit in the
+  // front and back stretches of the article (~12% and ~88% of blocks), i.e.
+  // OUTSIDE the 20-80% middle zone the ad units occupy, so a promo never
+  // stacks against a network ad. Each index is nudged forward until it
+  // avoids the block's ad index (and, on very short articles, stays in
+  // range).
+  const promoIndices = useMemo(() => {
+    const out: number[] = [];
+    const picks = (promoArticles || []).slice(0, 2);
+    if (!picks.length || !onOpenPromoArticle || blocks.length <= 2) return out;
+    const taken = new Set(adInsertIndices);
+    insertPositions.forEach((_, blockIdx) => taken.add(blockIdx));
+    [0.12, 0.88].forEach((frac, slot) => {
+      let idx = Math.max(1, Math.min(blocks.length - 2, Math.floor(blocks.length * frac)));
+      let guard = 0;
+      while (taken.has(idx) && guard < 3 && idx < blocks.length - 1) { idx += 1; guard += 1; }
+      if (!taken.has(idx)) {
+        taken.add(idx);
+        out[slot] = idx;
+      }
+    });
+    return out.filter((i) => i !== undefined);
+  }, [blocks, adInsertIndices, insertPositions, promoArticles, onOpenPromoArticle]);
+
   if (!blocks || blocks.length === 0) {
     return (
       <div className={className}>
@@ -234,6 +271,22 @@ export default function ArticleBodyWithInserts({
             {/* Seamless In-Article Ad Placement (Google AdSense, Monetag, or Adsterra) */}
             {adInsertIndices.includes(idx) && (
               <AdPlacement slot="in_article" className="my-6" />
+            )}
+
+            {/* House ad: promote another Heartsyncx article (2 slots) */}
+            {promoIndices.indexOf(idx) !== -1 && promoArticles && onOpenPromoArticle && (
+              <ArticlePromoCard
+                article={promoArticles[promoIndices.indexOf(idx)]}
+                onOpen={onOpenPromoArticle}
+                variant={promoIndices.indexOf(idx) === 0 ? 'first' : 'second'}
+              />
+            )}
+
+            {/* Cross-site promo AFTER the last content block: the single
+                FRELUX slot. Skipped when the last block already carries an
+                ad or insert to avoid a stacked wall at the article end. */}
+            {showFreluxPromo && idx === blocks.length - 1 && !adInsertIndices.includes(idx) && !insertPositions.has(idx) && (
+              <FreluxCrossPromo />
             )}
           </React.Fragment>
         );

@@ -109,6 +109,17 @@ activeArticle, articleBody, headings, markdownComponents, siteSettings, navigate
                 : 'lg:col-span-8';
               const sidebarLeft = (siteSettings.article_sidebar_position || 'right') === 'left';
               const relatedInSidebar = (siteSettings.article_desktop_related_placement || 'bottom') === 'sidebar';
+              // HOUSE AD TARGETS: two OTHER published articles to promote
+              // inside this article's body. Same-category picks first
+              // (most relevant continuation), then most recent others.
+              const promoPicks = useMemo(() => {
+                const others = (publishedArticles || []).filter(
+                  (p) => p.id !== activeArticle?.id && p.status === 'published' && p.slug
+                );
+                const sameCat = others.filter((p) => p.category_id === activeArticle?.category_id);
+                const rest = others.filter((p) => p.category_id !== activeArticle?.category_id);
+                return [...sameCat, ...rest].slice(0, 2);
+              }, [publishedArticles, activeArticle?.id, activeArticle?.category_id]);
               const mobileShareStyle = siteSettings.article_mobile_share_style || 'dock';
               const showMobileDock = mobileShareStyle === 'dock' && siteSettings.article_mobile_sticky_actions !== false;
               const bodyWidthClass = siteSettings.article_desktop_content_width || siteSettings.article_content_width || 'max-w-none';
@@ -935,6 +946,9 @@ activeArticle, articleBody, headings, markdownComponents, siteSettings, navigate
                               content={articleBody}
                               inserts={siteSettings.article_inserts_enabled !== false ? activeArticle.in_article_inserts : undefined}
                               markdownComponents={markdownComponents}
+                              promoArticles={promoPicks}
+                              onOpenPromoArticle={(slug) => navigateTo('article', slug)}
+                              showFreluxPromo
                               className={`markdown-body prose dark:prose-invert ${bodyWidthClass}${bodyWidthClass !== 'max-w-none' ? ' mx-auto' : ''} text-zinc-850 dark:text-zinc-200 ${lineHeightClass} ${spacingClass} ${headingsClass} ${
                                 siteSettings.article_font_size === 'sm' ? 'text-xs sm:text-sm' :
                                 siteSettings.article_font_size === 'lg' ? 'text-sm sm:text-lg leading-extra-relaxed' :
