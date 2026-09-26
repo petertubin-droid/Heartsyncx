@@ -6,6 +6,7 @@ import HeroSection from './HeroSection';
 import BlogCard from './BlogCard';
 import RelatedContentBlock from './RelatedContentBlock';
 import { AdPlacement, AdsterraDirectLink } from './AdPlacement';
+import CrossPromoSlot from './houseAds/CrossPromoSlot';
 import { heartsync, getAuthors } from '../store';
 import { Post, Author, Topic, Category } from '../types';
 import { getTranslation, formatTranslation, Language } from '../utils/i18n';
@@ -1887,12 +1888,27 @@ export default function HomePage({
                     premium_articles: 'footer'
                   };
                   const adSlotAfter = AD_SLOT_AFTER_SECTION[sec.type];
-                  return adSlotAfter ? (
+                  // Cross-site house ads (admin-configured format): two
+                  // homepage slots, placed on sections that carry no
+                  // network ad so the two systems never stack.
+                  const CROSS_PROMO_AFTER_SECTION: Record<string, number> = {
+                    about: 0,
+                    newsletter: 1
+                  };
+                  const crossPromoSlotAfter = CROSS_PROMO_AFTER_SECTION[sec.type];
+                  return adSlotAfter || crossPromoSlotAfter !== undefined ? (
                     <React.Fragment key={`adwrap-${sec.id}`}>
                       {sectionNode}
-                      <div className="max-w-6xl mx-auto px-4 w-full">
-                        <AdPlacement slot={adSlotAfter} className="my-6" lazy />
-                      </div>
+                      {adSlotAfter && (
+                        <div className="max-w-6xl mx-auto px-4 w-full">
+                          <AdPlacement slot={adSlotAfter} className="my-6" lazy />
+                        </div>
+                      )}
+                      {crossPromoSlotAfter !== undefined && (
+                        <div className="max-w-6xl mx-auto px-4 w-full">
+                          <CrossPromoSlot slotIndex={crossPromoSlotAfter} source={`home_${crossPromoSlotAfter}`} />
+                        </div>
+                      )}
                     </React.Fragment>
                   ) : sectionNode;
                 })})()}

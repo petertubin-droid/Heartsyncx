@@ -19,8 +19,9 @@ interface ArticleBodyWithInsertsProps {
   promoArticles?: Post[];
   /** Opens a promo article by slug (SPA navigation). */
   onOpenPromoArticle?: (slug: string) => void;
-  /** Single cross-site slot: FRELUX PROJECT CALC advertised here. */
-  showFreluxPromo?: boolean;
+  /** Cross-site house-ad slots (admin-configured format): node 0 goes
+   *  mid-article, node 1 after the last content block. */
+  crossPromoNodes?: React.ReactNode[];
 }
 
 export function RenderInsertCard({ insert }: { insert: InArticleInsertItem }) {
@@ -145,7 +146,7 @@ export default function ArticleBodyWithInserts({
   markdownComponents,
   promoArticles,
   onOpenPromoArticle,
-  showFreluxPromo,
+  crossPromoNodes,
   className = "markdown-body prose dark:prose-invert max-w-none text-zinc-850 dark:text-zinc-200 leading-relaxed space-y-5"
 }: ArticleBodyWithInsertsProps) {
   // Split content into paragraph blocks
@@ -244,6 +245,19 @@ export default function ArticleBodyWithInserts({
     return out.filter((i) => i !== undefined);
   }, [blocks, adInsertIndices, insertPositions, promoArticles, onOpenPromoArticle]);
 
+  // Mid-article cross-site promo position (~50% of blocks), nudged off
+  // ad/insert/promo indices so it never stacks against anything.
+  const crossPromoFirstIdx = useMemo(() => {
+    if (!crossPromoNodes || !crossPromoNodes[0] || blocks.length <= 3) return -1;
+    const taken = new Set(adInsertIndices);
+    insertPositions.forEach((_, blockIdx) => taken.add(blockIdx));
+    promoIndices.forEach((i) => taken.add(i));
+    let idx = Math.max(1, Math.floor(blocks.length * 0.5));
+    let guard = 0;
+    while (taken.has(idx) && guard < 3 && idx < blocks.length - 1) { idx += 1; guard += 1; }
+    return taken.has(idx) ? -1 : idx;
+  }, [blocks, adInsertIndices, insertPositions, promoIndices, crossPromoNodes]);
+
   if (!blocks || blocks.length === 0) {
     return (
       <div className={className}>
@@ -282,11 +296,17 @@ export default function ArticleBodyWithInserts({
               />
             )}
 
-            {/* Cross-site promo AFTER the last content block: the single
-                FRELUX slot. Skipped when the last block already carries an
-                ad or insert to avoid a stacked wall at the article end. */}
-            {showFreluxPromo && idx === blocks.length - 1 && !adInsertIndices.includes(idx) && !insertPositions.has(idx) && (
-              <FreluxCrossPromo />
+            {/* Cross-site house ad, slot 2 of 2: after the last content
+                block. Skipped when the last block already carries an ad or
+                insert to avoid a stacked wall at the article end. */}
+            {crossPromoNodes && crossPromoNodes[1] && idx === blocks.length - 1 && !adInsertIndices.includes(idx) && !insertPositions.has(idx) && (
+              crossPromoNodes[1]
+            )}
+
+            {/* Cross-site house ad, slot 1 of 2: mid-article, nudged so it
+                never stacks against a network ad or promo card. */}
+            {crossPromoNodes && crossPromoNodes[0] && crossPromoFirstIdx === idx && idx !== blocks.length - 1 && (
+              crossPromoNodes[0]
             )}
           </React.Fragment>
         );

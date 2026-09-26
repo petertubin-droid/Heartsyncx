@@ -10,6 +10,7 @@ import ArticleShareRow from './ArticleShareRow';
 import RelatedContentBlock from './RelatedContentBlock';
 import ArticleBodyWithInserts from './ArticleBodyWithInserts';
 import { AdPlacement } from './AdPlacement';
+import CrossPromoSlot from './houseAds/CrossPromoSlot';
 import ArticleTTS from './ArticleTTS';
 import { heartsync, getAuthors } from '../store';
 import { trackEvent } from '../lib/analytics';
@@ -948,7 +949,10 @@ activeArticle, articleBody, headings, markdownComponents, siteSettings, navigate
                               markdownComponents={markdownComponents}
                               promoArticles={promoPicks}
                               onOpenPromoArticle={(slug) => navigateTo('article', slug)}
-                              showFreluxPromo
+                              crossPromoNodes={[
+                                <CrossPromoSlot key="cp-mid" slotIndex={2} source="article_mid" />,
+                                <CrossPromoSlot key="cp-end" slotIndex={3} source="article_end" />
+                              ]}
                               className={`markdown-body prose dark:prose-invert ${bodyWidthClass}${bodyWidthClass !== 'max-w-none' ? ' mx-auto' : ''} text-zinc-850 dark:text-zinc-200 ${lineHeightClass} ${spacingClass} ${headingsClass} ${
                                 siteSettings.article_font_size === 'sm' ? 'text-xs sm:text-sm' :
                                 siteSettings.article_font_size === 'lg' ? 'text-sm sm:text-lg leading-extra-relaxed' :

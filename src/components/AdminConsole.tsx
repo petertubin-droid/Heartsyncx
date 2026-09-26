@@ -1164,7 +1164,7 @@ export default function AdminConsole({
   const [adsterraActive, setAdsterraActive] = useState(() => siteSettings.adsterra_active ?? heartsync.site_settings.adsterra_active ?? true);
 
   // Ad Networks configuration sub-tab inside Monetization pane
-  const [adNetworkActiveSubTab, setAdNetworkActiveSubTab] = useState<'adsense' | 'monetag' | 'adsterra' | 'placements'>('adsense');
+  const [adNetworkActiveSubTab, setAdNetworkActiveSubTab] = useState<'adsense' | 'monetag' | 'adsterra' | 'placements' | 'cross_promo'>('adsense');
 
   // Self-heal the ad-network toggles/fields against the true DB values once
   // hydration settles. These are all mount-time useState snapshots; if this
@@ -6520,6 +6520,18 @@ export default function AdminConsole({
                       >
                         <span>📐 Placement Slots</span>
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAdNetworkActiveSubTab('cross_promo')}
+                        className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                          adNetworkActiveSubTab === 'cross_promo'
+                            ? 'bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                            : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                        }`}
+                      >
+                        <span>🤝 Cross-Site Promo</span>
+                      </button>
                     </div>
                   </div>
 
@@ -6930,6 +6942,56 @@ export default function AdminConsole({
                   )}
 
                   {/* 4. WEBSITE LAYOUT PLACEMENT SLOTS */}
+                  {adNetworkActiveSubTab === 'cross_promo' && (
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-5">
+                      <div className="flex items-center justify-between border-b pb-3">
+                        <div className="space-y-0.5">
+                          <h4 className="font-extrabold text-sm text-zinc-900 dark:text-white flex items-center gap-2">
+                            <span>🤝</span> Cross-Site House Promos (Frelux ⇄ Heartsyncx)
+                          </h4>
+                          <p className="text-[11px] text-zinc-400">
+                            First-party promo slots advertising the sister site. Not ad-network units - no consent gate, cannot be blocked by ad blockers.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Display Format</label>
+                          <select
+                            value={(heartsync.site_settings as Record<string, unknown>).cross_promo_format as string || 'card'}
+                            onChange={(e) => heartsync.updateSettings({ cross_promo_format: e.target.value })}
+                            className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          >
+                            <option value="card">Card (rich grid of section links - default)</option>
+                            <option value="banner">Banner (slim strip, 3 rotating links)</option>
+                            <option value="native">Native (quiet in-feed text unit)</option>
+                            <option value="interstitial">Interstitial (full-screen overlay, once per session)</option>
+                          </select>
+                          <p className="text-[10px] text-zinc-400">Applies to all 4 slots (2 article + 2 homepage). Slots rotate destinations so each advertises different sections.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Master Switch</label>
+                          <label className="p-3 bg-zinc-50 dark:bg-zinc-950 border rounded-xl flex items-center justify-between cursor-pointer">
+                            <span className="text-xs font-semibold">Cross-site promos enabled</span>
+                            <input
+                              type="checkbox"
+                              checked={(heartsync.site_settings as Record<string, unknown>).cross_promo_enabled !== false}
+                              onChange={(e) => heartsync.updateSettings({ cross_promo_enabled: e.target.checked })}
+                              className="w-4 h-4 text-emerald-500 rounded cursor-pointer"
+                            />
+                          </label>
+                          <p className="text-[10px] text-zinc-400">Clicks are tracked in GA4 as cross_promo_click with the destination path.</p>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                        <strong>Placement map:</strong> Article pages - mid-article + after the last block. Homepage - after the About section and after the Newsletter section.
+                        The matching Heartsyncx promos on Frelux are configured separately in the Frelux admin.
+                      </div>
+                    </div>
+                  )}
+
                   {adNetworkActiveSubTab === 'placements' && (
                     <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-850 space-y-4">
                       <div className="flex items-center justify-between border-b pb-3">
