@@ -121,7 +121,8 @@ html.dark, html.dark body {
   font-size: 1.25rem !important;
 }
 .markdown-body h3, .prose h3 {
-  font-size: 1.125rem !important;
+  font-size: 1.25rem !important;
+  letter-spacing: -0.005em;
 }
 .markdown-body p, .prose p {
   margin-bottom: 1rem !important;

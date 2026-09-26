@@ -6898,7 +6898,84 @@ app.post('/api/maint/articles', async (req: Request, res: Response) => {
       res.json({ restored, skipped, missing, tooShort, slugs: restoredSlugs });
       return;
     }
-    res.status(400).json({ error: 'Unknown action. Use unpublish_empty or restore_batch.' });
+    // (2026-09-26) Media + image sync actions, same token gate. These exist so
+    // the owner's agent can put real curated cover photos INTO project storage
+    // (bucket heartsync-media) instead of hotlinking, and update article
+    // fields (featured_image, content) without a full admin state save.
+    //   { action: 'upload_media', files: [{ name, base64, contentType }] }
+    //     -> uploads to the heartsync-media bucket (creating it public if
+    //        missing), inserts public.media rows, returns the public URLs.
+    //   { action: 'update_articles', articles: [{ slug, featured_image?, content? }] }
+    //     -> targeted per-field updates on posts; empty/missing fields are
+    //        simply not written. content updates are validated non-empty.
+    if (action === 'upload_media') {
+      const files = (req.body && (req.body as any).files) as Array<{ name?: string; base64?: string; contentType?: string }> | undefined;
+      if (!Array.isArray(files) || files.length === 0 || files.length > 12) {
+        res.status(400).json({ error: 'Expected files array of 1-12 items { name, base64, contentType }.' });
+        return;
+      }
+      const BUCKET = 'heartsync-media';
+      // Bucket self-heal: create the public bucket if it does not exist yet.
+      const { data: buckets, error: bucketListErr } = await svc.storage.listBuckets();
+      if (!bucketListErr && Array.isArray(buckets) && !buckets.some((b: any) => b.name === BUCKET)) {
+        const envUrl = cleanConfigValue(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+        const envKey = cleanConfigValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
+        if (envUrl && envKey) {
+          await fetch(`${envUrl}/storage/v1/bucket`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${envKey}`, apikey: envKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: BUCKET, name: BUCKET, public: true })
+          }).catch(() => undefined);
+        }
+      }
+      const uploaded: Array<{ name: string; url: string }> = [];
+      const failed: Array<{ name: string; error: string }> = [];
+      for (const f of files) {
+        const name = String((f && f.name) || '').trim();
+        const b64 = String((f && f.base64) || '').trim();
+        const contentType = String((f && f.contentType) || 'image/jpeg');
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,180}\.(jpg|jpeg|png|webp)$/i.test(name) || !b64) {
+          failed.push({ name, error: 'Invalid name or empty base64 payload.' });
+          continue;
+        }
+        const path = `articles/${Date.now()}-${name}`;
+        const bytes = Buffer.from(b64, 'base64');
+        const { error: upErr } = await svc.storage.from(BUCKET).upload(path, bytes, { contentType, upsert: false });
+        if (upErr) { failed.push({ name, error: upErr.message }); continue; }
+        const { data: pub } = svc.storage.from(BUCKET).getPublicUrl(path);
+        const url = pub && pub.publicUrl ? pub.publicUrl : '';
+        const { error: dbErr } = await svc.from('media').insert({ name, url, type: contentType, size: bytes.length, storage_path: path });
+        if (dbErr) { /* media row is best-effort; the upload itself succeeded */ }
+        uploaded.push({ name, url });
+      }
+      res.json({ uploaded, failed });
+      return;
+    }
+    if (action === 'update_articles') {
+      const articles = (req.body && (req.body as any).articles) as Array<{ slug?: string; featured_image?: string; content?: string }> | undefined;
+      if (!Array.isArray(articles) || articles.length === 0 || articles.length > 12) {
+        res.status(400).json({ error: 'Expected articles array of 1-12 items { slug, featured_image?, content? }.' });
+        return;
+      }
+      let updated = 0, skipped = 0, missing = 0;
+      const slugs: string[] = [];
+      for (const a of articles) {
+        const slug = String((a && a.slug) || '');
+        if (!/^[a-z0-9][a-z0-9-]{0,199}$/.test(slug)) { skipped++; continue; }
+        const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (typeof a.featured_image === 'string' && /^https:\/\//.test(a.featured_image)) patch.featured_image = a.featured_image;
+        if (typeof a.content === 'string' && a.content.trim().length >= 500) patch.content = a.content;
+        if (Object.keys(patch).length === 1) { skipped++; continue; } // nothing to write
+        const { data: post, error: fetchErr } = await svc.from('posts').select('id').eq('slug', slug).maybeSingle();
+        if (fetchErr || !post) { missing++; continue; }
+        const { error: updateErr } = await svc.from('posts').update(patch).eq('id', post.id);
+        if (updateErr) { skipped++; continue; }
+        updated++; slugs.push(slug);
+      }
+      res.json({ updated, skipped, missing, slugs });
+      return;
+    }
+    res.status(400).json({ error: 'Unknown action. Use unpublish_empty, restore_batch, upload_media or update_articles.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Maintenance failed: ' + err.message });
   }
