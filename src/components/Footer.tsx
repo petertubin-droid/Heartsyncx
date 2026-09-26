@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { heartsync } from '../store';
-import { Heart, Send, CheckCircle2, AlertCircle, Mail, Facebook, Twitter, Instagram, Linkedin, Youtube } from 'lucide-react';
+import { Heart, Send, CheckCircle2, AlertCircle, Mail, Facebook, Twitter, Instagram, Linkedin, Youtube, Music2 } from 'lucide-react';
 import { Language, getTranslation } from '../utils/i18n';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -158,8 +158,9 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
             const instagramUrl = siteSettings.social_instagram_url || siteSettings.social_links?.instagram;
             const linkedinUrl = siteSettings.social_linkedin_url || (siteSettings.social_links as any)?.linkedin;
             const youtubeUrl = siteSettings.social_youtube_url || (siteSettings.social_links as any)?.youtube;
+            const tiktokUrl = siteSettings.social_tiktok_url || (siteSettings.social_links as any)?.tiktok;
 
-            const hasSocial = facebookUrl || twitterUrl || instagramUrl || linkedinUrl || youtubeUrl;
+            const hasSocial = facebookUrl || twitterUrl || instagramUrl || linkedinUrl || youtubeUrl || tiktokUrl;
             if (!hasSocial) return null;
 
             return (
@@ -212,6 +213,17 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
                     title="Subscribe on YouTube"
                   >
                     <Youtube className="w-4 h-4 md:w-5 md:h-5" />
+                  </a>
+                )}
+                {tiktokUrl && (
+                  <a 
+                    href={tiktokUrl} 
+                    target="_blank" rel="noopener noreferrer"
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-900/50 hover:bg-rose-500 hover:text-white hover:border-transparent text-zinc-400 border border-zinc-800/80 transition-all cursor-pointer shadow-xs md:w-9 md:h-9"
+                    title="Follow @heartsync12 on TikTok"
+                    aria-label="Follow us on TikTok"
+                  >
+                    <Music2 className="w-4 h-4 md:w-5 md:h-5" />
                   </a>
                 )}
               </div>

@@ -245,8 +245,10 @@ const DEFAULT_SETTINGS: SiteSettings = {
     facebook: 'https://facebook.com/heartsync',
     instagram: 'https://instagram.com/heartsync',
     twitter: 'https://twitter.com/heartsync',
-    pinterest: 'https://pinterest.com/heartsync'
+    pinterest: 'https://pinterest.com/heartsync',
+    tiktok: 'https://www.tiktok.com/@heartsync12'
   },
+  social_tiktok_url: 'https://www.tiktok.com/@heartsync12',
   social_facebook_url: 'https://facebook.com/heartsync',
   social_twitter_url: 'https://twitter.com/heartsync',
   social_instagram_url: 'https://instagram.com/heartsync',

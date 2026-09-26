@@ -309,12 +309,15 @@ export interface SiteSettings {
     instagram: string;
     twitter: string;
     pinterest: string;
-  };
+    tiktok?: string;
+};
   social_facebook_url?: string;
   social_twitter_url?: string;
   social_instagram_url?: string;
   social_linkedin_url?: string;
   social_youtube_url?: string;
+  /** TikTok profile URL shown in the footer social row and the article-page follow card. */
+  social_tiktok_url?: string;
   related_block_enabled?: boolean;
   related_block_title?: string;
   related_block_count?: number;

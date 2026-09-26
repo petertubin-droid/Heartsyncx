@@ -18,7 +18,7 @@ import ReactMarkdown from 'react-markdown';
 import {
   Heart, BookOpen, MessageSquare, Copy, ArrowLeft, Send,
   HelpCircle, RefreshCw, Twitter, Facebook, Link as LinkIcon, Calendar, Clock,
-  Lock, Play, Maximize2, ArrowRight, Share2
+  Lock, Play, Maximize2, ArrowRight, Share2, Music2
 } from 'lucide-react';
 
 export interface ArticlePageProps {
@@ -1058,6 +1058,39 @@ activeArticle, articleBody, headings, markdownComponents, siteSettings, navigate
                           ))}
                         </div>
                       )}
+
+                      {/* TikTok follow card - placed at the end of the
+                          article body: the reader has just finished, the
+                          highest-intent moment to convert them into a
+                          follower. Quiet, on-brand, dismissible by scroll. */}
+                      {(() => {
+                        const tiktokUrl = siteSettings.social_tiktok_url || (siteSettings.social_links as any)?.tiktok || 'https://www.tiktok.com/@heartsync12';
+                        if (siteSettings.article_tiktok_cta_enabled === false) return null;
+                        return (
+                          <a
+                            href={tiktokUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-10 mb-2 group flex items-center gap-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-gradient-to-br from-rose-50 to-zinc-50 dark:from-rose-950/20 dark:to-zinc-900/60 p-5 sm:p-6 transition-all hover:border-rose-300 dark:hover:border-rose-500/40 hover:shadow-md cursor-pointer"
+                            aria-label="Follow Heartsync on TikTok"
+                          >
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 transition-transform group-hover:scale-105">
+                              <Music2 className="h-5 w-5" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+                                Keep the spark alive
+                              </span>
+                              <span className="mt-1 block font-serif text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                                Follow @heartsync12 on TikTok
+                              </span>
+                              <span className="mt-0.5 block text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                                Daily relationship insights, couple challenges and real talk about modern love.
+                              </span>
+                            </span>
+                          </a>
+                        );
+                      })()}
 
                       {/* Previous / Next Article Navigation  - Frelux-style */}
                       {(() => {
