@@ -15564,9 +15564,11 @@ export default function AdminConsole({
             >
               <RichTextEditor 
                 post={editPost}
-                onSave={() => {
+                onSave={(savedPost) => {
                   setIsEditing(false);
-                  triggerToast('Article details successfully preserved.');
+                  triggerToast(savedPost?.status === 'published'
+                    ? `Article published - '${savedPost.title}' is now live on Heartsync.`
+                    : 'Draft saved. Hit Publish Live when the article is ready.');
                 }}
                 onCancel={() => {
                   setIsEditing(false);

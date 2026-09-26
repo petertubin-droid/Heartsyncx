@@ -141,6 +141,13 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
   const [aiLoading, setAiLoading] = useState(false);
   const [aiMode, setAiMode] = useState<'expand' | 'tone' | 'summarize' | 'seo'>('expand');
 
+  // --- AI ARTICLE WRITER STATES (full-article generation from a topic) ---
+  const [aiWriterTopic, setAiWriterTopic] = useState('');
+  const [aiWriterTone, setAiWriterTone] = useState('Empathetic & Warm');
+  const [aiWriterLength, setAiWriterLength] = useState<'short' | 'standard' | 'deep'>('standard');
+  const [aiWriterLoading, setAiWriterLoading] = useState(false);
+  const [aiWriterError, setAiWriterError] = useState('');
+
   // --- TOOLBAR INSERT POPUPS ---
   const [insertType, setInsertType] = useState<string | null>(null); // 'image' | 'gallery' | 'quote' | 'related' | 'author' | 'custom-section' | 'callout'
   const [insertData, setInsertData] = useState<any>({});
@@ -352,6 +359,64 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
     }
   };
 
+  // AI ARTICLE WRITER: generate a complete, publication-ready draft from
+  // just a topic. Fills the article body (and title/excerpt when empty) via
+  // the server-side Gemini proxy so the API key never reaches the client.
+  const handleAiWriteArticle = async () => {
+    if (!aiWriterTopic.trim()) {
+      setAiWriterError('Describe what the article should be about first.');
+      return;
+    }
+    if (content.trim() && !confirm('The AI writer will REPLACE the current article body. Continue?')) {
+      return;
+    }
+    setAiWriterLoading(true);
+    setAiWriterError('');
+    try {
+      let draftToken = '';
+      try {
+        if (heartsync.supabase) {
+          const { data: { session } } = await heartsync.supabase.auth.getSession();
+          draftToken = session?.access_token || '';
+        }
+      } catch (_) { /* not signed in */ }
+      const lengthGuide = aiWriterLength === 'short'
+        ? 'about 600 words across 3 sections'
+        : aiWriterLength === 'deep'
+          ? 'about 1600 words across 6-7 sections'
+          : 'about 1000 words across 4-5 sections';
+      const response = await fetch('/api/ai/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(draftToken ? { Authorization: `Bearer ${draftToken}` } : {}) },
+        body: JSON.stringify({
+          prompt: `Write a complete, publication-ready Heartsync article about: "${aiWriterTopic.trim()}". Tone: ${aiWriterTone}. Length: ${lengthGuide}. Open with a compelling introduction, use markdown H2 (##) section headings for the body sections, include practical takeaways readers can apply, and close with a warm, reflective conclusion. Do NOT use H1 (#) headings - the article title is rendered separately by the site.`,
+          mode: 'full-article',
+          context: ''
+        })
+      });
+      const data = await response.json();
+      if (data.success && data.text) {
+        setContent(data.text);
+        // Fill title/excerpt only when empty so the writer never clobbers
+        // intentional edits. The slug auto-derives from the title.
+        if (!title.trim()) {
+          setTitle(aiWriterTopic.trim().replace(/\s+/g, ' '));
+        }
+        if (!excerpt.trim()) {
+          const plain = data.text.replace(/[#*>`~\[\]()]/g, ' ').replace(/\s+/g, ' ').trim();
+          setExcerpt(plain.substring(0, 160) + (plain.length > 160 ? '...' : ''));
+        }
+        setSaveStatus('idle');
+      } else {
+        setAiWriterError(data.error || 'The AI writer could not generate the article. Check the server API key.');
+      }
+    } catch (err) {
+      setAiWriterError('Connection failed. Verify the AI drafting endpoint is reachable.');
+    } finally {
+      setAiWriterLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-zinc-100 dark:bg-zinc-950 flex flex-col overflow-hidden font-sans text-sm select-none antialiased">
       
@@ -407,8 +472,17 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
             onClick={() => handleFormSubmit()} 
             className="px-4 py-2 bg-rose-550 hover:bg-rose-600 text-white text-xs font-black rounded-xl transition-all shadow-md hover:scale-[1.01] cursor-pointer flex items-center gap-1.5"
           >
-            <Send className="w-3.5 h-3.5" /> Save Changes
+            <Send className="w-3.5 h-3.5" /> {status === 'published' ? 'Save Live Changes' : 'Save Draft'}
           </button>
+          {status !== 'published' && (
+            <button 
+              onClick={() => { setStatus('published'); handleFormSubmit('published'); }} 
+              title="Save this article with Published status so it goes live on the site immediately"
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-200/50 hover:scale-[1.01] cursor-pointer flex items-center gap-1.5"
+            >
+              <Globe className="w-3.5 h-3.5" /> Publish Live
+            </button>
+          )}
         </div>
       </header>
 
@@ -418,6 +492,67 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
         {/* LEFT COLUMN: THE CONTINUOUS EDITING CANVAS */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-zinc-50 dark:bg-zinc-950 select-text">
           
+          {/* A0. AI ARTICLE WRITER - full draft generation from a single topic */}
+          <section className="bg-gradient-to-r from-fuchsia-500/[0.03] to-rose-500/[0.03] dark:from-fuchsia-955/20 dark:to-rose-955/10 border border-fuchsia-500/20 dark:border-fuchsia-900/40 rounded-3xl p-6 text-left space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-fuchsia-100 dark:border-fuchsia-950">
+              <Wand2 className="w-5 h-5 text-fuchsia-500" />
+              <h3 className="text-xs font-black uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">AI Article Writer</h3>
+              <span className="text-[9px] font-mono text-zinc-400 ml-auto">Generate a complete first draft from one topic</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs">
+              <div className="md:col-span-6">
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 block mb-1.5">What should the article be about?</label>
+                <input 
+                  value={aiWriterTopic} 
+                  onChange={(e) => setAiWriterTopic(e.target.value)} 
+                  placeholder="e.g. Rebuilding trust after a betrayal" 
+                  className="w-full px-3 py-2.5 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl text-xs"
+                />
+              </div>
+              <div className="md:col-span-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 block mb-1.5">Tone</label>
+                <select 
+                  value={aiWriterTone} 
+                  onChange={(e) => setAiWriterTone(e.target.value)} 
+                  className="w-full px-3 py-2.5 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl text-xs cursor-pointer"
+                >
+                  <option>Empathetic & Warm</option>
+                  <option>Clinical & Insightful</option>
+                  <option>Romantic</option>
+                  <option>Playful & Light</option>
+                  <option>Reflective & Calm</option>
+                </select>
+              </div>
+              <div className="md:col-span-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 block mb-1.5">Length</label>
+                <select 
+                  value={aiWriterLength} 
+                  onChange={(e) => setAiWriterLength(e.target.value as 'short' | 'standard' | 'deep')} 
+                  className="w-full px-3 py-2.5 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl text-xs cursor-pointer"
+                >
+                  <option value="short">Quick Read (~600 words)</option>
+                  <option value="standard">Standard (~1000 words)</option>
+                  <option value="deep">Deep Dive (~1600 words)</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleAiWriteArticle} 
+                disabled={aiWriterLoading} 
+                className="px-5 py-2.5 bg-gradient-to-r from-fuchsia-500 to-rose-500 text-white rounded-xl font-black shadow-md hover:scale-[1.01] transition-all disabled:opacity-50 cursor-pointer text-xs flex items-center gap-1.5"
+              >
+                <Wand2 className="w-3.5 h-3.5" /> 
+                {aiWriterLoading ? 'Writing your article...' : 'Generate Full Article'}
+              </button>
+              {aiWriterError && (
+                <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> {aiWriterError}
+                </span>
+              )}
+            </div>
+          </section>
+
           {/* A. TITLE & ESSENTIAL METADATA */}
           <section className="bg-white dark:bg-zinc-900 border border-zinc-200/85 dark:border-zinc-800/80 rounded-3xl p-6 shadow-xs space-y-4 text-left">
             <div className="flex items-center gap-2 mb-2">
