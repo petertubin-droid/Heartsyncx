@@ -6,7 +6,7 @@ import React, { useEffect } from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, act, screen } from '@testing-library/react';
 import { ConsentProvider, useConsentContext } from '../ConsentProvider';
-import { heartsync } from '../../store';
+import { heartsync, DEFAULT_SETTINGS } from '../../store';
 
 const Probe = () => {
   const ctx = useConsentContext();
@@ -82,3 +82,12 @@ const ProbeToggle = ({ onReady }: { onReady: (c: any) => void }) => {
   }, [ctx.hasConsented]);
   return null;
 };
+
+describe('GA4 measurement ID wiring (G-FEJLEG7LRB)', () => {
+  it('the store default carries the real measurement ID, so every page can inject GA', () => {
+    // Regression: Google's snippet requires the gtag.js library with this
+    // exact ID on every page. The store default is the baseline that works
+    // even before any admin configuration or env var.
+    expect((DEFAULT_SETTINGS as any).ga_measurement_id).toBe('G-FEJLEG7LRB');
+  });
+});

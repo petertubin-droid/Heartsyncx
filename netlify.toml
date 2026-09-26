@@ -29,6 +29,10 @@
   # NODE_ENV=production above, so runtime behavior is unaffected.
   NPM_FLAGS = "--include=dev"
   SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY,VITE_SUPABASE_ANON_KEY,SUPABASE_URL,VITE_SUPABASE_URL"
+  # Google Analytics 4 measurement ID (public - Google prints it in the
+  # snippet they ask you to add to every page). Inlined into the bundle by
+  # Vite so ConsentProvider can inject the consent-gated gtag.js snippet.
+  VITE_GA_MEASUREMENT_ID = "G-FEJLEG7LRB"
 
 [functions]
   # Belt-and-suspenders alongside the Function-constructed dynamic import in

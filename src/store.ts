@@ -59,8 +59,12 @@ const DEFAULT_COMMENTS: Comment[] = [];
 
 export const DEFAULT_TOPICS: Topic[] = [];
 
-const DEFAULT_SETTINGS: SiteSettings = {
+export const DEFAULT_SETTINGS: SiteSettings = {
   site_name: 'Heartsync',
+  // Google Analytics 4 measurement ID (public by design - appears in every page's
+  // HTML). ConsentProvider injects the gtag.js snippet on every page, but
+  // only after the visitor grants analytics consent (Consent Mode v2).
+  ga_measurement_id: 'G-FEJLEG7LRB',
   site_description: 'An elegant, science-backed platform exploring modern romance, emotional wellness, dating alignment, and intentional lifestyle content.',
   homepage_topics_title: 'EXPLORE BY TOPIC',
   homepage_topics_subheading: 'Explore expert insights, practical guidance, and inspiring stories across topics that matter most. Discover trusted resources designed to inform, support, and empower every step of your journey.',
