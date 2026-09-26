@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { trackEvent } from '../lib/analytics';
 import { 
   Check, Shield, CreditCard, Lock, Mail, Users, ArrowRight, 
   HelpCircle, CheckCircle, RefreshCw, AlertCircle, Heart, Award, LogOut, X
@@ -148,6 +149,17 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
     e.preventDefault();
     if (!selectedPlan || !user) return;
 
+    // GA4 conversion funnel: the visitor committed to a paid checkout.
+    // Fired at gateway hand-off so the value survives the redirect.
+    trackEvent('begin_checkout', {
+      plan_id: selectedPlan.id,
+      plan_name: selectedPlan.name,
+      billing_cycle: billingCycle,
+      gateway: checkoutGateway,
+      value: billingCycle === 'monthly' ? selectedPlan.price_monthly : selectedPlan.price_yearly,
+      currency: 'USD'
+    });
+
     setLoading(true);
     setCheckoutError(null);
     fetch('/api/subscriptions/checkout', {
@@ -183,6 +195,14 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
     if (params.get('checkout') === 'success') {
       const returnedPlan = plans.find(p => p.id === params.get('planId'));
       if (returnedPlan) {
+        // GA4 conversion: the paid checkout succeeded (same-browser session
+        // survives the gateway redirect, so GA4 attributes the purchase).
+        trackEvent('purchase', {
+          plan_id: returnedPlan.id,
+          plan_name: returnedPlan.name,
+          value: billingCycle === 'monthly' ? returnedPlan.price_monthly : returnedPlan.price_yearly,
+          currency: 'USD'
+        });
         setSelectedPlan(returnedPlan);
         setIsSuccessOverlayOpen(true);
         window.history.replaceState({}, '', window.location.pathname);
