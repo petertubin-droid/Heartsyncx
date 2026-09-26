@@ -12,7 +12,7 @@ describe('AdminConsole > Ad Networks > GA4 field', () => {
   let previous: any;
   beforeEach(() => {
     previous = heartsync.current_user;
-    heartsync.current_user = { id: 'u1', name: 'Admin', email: 'a@x.com', role: 'admin' };
+    heartsync.current_user = { id: 'u1', name: 'Admin', email: 'a@x.com', role: 'admin', created_at: new Date().toISOString() };
     heartsync.site_settings.ga_measurement_id = '';
   });
   afterEach(() => {

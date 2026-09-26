@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+import { trackPageView } from './lib/analytics';
 
 // The 16k-line admin console is split out of the reader bundle  - it only
 // downloads when an admin actually opens the admin tab.
@@ -853,6 +854,25 @@ export default function App() {
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [isCreatingNewPost, setIsCreatingNewPost] = useState(false);
 
+  // SPA page views (2026-09-26): tab navigation changes the view without a
+  // reload, so GA4 and the internal /api/analytics beacon only saw the
+  // landing page. Fire on every tab/article transition (skip the mount run -
+  // the H-08 effect below already logs the landing view).
+  const spaPageViewFirstRunRef = React.useRef(true);
+  useEffect(() => {
+    if (spaPageViewFirstRunRef.current) {
+      spaPageViewFirstRunRef.current = false;
+      return;
+    }
+    const path = window.location.pathname;
+    trackPageView(path);
+    fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    }).catch(() => {});
+  }, [currentTab, tabArg]);
+
   // Sync URL with site tab on mount & handle popstate browser back/forward buttons
   useEffect(() => {
     // H-08: anonymous page-view beacon  - persisted server-side via the
@@ -996,6 +1016,28 @@ export default function App() {
     };
     schemasToInject.push(webPageSchema);
 
+    // Organization schema with sameAs: links the brand entity to every
+    // social profile (incl. TikTok) so Google can consolidate the knowledge
+    // panel - critical while promoting on TikTok.
+    const sameAs = [
+      siteSettings.social_facebook_url,
+      siteSettings.social_twitter_url,
+      siteSettings.social_instagram_url,
+      siteSettings.social_youtube_url,
+      siteSettings.social_tiktok_url,
+      (siteSettings.social_links as Record<string, string> | undefined)?.pinterest
+    ].filter(Boolean);
+    if (sameAs.length > 0) {
+      schemasToInject.push({
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": siteSettings.site_name || "Heartsync Relationship Journal",
+        "url": window.location.origin,
+        "logo": { "@type": "ImageObject", "url": ogImage },
+        "sameAs": sameAs
+      });
+    }
+
     // If on an article page, inject BlogPosting, BreadcrumbList, and FAQPage schemas
     if (currentTab === 'article' && activeArticle) {
       // 1. BlogPosting Schema
@@ -1006,7 +1048,7 @@ export default function App() {
         "description": description,
         "image": ogImage,
         "datePublished": activeArticle.publish_date || new Date().toISOString(),
-        "dateModified": activeArticle.publish_date || new Date().toISOString(),
+        "dateModified": (activeArticle as any).updated_date || activeArticle.publish_date || new Date().toISOString(),
         "author": {
           "@type": "Person",
           "name": authorObj.name

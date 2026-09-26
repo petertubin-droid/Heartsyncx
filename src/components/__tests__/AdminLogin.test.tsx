@@ -28,14 +28,14 @@ describe('AdminLogin (master admin access)', () => {
   });
 
   it('hands off to the console when an authorized role is already logged in', async () => {
-    heartsync.current_user = { id: 'u1', name: 'Admin', email: 'admin@heartsync.com', role: 'admin' };
+    heartsync.current_user = { id: 'u1', name: 'Admin', email: 'admin@heartsync.com', role: 'admin', created_at: new Date().toISOString() };
     const onSuccess = vi.fn();
     render(<AdminLogin onNavigate={() => {}} onSuccess={onSuccess} />);
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
   });
 
   it('does NOT hand off for an unauthorized role', async () => {
-    heartsync.current_user = { id: 'u2', name: 'Guest', email: 'g@x.com', role: 'visitor' };
+    heartsync.current_user = { id: 'u2', name: 'Guest', email: 'g@x.com', role: 'reader', created_at: new Date().toISOString() };
     const onSuccess = vi.fn();
     render(<AdminLogin onNavigate={() => {}} onSuccess={onSuccess} />);
     await new Promise((r) => setTimeout(r, 700));

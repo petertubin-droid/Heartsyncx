@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Twitter, Facebook, Linkedin, Instagram, Music2, Send, Share2, Link2, Mail } from 'lucide-react';
+import { trackEvent } from '../lib/analytics';
 
 interface ArticleShareRowProps {
   title: string;
@@ -42,6 +43,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
   };
 
   const nativeShare = async () => {
+    trackEvent('share', { method: 'native' });
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({ title, url: shareUrl });
@@ -66,6 +68,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
         {/* X / Twitter */}
         <a
           href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`}
+          onClick={() => trackEvent('share', { method: 'x' })}
           target="_blank"
           rel="noopener noreferrer"
           className={`${btnBase} ${compact ? circleBtn : flatBtn}`}
@@ -79,6 +82,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
         {/* Facebook */}
         <a
           href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
+          onClick={() => trackEvent('share', { method: 'facebook' })}
           target="_blank"
           rel="noopener noreferrer"
           className={`${btnBase} ${compact ? circleBtn : flatBtn}`}
@@ -92,6 +96,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
         {/* LinkedIn */}
         <a
           href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`}
+          onClick={() => trackEvent('share', { method: 'linkedin' })}
           target="_blank"
           rel="noopener noreferrer"
           className={`${btnBase} ${compact ? circleBtn : flatBtn}`}
@@ -105,6 +110,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
         {/* WhatsApp */}
         <a
           href={`https://wa.me/?text=${encodeURIComponent(`${title} ${shareUrl}`)}`}
+          onClick={() => trackEvent('share', { method: 'whatsapp' })}
           target="_blank"
           rel="noopener noreferrer"
           className={`${btnBase} ${compact ? circleBtn : flatBtn}`}
@@ -118,6 +124,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
         {/* Reddit */}
         <a
           href={`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(title)}`}
+          onClick={() => trackEvent('share', { method: 'reddit' })}
           target="_blank"
           rel="noopener noreferrer"
           className={`${btnBase} ${compact ? circleBtn : flatBtn}`}
@@ -131,7 +138,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
         {/* Instagram  - app-only posting: copy link, prompt to paste */}
         <button
           type="button"
-          onClick={() => copyLink('paste it in your Instagram story or post')}
+          onClick={() => { trackEvent('share', { method: 'instagram' }); copyLink('paste it in your Instagram story or post'); }}
           className={`${btnBase} ${compact ? circleBtn : flatBtn}`}
           title="Copy link for Instagram"
           aria-label="Copy link for Instagram"
@@ -143,7 +150,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
         {/* TikTok  - app-only posting: copy link, prompt to paste */}
         <button
           type="button"
-          onClick={() => copyLink('paste it in your TikTok video or bio')}
+          onClick={() => { trackEvent('share', { method: 'tiktok' }); copyLink('paste it in your TikTok video or bio'); }}
           className={`${btnBase} ${compact ? circleBtn : flatBtn}`}
           title="Copy link for TikTok"
           aria-label="Copy link for TikTok"
@@ -155,6 +162,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
         {/* Email */}
         <a
           href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(shareUrl)}`}
+          onClick={() => trackEvent('share', { method: 'email' })}
           className={`${btnBase} ${compact ? circleBtn : flatBtn}`}
           title="Share via Email"
           aria-label="Share via Email"
@@ -178,7 +186,7 @@ export const ArticleShareRow: React.FC<ArticleShareRowProps> = ({ title, url, co
         {/* Copy link */}
         <button
           type="button"
-          onClick={() => copyLink()}
+          onClick={() => { trackEvent('share', { method: 'copy' }); copyLink(); }}
           className={`${btnBase} ${compact ? circleBtn : flatBtn}`}
           title="Copy article link"
           aria-label="Copy article link"
