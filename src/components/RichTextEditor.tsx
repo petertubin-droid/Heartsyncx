@@ -176,7 +176,8 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
   // --- AI ARTICLE WRITER STATES (full-article generation from a topic) ---
   const [aiWriterTopic, setAiWriterTopic] = useState('');
   const [aiWriterTone, setAiWriterTone] = useState('Empathetic & Warm');
-  const [aiWriterLength, setAiWriterLength] = useState<'short' | 'standard' | 'deep'>('standard');
+  const [aiWriterLength, setAiWriterLength] = useState<'short' | 'standard' | 'deep' | 'custom'>('standard');
+  const [aiWriterCustomWords, setAiWriterCustomWords] = useState('');
   const [aiWriterLoading, setAiWriterLoading] = useState(false);
   const [aiWriterError, setAiWriterError] = useState('');
 
@@ -416,11 +417,21 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
           draftToken = session?.access_token || '';
         }
       } catch (_) { /* not signed in */ }
+      // Custom length: the owner sets any target between 100 and 5000 words;
+      // section count scales with the target so structure stays proportional.
+      const customTarget = parseInt(aiWriterCustomWords, 10);
+      if (aiWriterLength === 'custom' && (!Number.isFinite(customTarget) || customTarget < 100 || customTarget > 5000)) {
+        setAiWriterError('Enter a custom word count between 100 and 5000.');
+        setAiWriterLoading(false);
+        return;
+      }
       const lengthGuide = aiWriterLength === 'short'
         ? 'about 600 words across 3 sections'
         : aiWriterLength === 'deep'
-          ? 'about 1600 words across 6-7 sections'
-          : 'about 1000 words across 4-5 sections';
+          ? 'about 5000 words across 10-12 sections'
+          : aiWriterLength === 'custom'
+            ? `about ${customTarget} words across roughly ${Math.max(3, Math.min(14, Math.round(customTarget / 400)))} sections - do not stop early, write the full article`
+            : 'about 1000 words across 4-5 sections';
       const response = await fetch('/api/ai/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(draftToken ? { Authorization: `Bearer ${draftToken}` } : {}) },
@@ -560,13 +571,26 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
                 <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 block mb-1.5">Length</label>
                 <select 
                   value={aiWriterLength} 
-                  onChange={(e) => setAiWriterLength(e.target.value as 'short' | 'standard' | 'deep')} 
+                  onChange={(e) => setAiWriterLength(e.target.value as 'short' | 'standard' | 'deep' | 'custom')} 
                   className="w-full px-3 py-2.5 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl text-xs cursor-pointer"
                 >
                   <option value="short">Quick Read (~600 words)</option>
                   <option value="standard">Standard (~1000 words)</option>
-                  <option value="deep">Deep Dive (~1600 words)</option>
+                  <option value="deep">Deep Dive (~5000 words)</option>
+                  <option value="custom">Custom (choose word count)</option>
                 </select>
+                {aiWriterLength === 'custom' && (
+                  <input
+                    type="number"
+                    min={100}
+                    max={5000}
+                    step={100}
+                    value={aiWriterCustomWords}
+                    onChange={(e) => setAiWriterCustomWords(e.target.value)}
+                    placeholder="e.g. 2000 words (100-5000)"
+                    className="w-full mt-2 px-3 py-2.5 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl text-xs"
+                  />
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3">
