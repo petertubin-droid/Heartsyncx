@@ -34,6 +34,36 @@ export interface RichTextEditorProps {
   onCancel?: () => void;
 }
 
+// Derive a clean, plain-text excerpt from markdown content (2026-09-27).
+// Publishes with an empty excerpt used to fall back to content.substring(0,150),
+// which leaked raw markdown ("# Title\n\nThere is a moment...") into the article
+// subtitle, grid cards and the meta description. This strips heading hashes,
+// emphasis markers, links and list syntax first, then truncates on a word
+// boundary to ~150 characters.
+export function deriveExcerptFromContent(content: string): string {
+  const plain = (content || '')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')          // images -> alt text
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')           // links -> label
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')                    // heading hashes
+    .replace(/\*\*([^*]+)\*\*/g, '$1')                     // bold markers
+    .replace(/\*([^*]+)\*/g, '$1')                          // italic markers
+    .replace(/__([^_]+)__/g, '$1')                           // alt bold markers
+    .replace(/`([^`]*)`/g, '$1')                             // inline code
+    .replace(/^\s*[>+-]\s+/gm, '')                          // blockquote/list bullets
+    .replace(/^\s*\d+[.)]\s+/gm, '')                       // ordered list numbers
+    .replace(/[#*_`>]+/g, '')                                // stray markers
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!plain) return '';
+  const words = plain.split(' ');
+  let out = '';
+  for (const w of words) {
+    if ((out ? out.length + 1 : 0) + w.length > 150) break;
+    out = out ? out + ' ' + w : w;
+  }
+  return out + (out.length < plain.length ? '...' : '');
+}
+
 export default function RichTextEditor({ post, isEditMode = !!post, categories = heartsync.categories || [], onClose, onSave, onCancel }: RichTextEditorProps) {
   const handleClose = () => {
     if (onClose) onClose();
@@ -279,13 +309,13 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
       slug: slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
       category_id: categoryId,
       author_id: authorId,
-      excerpt: excerpt || (content.substring(0, 150) + '...'),
+      excerpt: excerpt || deriveExcerptFromContent(content),
       content: content,
       status: finalStatus,
       featured_image: featuredImage || 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=800',
       tags,
       seo_title: seoTitle || title,
-      seo_description: seoDescription || excerpt,
+      seo_description: seoDescription || excerpt || deriveExcerptFromContent(content),
       allow_comments: allowComments,
       tts_enabled: ttsEnabled,
       is_premium: isPremium,
@@ -660,6 +690,11 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
                     />
                   </label>
                 </div>
+                  {featuredImage.startsWith('data:') && (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 w-full">
+                      <AlertCircle className="w-3 h-3" /> Upload failed: cover stored as base64 in the article record. Retry upload or use an https URL.
+                    </p>
+                  )}
               </div>
             </div>
 
@@ -1317,6 +1352,12 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
               placeholder="https://images.unsplash.com/photo-..."
               className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-rose-500"
             />
+            {featuredImage.startsWith('data:') && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>The cover upload to cloud storage failed, so this image is embedded as base64 inside the article record. It bloats every page load. Re-try the Upload button or paste an https:// image URL before publishing.</span>
+              </div>
+            )}
             {featuredImage && (
               <img src={featuredImage} alt="Featured preview" className="w-full h-32 object-cover rounded-xl border border-zinc-200 dark:border-zinc-800" />
             )}

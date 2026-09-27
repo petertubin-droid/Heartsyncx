@@ -159,6 +159,11 @@ vi.hoisted(() => {
   process.env.PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || 'sk_test_dummy_key_for_tests';
   process.env.RESEND_API_KEY = process.env.RESEND_API_KEY || 're_dummy_test_key';
   delete process.env.GEMINI_API_KEY;
+  // Pin the ops tokens to the built-in defaults so an ambient HX_MAINT_TOKEN /
+  // HX_RECOVERY_TOKEN (e.g. a rotated production secret in the dev shell) can
+  // never break the contract tests: they assert against the default constants.
+  process.env.HX_MAINT_TOKEN = 'hxmaint_c378fe6d8c395f60905dd1b4b03aeb88';
+  process.env.HX_RECOVERY_TOKEN = 'hxrec_b39c975dadf0569aa37d099035f0a91b';
 });
 
 // NOTE: importing the server app AFTER the mock + env bootstrap above.

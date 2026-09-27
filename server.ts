@@ -6952,9 +6952,9 @@ app.post('/api/maint/articles', async (req: Request, res: Response) => {
       return;
     }
     if (action === 'update_articles') {
-      const articles = (req.body && (req.body as any).articles) as Array<{ slug?: string; featured_image?: string; content?: string }> | undefined;
+      const articles = (req.body && (req.body as any).articles) as Array<{ slug?: string; featured_image?: string; content?: string; excerpt?: string; seo_description?: string }> | undefined;
       if (!Array.isArray(articles) || articles.length === 0 || articles.length > 12) {
-        res.status(400).json({ error: 'Expected articles array of 1-12 items { slug, featured_image?, content? }.' });
+        res.status(400).json({ error: 'Expected articles array of 1-12 items { slug, featured_image?, content?, excerpt?, seo_description? }.' });
         return;
       }
       let updated = 0, skipped = 0, missing = 0;
@@ -6965,6 +6965,13 @@ app.post('/api/maint/articles', async (req: Request, res: Response) => {
         const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
         if (typeof a.featured_image === 'string' && /^https:\/\//.test(a.featured_image)) patch.featured_image = a.featured_image;
         if (typeof a.content === 'string' && a.content.trim().length >= 500) patch.content = a.content;
+        // Excerpt/SEO repairs (2026-09-27): publishes with an empty excerpt used to
+        // fall back to raw content.substring(0,150), leaking markdown ("# Title...")
+        // into the subtitle, cards and meta description. Accept clean replacement
+        // values here so the two Sep-26 posts can be repaired without a full admin
+        // edit pass. Strict hygiene: non-empty plain text, markdown-free, capped.
+        if (typeof a.excerpt === 'string' && a.excerpt.trim().length >= 20 && a.excerpt.trim().length <= 400 && !/^#/.test(a.excerpt.trim())) patch.excerpt = a.excerpt.trim();
+        if (typeof a.seo_description === 'string' && a.seo_description.trim().length >= 20 && a.seo_description.trim().length <= 400 && !/^#/.test(a.seo_description.trim())) patch.seo_description = a.seo_description.trim();
         if (Object.keys(patch).length === 1) { skipped++; continue; } // nothing to write
         const { data: post, error: fetchErr } = await svc.from('posts').select('id').eq('slug', slug).maybeSingle();
         if (fetchErr || !post) { missing++; continue; }
