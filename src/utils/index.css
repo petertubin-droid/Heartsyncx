@@ -453,10 +453,17 @@ html.dark, html.dark body {
   word-break: break-word;
 }
 #heartsync-premium-article-reading-body img,
-#heartsync-premium-article-reading-body video,
-#heartsync-premium-article-reading-body iframe {
+#heartsync-premium-article-reading-body video {
   max-width: 100% !important;
   height: auto !important;
+}
+/* Iframes keep their OWN height. Forcing height:auto !important here pinned
+   every in-article ad iframe to the browser default 150px intrinsic height,
+   overriding the ad container's measured inline height and clipping the
+   creative - the "ad renders but its full height is never displayed" bug.
+   Only the width stays constrained. */
+#heartsync-premium-article-reading-body iframe {
+  max-width: 100% !important;
 }
 #heartsync-premium-article-reading-body table {
   display: block;

@@ -39,8 +39,15 @@ const SLOT_LABEL: Record<SlotFamily, string> = {
  * squashed, symmetrically-cropped slice of its creative image with no
  * title at all). This value matches the card CSS the network itself ships
  * (~340px max-width, a 75% padding-top image box plus a 36px title strip
- * lands around 300px), so the script never sees a starved viewport. The
- * real measurement below still shrinks the frame to 0 on a genuine no-fill.
+ * lands around 300px), so the script never sees a starved viewport.
+ *
+ * It is ONLY the initial frame height (the viewport the script sees at
+ * init), never a permanent reservation: the srcDoc body carries NO
+ * min-height pin (that pin floored every measurement at 300px, so a
+ * shorter creative kept dead space and a no-fill kept a 300px blank box),
+ * and the measurement grows the frame for taller creatives, shrinks it to
+ * the real creative once rendered, and collapses to 0 when the zone
+ * no-fills after the fill window.
  */
 const NATIVE_MIN_HEIGHT = 300;
 
@@ -74,17 +81,26 @@ const AutoHeightFrame: React.FC<{ srcDoc: string; initialHeight: number; maxWidt
     let mo: MutationObserver | null = null;
     let ro: ResizeObserver | null = null;
     const imgListeners: Array<{ el: HTMLImageElement; fn: () => void }> = [];
+    // Deliberately measures CONTENT height only (body scrollHeight + every
+    // descendant's bottom edge), NOT documentElement.scrollHeight: the root
+    // element's scrollHeight is floored at the frame's own viewport height,
+    // so including it meant the frame could grow but never shrink back to a
+    // shorter creative (and could never collapse to 0 on a no-fill) - the
+    // "permanent blank box under a short/no-fill ad" bug. Growth applies
+    // immediately; the frame shrinks only once real content exists, and an
+    // empty creative keeps the roomy initialHeight until the fill window
+    // expires so the provider's script never sees a starved viewport.
+    const fillDeadline = Date.now() + 8000; // matches the poll window below
     const measure = () => {
       if (stopped) return;
-      let h = 0;
+      let content = 0;
       try {
         const doc = iframe.contentDocument;
         const body = doc?.body;
         if (body) {
-          h = Math.ceil(
+          content = Math.ceil(
             Math.max(
               body.scrollHeight,
-              doc?.documentElement?.scrollHeight ?? 0,
               body.firstElementChild instanceof HTMLElement
                 ? body.firstElementChild.getBoundingClientRect().height
                 : 0
@@ -99,7 +115,7 @@ const AutoHeightFrame: React.FC<{ srcDoc: string; initialHeight: number; maxWidt
           // as the floor for the frame height.
           body.querySelectorAll<HTMLElement>('*').forEach((el) => {
             const r = el.getBoundingClientRect();
-            if (r.bottom > h) h = Math.ceil(r.bottom);
+            if (r.bottom > content) content = Math.ceil(r.bottom);
           });
         }
       } catch {
@@ -107,7 +123,13 @@ const AutoHeightFrame: React.FC<{ srcDoc: string; initialHeight: number; maxWidt
         // keep the declared height rather than guessing.
         return;
       }
-      h = Math.min(Math.max(h, 0), 1200);
+      content = Math.min(Math.max(content, 0), 1200);
+      // While no creative has rendered yet (content 0), hold the roomy
+      // initialHeight so the provider's script never sees a starved
+      // viewport at init (the squashed-native bug). After the fill window
+      // expires with still nothing rendered, collapse to 0 - the slot
+      // shows only its label instead of a blank rectangle.
+      const h = content === 0 && Date.now() < fillDeadline ? initialHeight : content;
       setHeight((prev) => (Math.abs(prev - h) > 4 ? h : prev));
     };
     // Watch every <img> in the creative directly: on a slow connection
@@ -480,7 +502,7 @@ const AdsterraBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
   // actually serves; collapses when the zone no-fills.
   if (unit.native) {
     const containerDiv = unit.native === 'invoke' ? `<div id="container-${key}"></div>\n` : '';
-    const nativeSrcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;overflow:hidden;min-height:${NATIVE_MIN_HEIGHT}px}</style></head><body>
+    const nativeSrcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;overflow:hidden}</style></head><body>
 ${containerDiv}<script type="text/javascript" src="https://${unit.domain}/${key}/${unit.native}.js" async data-cfasync="false"></script>
 </body></html>`;
     return <AutoHeightFrame srcDoc={nativeSrcDoc} initialHeight={NATIVE_MIN_HEIGHT} />;
@@ -527,7 +549,7 @@ const MonetagBanner: React.FC<{ slot: SlotFamily }> = ({ slot }) => {
   // exactly what a native ad card needs. `img,div,a{max-width:100%}` is a
   // second guard so no individual creative element can force a horizontal
   // scrollbar/clip even if Monetag ever nests one wide element deeper.
-  const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;overflow:hidden;min-height:${NATIVE_MIN_HEIGHT}px}img,div,a{max-width:100%;box-sizing:border-box}</style></head><body>
+  const srcDoc = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;overflow:hidden}img,div,a{max-width:100%;box-sizing:border-box}</style></head><body>
 <script type="text/javascript" src="${tag.src}" data-zone="${tag.zone}" async data-cfasync="false"></script>
 </body></html>`;
   // Same starved-viewport fix as the Adsterra native banner above: give the

@@ -8337,7 +8337,64 @@ async function resolveAdSenseClientIdServer(): Promise<{ clientId: string; activ
 }
 
 // Handler to serve index.html dynamically injected with dynamic SEO meta tags and correct AdSense Publisher ID
+/**
+ * CRAWLER ACCESSIBILITY HELPERS (used by handleDynamicHtml).
+ *
+ * 1) stripShellSeoTags: index.html ships STATIC site-wide SEO defaults
+ *    (description, homepage canonical, generic OG and Twitter card) so the
+ *    homepage - which Netlify serves straight off the CDN as a real static
+ *    file - always carries correct tags even without the server bridge.
+ *    Every OTHER route is served by this function with per-route SEO
+ *    injected, and until now the shell's static block was left in place:
+ *    every dynamic page carried TWO canonicals (the homepage one FIRST),
+ *    two descriptions and two complete OG and Twitter tag sets. Crawlers that
+ *    honor the first occurrence (most of them) saw every article declare
+ *    itself a duplicate of the homepage, and social previews rendered the
+ *    generic site card instead of the article's title/cover. Stripping the
+ *    shell block here leaves the injected per-route tags as the ONLY ones.
+ */
+export function stripShellSeoTags(html: string): string {
+  return html
+    .replace(/\s*<meta name="description"[^>]*\/?>/i, '')
+    .replace(/\s*<link rel="canonical"[^>]*\/?>/i, '')
+    .replace(/\s*<meta property="og:[^"]*"[^>]*\/?>/gi, '')
+    .replace(/\s*<meta name="twitter:[^"]*"[^>]*\/?>/gi, '');
+}
+
+/**
+ * 2) markdownToPlainHtml: server-rendered <noscript> article text. The app
+ *    is a SPA - the article body is composed client-side, which Google can
+ *    render but AI crawlers, social previews and text-only fetchers cannot;
+ *    for them the page was an empty shell. This converts the stored
+ *    markdown into semantic, entity-escaped plain HTML so non-JS agents can
+ *    read the real article. Hidden automatically by every browser that has
+ *    JavaScript enabled; never shown to real users.
+ */
+export function markdownToPlainHtml(md: string, title: string): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const paras = md
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter(Boolean)
+    .slice(0, 250)
+    .map((b) => {
+      const t = b
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')        // images: drop
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')      // links: keep text
+        .replace(/^\s{0,3}#{1,6}\s+/gm, '')              // heading marks
+        .replace(/^\s{0,3}>\s?/gm, '')                   // blockquote marks
+        .replace(/\*\*([^*]+)\*\*/g, '$1')             // bold
+        .replace(/\*([^*]+)\*/g, '$1')                   // italic
+        .replace(/\s*\n\s*/g, ' ')                      // soft wraps
+        .trim();
+      return t ? `<p>${esc(t)}</p>` : '';
+    })
+    .filter(Boolean);
+  return `<article><h1>${esc(title)}</h1>${paras.join('')}</article>`;
+}
+
 async function handleDynamicHtml(req: Request, res: Response) {
+
   const protocol = req.protocol;
   const host = req.get('host') || 'localhost:3000';
   const baseUrl = `${protocol}://${host}`;
@@ -8526,6 +8583,35 @@ async function handleDynamicHtml(req: Request, res: Response) {
       }
     }
 
+    // DB posts resolved from serverCacheState are the boot payload's
+    // list-columns projection: they have NO content field (full bodies are
+    // fetched per-article, see POST_LIST_COLUMNS). Fetch the body now so the
+    // crawler-accessible <noscript> text and the articleBody schema carry
+    // the real article instead of silently never firing for DB posts.
+    // Code articles are untouched (they set content: '' above), and any
+    // fetch failure simply falls back to the old no-noscript behavior.
+    if (post && post.content === undefined) {
+      const client = getSupabaseClient();
+      if (client) {
+        try {
+          const { data: fullPost } = await client
+            .from('posts')
+            .select('content')
+            .eq('slug', slug)
+            .maybeSingle();
+          if (fullPost && typeof fullPost.content === 'string') {
+            post.content = fullPost.content;
+          } else {
+            post.content = '';
+          }
+        } catch (_) {
+          post.content = '';
+        }
+      } else {
+        post.content = '';
+      }
+    }
+
     if (post) {
       seoTitle = post.seo_title || `${post.title} | Heartsync Insights`;
       seoDesc = post.seo_description || post.excerpt || seoDesc;
@@ -8585,7 +8671,12 @@ async function handleDynamicHtml(req: Request, res: Response) {
         },
         "wordCount": wordCount,
         "articleSection": categoryName,
-        "keywords": seoKeywords
+        "keywords": seoKeywords,
+        // Full body text for crawlers/AI agents that do not execute
+        // JavaScript; JSON.stringify escapes it safely.
+        ...(post.content
+          ? { articleBody: String(post.content).replace(/[*_#>`]/g, '').slice(0, 20000) }
+          : {})
       };
       schemas.push(articleSchema);
 
@@ -8779,9 +8870,27 @@ async function handleDynamicHtml(req: Request, res: Response) {
     ${JSON.stringify(s, null, 2)}
     </script>`).join('\n');
 
+  // Private pages (admin, login, denied) must never enter any index even
+  // if an external link bypasses robots.txt.
+  const isPrivateRoute = /^\/(admin|login|access-denied)(\/|$)/.test(req.path);
+  const robotsDirective = isPrivateRoute ? 'noindex, nofollow' : '';
+
+  // Remove the shell's static SEO defaults so the injected per-route tags
+  // below are the ONLY canonical/description/OG/Twitter tags on the page
+  // (see stripShellSeoTags doc for why duplicates were fatal for indexing).
+  html = stripShellSeoTags(html);
+
+  // Server-rendered article text for non-JavaScript agents (AI crawlers,
+  // social preview fetchers, text browsers). Real users never see it.
+  if (post && post.content && req.path.startsWith('/article/')) {
+    const noscriptHtml = `<noscript>${markdownToPlainHtml(String(post.content), post.title || seoTitle)}</noscript>`;
+    html = html.replace(/<body([^>]*)>/i, `<body$1>${noscriptHtml}`);
+  }
+
   // Formulate dynamic search crawler and social indexing compliance meta tag layout
   const seoHeadInject = `
     <!-- Dynamic Search Engine & Indexing Compliance Meta Tags -->
+    ${robotsDirective ? `<meta name="robots" content="${robotsDirective}" />` : ''}
     <meta name="description" content="${seoDesc.replace(/"/g, '&quot;')}" />
     <meta name="keywords" content="${seoKeywords.replace(/"/g, '&quot;')}" />
     <link rel="canonical" href="${canonicalUrl}" />
