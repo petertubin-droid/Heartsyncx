@@ -2307,7 +2307,7 @@ ${tone ? `Tone: ${tone}.` : 'Tone: warm, evidence-informed, practical; grounded 
 ${categoryHint ? `Site category context: ${categoryHint}.` : ''}
 ${langNote} ${kwNote}
 
-Structure the body in clean Markdown (## section headings, paragraphs, occasional bold for key ideas, at most one blockquote). 1200-1800 words. Open with a hook, deliver concrete phrases and practices readers can actually use, close with a short reflective send-off. Never invent studies, statistics or expert names.
+Structure the body in clean Markdown (## section headings, paragraphs, at most one blockquote). Never use bold (**) anywhere in the body, never use em dashes, and never repeat the title as a heading inside the body: the body starts directly with the opening paragraph. Aim for about 2,000 words. Open with a hook, deliver concrete phrases and practices readers can actually use, close with a short reflective send-off. Never invent studies, statistics or expert names.
 
 Return ONLY strictly valid JSON with EXACTLY this shape:
 {
@@ -2347,6 +2347,25 @@ Return ONLY strictly valid JSON with EXACTLY this shape:
       return;
     }
 
+    // BOLD GUARD (2026-09-27): the Sep posts-46-75 batch was written with
+    // full-sentence bold passages that drowned the sub-headers and forced a
+    // 28-article cleanup. The prompt now forbids bold outright; this strip is
+    // the hard guarantee, applied to every AI draft before it reaches the
+    // editor: unwrap bold spans longer than a few words, unwrap line-leading
+    // bold, and unwrap full-line bold that is not a heading.
+    const stripHeavyBold = (raw: string): string => {
+      let t = String(raw);
+      t = t.replace(/\*\*([^*]+?)\*\*/g, (m, inner: string) => (inner.length > 34 ? inner : m));
+      t = t.split('\n').map((line: string) => {
+        const m = line.match(/^(\s*(?:[-*+]|\d+[.)])?\s*)\*\*([^*]+)\*\*(.*)$/);
+        if (m && m[3].trim() && !line.trim().startsWith('#')) return m[1] + m[2] + m[3];
+        const s = line.trim();
+        if (s.startsWith('**') && s.endsWith('**') && !s.startsWith('#') && !s.slice(2, -2).includes('**')) return line.replace(s, s.slice(2, -2));
+        return line;
+      }).join('\n');
+      return t;
+    };
+
     // Normalize the shape the editor expects
     const safeSlug = String(article.slug || article.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     res.json({
@@ -2355,7 +2374,7 @@ Return ONLY strictly valid JSON with EXACTLY this shape:
         title: String(article.title).trim(),
         slug: safeSlug,
         excerpt: String(article.excerpt || '').trim(),
-        content: String(article.content).trim(),
+        content: stripHeavyBold(String(article.content)).trim(),
         tags: Array.isArray(article.tags) ? article.tags.map((t: any) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 6) : [],
         seo_title: String(article.seo_title || article.title).trim(),
         seo_description: String(article.seo_description || article.excerpt || '').trim(),
