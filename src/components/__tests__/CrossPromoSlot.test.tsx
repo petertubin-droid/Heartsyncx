@@ -90,7 +90,7 @@ describe('CrossPromoSlot rendering', () => {
     heartsync.site_settings = prev;
   });
 
-  it('features an external partner promo in the banner slot with its own headline and domain', () => {
+  it('features an external partner promo in the banner slot with its own headline and NO display URL', () => {
     const prev = heartsync.site_settings;
     heartsync.site_settings = {
       cross_promo_enabled: true,
@@ -103,12 +103,14 @@ describe('CrossPromoSlot rendering', () => {
     // Rotation: 5 Frelux items then the partner at index 5.
     const { container } = render(<CrossPromoSlot slotIndex={5} />);
     expect(container.textContent).toContain('Buy cement online');
-    expect(container.textContent).toContain('cementmart.example');
+    // The display URL must not appear anywhere on the unit (all formats,
+    // Frelux and partner alike): the ad redirects to the destination, so
+    // the raw host stays hidden. Absolute link URLs are still covered by
+    // the buildPromoItems tests above.
+    expect(container.textContent).not.toContain('cementmart.example');
+    expect(container.textContent).not.toContain('frelux.com');
     // Ad badge attributes the unit to the partner, not Frelux.
     expect(container.querySelector('[title*="CementMart"]')).not.toBeNull();
-    // Frelux display URLs now show the custom domain (absolute link URLs
-    // are covered by the buildPromoItems tests above).
-    expect(container.textContent).toContain('frelux.com');
     heartsync.site_settings = prev;
   });
 

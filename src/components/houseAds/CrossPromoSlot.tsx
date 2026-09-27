@@ -65,7 +65,6 @@ export interface ExternalPromo {
 /* Standard programmatic-ad chrome colors (AdSense conventions):
    blue headline, green display URL, neutral container. */
 const HEADLINE = 'text-[#1a0dab] dark:text-[#8ab4f8] visited:text-[#681da8]';
-const DISPLAY_URL = 'text-[#006629]/90 dark:text-[#7ee787]/80';
 const AD_CONTAINER = 'bg-white dark:bg-[#202124] border border-[#dadce0] dark:border-[#3c4043] rounded-lg';
 const AD_BODY = 'text-[#3c4043] dark:text-[#9aa0a6]';
 
@@ -308,7 +307,6 @@ const DisplayAd: React.FC<{ items: PromoItem[]; slotIndex: number; source: strin
           >
             {d.label}
           </button>
-          <span className={`text-[11px] ${DISPLAY_URL}`}>{d.domain}</span>
           <p className={`mt-0.5 text-xs ${AD_BODY} line-clamp-2`}>{d.blurb}</p>
         </div>
         <CtaButton dest={d} source={source} />
@@ -335,9 +333,8 @@ const Banner: React.FC<{ items: PromoItem[]; slotIndex: number; source: string }
             onClick={() => go(featured, source)}
             className={`text-left text-sm sm:text-base font-bold ${HEADLINE} hover:underline cursor-pointer block`}
           >
-            {featured.label}{featured.site === 'frelux' ? ' — free Nigerian construction tools' : ''}
+            {featured.label}{featured.site === 'frelux' ? ': free Nigerian construction tools' : ''}
           </button>
-          <span className={`text-[11px] ${DISPLAY_URL}`}>{featured.domain}{featured.site === 'frelux' ? featured.path : ''}</span>
           <p className={`mt-0.5 text-xs ${AD_BODY} truncate`}>{featured.blurb}. {featured.pitch}</p>
         </div>
         <CtaButton dest={featured} source={source} />
@@ -352,7 +349,6 @@ const Banner: React.FC<{ items: PromoItem[]; slotIndex: number; source: string }
             className="px-4 py-2.5 text-left hover:bg-[#f8f9fa] dark:hover:bg-[#292a2d] cursor-pointer"
           >
             <span className={`block text-xs font-bold ${HEADLINE} truncate`}>{d.label}</span>
-            <span className={`block text-[10px] ${DISPLAY_URL} truncate`}>{d.domain}</span>
           </button>
         ))}
       </div>
@@ -432,8 +428,7 @@ const RecCard: React.FC<{ items: PromoItem[]; slotIndex: number; source: string 
             </span>
             <span className="min-w-0">
               <span className={`block text-xs font-bold leading-snug line-clamp-2 ${HEADLINE}`}>{d.label}</span>
-              <span className={`block text-[10px] mt-1 ${DISPLAY_URL} truncate`}>{d.domain}</span>
-              <span className="block text-[10px] mt-0.5 text-[#5f6368] dark:text-[#9aa0a6]">Sponsored</span>
+              <span className="block text-[10px] mt-1 text-[#5f6368] dark:text-[#9aa0a6]">Sponsored</span>
             </span>
           </button>
         ))}
@@ -485,7 +480,6 @@ const Interstitial: React.FC<{ items: PromoItem[]; source: string }> = ({ items,
           >
             {featured.bigHeadline}
           </button>
-          <span className={`text-xs ${DISPLAY_URL}`}>{featured.domain}</span>
           <p className={`mt-2 text-sm leading-relaxed ${AD_BODY}`}>{featured.bigBody}</p>
           <div className="mt-4">
             <CtaButton big dest={featured} source={source} label="Visit site" />
@@ -500,7 +494,6 @@ const Interstitial: React.FC<{ items: PromoItem[]; source: string }> = ({ items,
               >
                 <span className="min-w-0">
                   <span className={`block text-xs font-bold ${HEADLINE} group-hover:underline truncate`}>{d.label}</span>
-                  <span className={`block text-[10px] ${DISPLAY_URL} truncate`}>{d.domain}{d.site === 'frelux' ? d.path : ''}</span>
                 </span>
                 <ExternalLink className="w-3 h-3 shrink-0 text-[#5f6368] dark:text-[#9aa0a6] opacity-0 group-hover:opacity-100" />
               </button>
