@@ -4566,6 +4566,39 @@ async function syncStateToSupabase(newState: any, dbClient?: any, opts: { reader
       }
     } catch (e: any) { console.warn('Supabase categories sync warning:', e.message); }
 
+    // AUTHORS. Missing for the whole admin lifetime: author add/edit/delete
+    // updated the in-memory store and the server cache, but nothing ever
+    // wrote public.authors, so every author change resurrected on the next
+    // boot (the payload rebuilds authors from the DB). This is the DB leg of
+    // author management; the admin console edit/delete path relies on it.
+    try {
+      if (Array.isArray(newState.authors) && !opts.reader) {
+        const authorRows = newState.authors
+          .filter((a: any) => a && typeof a.id === 'string' && a.id.trim().length > 0)
+          .map((a: any) => {
+            const row: any = {
+              id: a.id,
+              name: a.name || 'Anonymous User',
+              bio: a.bio || '',
+              avatar: a.avatar_url || '',
+              role: a.role || 'Author',
+              // Soft delete is the only delete the UI performs: keep the
+              // row (posts.author_id FK) and flag it inactive so the boot
+              // payload maps it back to is_deleted and the UI hides it.
+              is_active: (a.is_deleted ?? false) === false
+            };
+            // Only touch email when the client actually has one: the boot
+            // payload intentionally omits email, so upserting a synthetic
+            // placeholder here would clobber real addresses on every save.
+            if (typeof a.email === 'string' && a.email.trim().length > 0) row.email = a.email;
+            return row;
+          });
+        if (authorRows.length > 0) {
+          await upsertResilient(supabase, 'authors', authorRows);
+        }
+      }
+    } catch (e: any) { console.warn('Supabase authors sync warning:', e.message); }
+
     try {
       if (Array.isArray(newState.posts) && newState.posts.length > 0) {
         if (opts.reader) {
