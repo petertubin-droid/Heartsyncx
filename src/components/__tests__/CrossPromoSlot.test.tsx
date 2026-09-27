@@ -42,6 +42,7 @@ describe('buildPromoItems', () => {
     expect(calc!.url).toBe('https://frelux.com/calculators');
     expect(calc!.domain).toBe('frelux.com');
     expect(calc!.site).toBe('frelux');
+    expect(calc!.logo).toBe('/frelux-logo.png');
   });
 
   it('uses the default origin when no custom URL is set', () => {
@@ -119,7 +120,8 @@ describe('CrossPromoSlot rendering', () => {
     expect(frelux[0].id).toBe('frelux-site');
     expect(frelux[0].label).toBe('Frelux');
     expect(frelux[0].url).toBe('https://frelux.com');
-    expect(frelux[0].logo).toBe('https://frelux.com/logo-mark.png');
+    // Logo is the owner-supplied brand mark hosted on THIS site.
+    expect(frelux[0].logo).toBe('/frelux-logo.png');
     // The real site description from Frelux's own index.html.
     expect(frelux[0].blurb).toContain('construction estimation');
     // External partners follow with their own logos.
@@ -145,10 +147,10 @@ describe('CrossPromoSlot rendering', () => {
     const { container } = render(<CrossPromoSlot slotIndex={0} />);
     // The "Advertisement" label of the single-unit format.
     expect(container.textContent).toContain('Advertisement');
-    // The real Frelux logo is rendered as an image against the default base URL.
+    // The Frelux brand mark is rendered from THIS site's hosted copy.
     const img = container.querySelector('img');
     expect(img).not.toBeNull();
-    expect(img!.getAttribute('src')).toBe(`${DEFAULT_CROSS_PROMO_BASE_URL}/logo-mark.png`);
+    expect(img!.getAttribute('src')).toBe('/frelux-logo.png');
     // Real site description is present.
     expect(container.textContent).toContain('construction estimation');
     // One unit, not the recommendation-card grid of three tiles.
@@ -169,7 +171,29 @@ describe('CrossPromoSlot rendering', () => {
     const prev = heartsync.site_settings;
     heartsync.site_settings = { cross_promo_enabled: true, cross_promo_format: 'native' } as unknown as typeof heartsync.site_settings;
     const { container } = render(<CrossPromoSlot slotIndex={1} />);
-    expect(container.textContent).toContain('Frelux');
+    // Rotation item renders with its blurb, CTA and logo thumbnail.
+    expect(container.textContent).toContain('Cost estimator');
+    expect(container.textContent).toContain('Read more');
+    expect(container.querySelector('img')).not.toBeNull();
+    heartsync.site_settings = prev;
+  });
+
+  it('renders the Native format with the real logo thumbnail and NO display URL', () => {
+    const prev = heartsync.site_settings;
+    heartsync.site_settings = { cross_promo_enabled: true, cross_promo_format: 'native' } as unknown as typeof heartsync.site_settings;
+    // slotIndex 2 rotates to the 'Color world' destination from the screenshot.
+    const { container } = render(<CrossPromoSlot slotIndex={2} />);
+    // The Frelux brand mark replaces the icon+gradient tile.
+    const img = container.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute('src')).toBe('/frelux-logo.png');
+    // The display URL must not appear anywhere on the unit: the ad
+    // redirects to the site, so the raw netlify subdomain stays hidden.
+    expect(container.textContent).not.toContain(DEFAULT_CROSS_PROMO_BASE_URL);
+    expect(container.textContent).not.toContain('freluxtools.netlify.app');
+    // CTA and ad chrome are intact.
+    expect(container.textContent).toContain('Read more');
+    expect(container.querySelector('[title*="Frelux"]')).not.toBeNull();
     heartsync.site_settings = prev;
   });
 });

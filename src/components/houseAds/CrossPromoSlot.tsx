@@ -39,6 +39,11 @@ const FRELUX_SITE = {
   logoPath: '/logo-mark.png',
   description: 'Free online construction estimation platform: paint, screeding, tile and POP ceiling calculators, plus cost estimators and an AI color assistant for Nigerian building projects.',
 };
+/** Frelux brand mark shown in ad thumbnails (owner-supplied logo, Sep
+ *  2026). Hosted on THIS site so it never depends on the Frelux deploy
+ *  state or a future custom-domain move. */
+const FRELUX_AD_LOGO = '/frelux-logo.png';
+
 const INTERSTITIAL_FLAG = 'hs_cross_promo_interstitial_shown';
 export type CrossPromoFormat = 'display' | 'card' | 'banner' | 'native' | 'interstitial';
 
@@ -138,7 +143,7 @@ export function buildPromoItems(settings: Record<string, unknown> = {}): PromoIt
     pitch: 'Fast, accurate, no sign-up needed.',
     bigHeadline: 'Building in Nigeria? Know exactly what your project needs.',
     bigBody: 'Free construction calculators, cost estimates and practical guides from the Frelux team.',
-    logo: `${base}${FRELUX_SITE.logoPath}`,
+    logo: FRELUX_AD_LOGO,
   }));
 
   const rawList = Array.isArray(settings.external_promos) ? (settings.external_promos as ExternalPromo[]) : [];
@@ -187,7 +192,7 @@ export function buildDisplayPromoItems(settings: Record<string, unknown> = {}): 
     pitch: 'Fast, accurate, no sign-up needed.',
     bigHeadline: 'Building in Nigeria? Know exactly what your project needs.',
     bigBody: FRELUX_SITE.description,
-    logo: `${base}${FRELUX_SITE.logoPath}`,
+    logo: FRELUX_AD_LOGO,
   };
 
   const rawList = Array.isArray(settings.external_promos) ? (settings.external_promos as ExternalPromo[]) : [];
@@ -365,11 +370,15 @@ const NativeUnit: React.FC<{ items: PromoItem[]; slotIndex: number; source: stri
       <button
         type="button"
         onClick={() => go(d, source)}
-        className={`relative w-24 h-20 sm:w-28 sm:h-[5.5rem] shrink-0 rounded-md overflow-hidden bg-gradient-to-br ${d.gradient} cursor-pointer`}
+        className={`relative w-24 h-20 sm:w-28 sm:h-[5.5rem] shrink-0 rounded-md overflow-hidden cursor-pointer ${d.logo ? 'bg-white' : `bg-gradient-to-br ${d.gradient}`}`}
         aria-label={d.label}
       >
-        <d.icon className="absolute inset-0 m-auto w-8 h-8 text-white/90" />
-        <span className="absolute bottom-1 left-1.5 text-[8px] font-black tracking-widest text-white/80 uppercase">{d.owner}</span>
+        {d.logo ? (
+          <img src={d.logo} alt="" loading="lazy" className="absolute inset-0 m-auto w-full h-full object-contain p-1.5" />
+        ) : (
+          <d.icon className="absolute inset-0 m-auto w-8 h-8 text-white/90" />
+        )}
+        {!d.logo && <span className="absolute bottom-1 left-1.5 text-[8px] font-black tracking-widest text-white/80 uppercase">{d.owner}</span>}
         <AdBadge by={d.owner} className="absolute top-1 right-1 !bg-black/30 !text-white" />
       </button>
       <div className="min-w-0 flex-1 flex flex-col">
@@ -386,14 +395,11 @@ const NativeUnit: React.FC<{ items: PromoItem[]; slotIndex: number; source: stri
         <p className={`mt-1 text-[11px] leading-relaxed line-clamp-2 ${AD_BODY}`}>
           {d.blurb}. {d.pitch}
         </p>
-        <div className="mt-auto pt-1 flex items-center gap-2">
-          <button type="button" onClick={() => go(d, source)} className={`text-[10px] font-bold ${DISPLAY_URL} hover:underline cursor-pointer truncate`}>
-            {d.domain}
-          </button>
+        <div className="mt-auto pt-1 flex items-center justify-end">
           <button
             type="button"
             onClick={() => go(d, source)}
-            className="ml-auto text-[11px] font-bold text-[#1a73e8] dark:text-[#8ab4f8] hover:underline cursor-pointer"
+            className="text-[11px] font-bold text-[#1a73e8] dark:text-[#8ab4f8] hover:underline cursor-pointer"
           >
             Read more »
           </button>
