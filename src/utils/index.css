@@ -109,10 +109,15 @@ html.dark, html.dark body {
 .markdown-body, .prose {
   font-family: inherit;
 }
-.markdown-body h2, .prose h2,
+.markdown-body h2, .prose h2 {
+  font-weight: 700;
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.75rem !important;
+  color: inherit;
+}
 .markdown-body h3, .prose h3,
 .markdown-body h4, .prose h4 {
-  font-weight: 700;
+  font-weight: 600;
   margin-top: 1.5rem !important;
   margin-bottom: 0.75rem !important;
   color: inherit;
@@ -121,12 +126,13 @@ html.dark, html.dark body {
   font-size: 1.25rem !important;
 }
 .markdown-body h3, .prose h3 {
-  font-size: 1.25rem !important;
+  font-size: 1.05rem !important;
   letter-spacing: -0.005em;
 }
 .markdown-body p, .prose p {
   margin-bottom: 1rem !important;
   line-height: 1.75 !important;
+  font-weight: 400 !important;
   color: inherit;
 }
 .markdown-body ul, .prose ul,
@@ -140,6 +146,7 @@ html.dark, html.dark body {
 }
 .markdown-body li, .prose li {
   margin-bottom: 0.375rem !important;
+  font-weight: 400 !important;
 }
 .markdown-body blockquote, .prose blockquote {
   border-left: 3px solid #f43f5e !important;
