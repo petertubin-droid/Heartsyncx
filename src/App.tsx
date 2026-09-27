@@ -524,7 +524,7 @@ export default function App() {
         if (result) {
           const { firstLetter, node: remainingNode } = result;
           return (
-            <p className="font-serif leading-relaxed text-zinc-850 dark:text-zinc-200 mb-6 text-lg sm:text-xl relative">
+            <p className="leading-relaxed text-zinc-850 dark:text-zinc-200 mb-6 text-lg sm:text-xl relative">
               <span 
                 className="float-left font-serif font-black text-[#CE2B5E] dark:text-rose-400 select-none align-middle font-display mr-3.5 mt-2 block"
                 style={{
@@ -546,7 +546,7 @@ export default function App() {
         }
       }
 
-      return <p className="font-serif leading-relaxed text-zinc-800 dark:text-zinc-200 mb-6 text-base sm:text-lg">{children}</p>;
+      return <p className="leading-relaxed text-zinc-800 dark:text-zinc-200 mb-6 text-base sm:text-lg">{children}</p>;
     },
     h2: ({ children }: any) => {
       const text = String(children || '');
