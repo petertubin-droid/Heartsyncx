@@ -323,8 +323,14 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {plans.map(plan => {
             const isPremiumPlus = plan.id === 'plan-plus';
-            const price = billingCycle === 'yearly' ? (plan.price_yearly || (plan.price_monthly * 10)) : plan.price_monthly;
+            // Guard against a plan record missing price fields (e.g. an
+            // incomplete row from the 'plans' table) - falls back to 0
+            // instead of crashing the whole page on .toFixed().
+            const monthlyPrice = Number(plan.price_monthly) || 0;
+            const yearlyPrice = Number(plan.price_yearly) || (monthlyPrice * 10);
+            const price = billingCycle === 'yearly' ? yearlyPrice : monthlyPrice;
             const cycleText = billingCycle === 'yearly' ? 'year' : 'month';
+            const planFeatures = Array.isArray(plan.features) ? plan.features : [];
             
             return (
               <div
@@ -355,7 +361,7 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                   </div>
 
                   <ul className="space-y-3.5 border-t border-zinc-100 dark:border-zinc-800 pt-5">
-                    {plan.features.map((feature, idx) => (
+                    {planFeatures.map((feature, idx) => (
                       <li key={idx} className="flex gap-2.5 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
                         <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                         <span>{feature}</span>
@@ -710,7 +716,11 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
                 <div className="text-right">
                   <span className="text-[10px] text-zinc-400 block uppercase font-bold">Price ({billingCycle})</span>
                   <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">
-                    ${(billingCycle === 'yearly' ? (selectedPlan.price_yearly || (selectedPlan.price_monthly * 10)) : selectedPlan.price_monthly).toFixed(2)}
+                    ${(() => {
+                      const monthly = Number(selectedPlan.price_monthly) || 0;
+                      const yearly = Number(selectedPlan.price_yearly) || (monthly * 10);
+                      return (billingCycle === 'yearly' ? yearly : monthly).toFixed(2);
+                    })()}
                   </span>
                 </div>
               </div>
