@@ -5912,12 +5912,50 @@ async function saveServerCacheState(newState: any, dbClient?: any, opts: { reade
 
 const GATEWAY_BASE = (req: Request) => `${req.headers.origin || req.protocol + '://' + req.get('host')}`;
 
-function getGatewayKeys() {
-  return {
-    stripe: cleanConfigValue(process.env.STRIPE_SECRET_KEY),
-    paystack: cleanConfigValue(process.env.PAYSTACK_SECRET_KEY),
-    stripeWebhook: cleanConfigValue(process.env.STRIPE_WEBHOOK_SECRET)
+// Payment gateway keys resolve in priority order:
+//   1. Keys pasted by the admin in the console (integration_settings rows
+//      for the 'stripe' / 'paystack' integrations) - hot-reloads without a
+//      Netlify redeploy. This is the "add the API key in the admin" path.
+//   2. Netlify environment variables (STRIPE_SECRET_KEY / PAYSTACK_SECRET_KEY /
+//      STRIPE_WEBHOOK_SECRET).
+// The secrets live server-side only; the reader-facing client store never
+// selects integration_settings.
+let paymentKeysCache: { stripe: string; paystack: string; stripeWebhook: string; ts: number } | null = null;
+
+function invalidatePaymentKeysCache() {
+  paymentKeysCache = null;
+}
+
+async function readIntegrationSetting(integrationId: string, key: string): Promise<string> {
+  const svc = getServiceRoleSupabase() || getSupabaseClient();
+  if (!svc) return '';
+  try {
+    const { data } = await queryWithTimeout(
+      svc.from('integration_settings').select('value').eq('id', `${integrationId}_${key}`).maybeSingle(),
+      2500
+    );
+    const v = data?.value;
+    return (v && String(v).trim()) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+async function getGatewayKeys(): Promise<{ stripe: string; paystack: string; stripeWebhook: string }> {
+  const now = Date.now();
+  if (paymentKeysCache && now - paymentKeysCache.ts < 15000) return paymentKeysCache;
+  const [stripeKey, stripeWh, paystackKey] = await Promise.all([
+    readIntegrationSetting('stripe', 'apiKey'),
+    readIntegrationSetting('stripe', 'webhookSecret'),
+    readIntegrationSetting('paystack', 'apiKey')
+  ]);
+  const keys = {
+    stripe: cleanConfigValue(stripeKey) || cleanConfigValue(process.env.STRIPE_SECRET_KEY) || '',
+    paystack: cleanConfigValue(paystackKey) || cleanConfigValue(process.env.PAYSTACK_SECRET_KEY) || '',
+    stripeWebhook: cleanConfigValue(stripeWh) || cleanConfigValue(process.env.STRIPE_WEBHOOK_SECRET) || ''
   };
+  paymentKeysCache = { ...keys, ts: now };
+  return keys;
 }
 
 function getServiceRoleSupabase() {
@@ -5988,7 +6026,7 @@ async function createStripeCheckoutSession(opts: {
   email?: string; clientRefId?: string; metadata: Record<string, string>;
   successUrl: string; cancelUrl: string;
 }) {
-  const key = cleanConfigValue(process.env.STRIPE_SECRET_KEY);
+  const key = (await getGatewayKeys()).stripe;
   if (!key) return null;
   const body = new URLSearchParams();
   body.set('mode', opts.mode);
@@ -6016,7 +6054,7 @@ async function createPaystackTransaction(opts: {
   amount: number; currency: string; email: string; callbackUrl: string;
   metadata: Record<string, string>;
 }) {
-  const key = cleanConfigValue(process.env.PAYSTACK_SECRET_KEY);
+  const key = (await getGatewayKeys()).paystack;
   if (!key) return null;
   const r = await fetch('https://api.paystack.co/transaction/initialize', {
     method: 'POST',
@@ -6078,9 +6116,77 @@ app.post('/api/subscriptions/checkout', async (req: Request, res: Response) => {
   }
 });
 
+// VERIFIED-RETURN ACTIVATION (Paystack): the buyer returns from the Paystack
+// hosted checkout to /subscription?checkout=success&planId=..&reference=REF.
+// Paystack appends the reference to the callback URL, so the client calls
+// this endpoint - the transaction is re-verified against Paystack's API and
+// the subscription is activated. This makes paid memberships work end-to-end
+// even before the Paystack dashboard webhook (charge.success) is configured;
+// the webhook remains the second, independent confirmation channel.
+app.get('/api/subscriptions/verify', async (req: Request, res: Response) => {
+  const reference = String(req.query.reference || '').trim();
+  if (!reference) { res.status(400).json({ error: 'A payment reference is required.' }); return; }
+  const svc = getServiceRoleSupabase();
+  if (!svc) { res.status(503).json({ error: 'Subscription verification is not available on this server.' }); return; }
+
+  try {
+    // Idempotence: the webhook may have processed this reference first.
+    const { data: alreadyPaid } = await svc.from('payments').select('id, subscription_id').eq('transaction_id', reference).maybeSingle();
+    if (alreadyPaid) { res.json({ success: true, alreadyVerified: true }); return; }
+
+    const key = (await getGatewayKeys()).paystack;
+    if (!key) { res.status(501).json({ error: 'Paystack is not configured yet. Payments go live once the Paystack secret key is added in the admin console.' }); return; }
+
+    const verify = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      headers: { Authorization: `Bearer ${key}` }
+    });
+    const vdata = await verify.json();
+    if (!verify.ok || vdata?.data?.status !== 'success') {
+      res.status(400).json({ error: 'This payment could not be verified as successful.' });
+      return;
+    }
+    const md = vdata.data.metadata || {};
+    if (md.kind === 'digital_product') { res.json({ success: true, handled: 'digital_product' }); return; }
+    if (!md.userId || !md.planId) { res.status(400).json({ error: 'This payment is missing subscription metadata.' }); return; }
+
+    await activatePaidSubscription({
+      userId: md.userId,
+      planId: md.planId,
+      billingCycle: md.billingCycle === 'yearly' ? 'yearly' : 'monthly',
+      gateway: 'paystack',
+      amount: (vdata.data.amount || 0) / 100,
+      currency: (vdata.data.currency || 'USD').toUpperCase(),
+      transactionId: reference
+    });
+    res.json({ success: true, planId: md.planId });
+  } catch (err: any) {
+    console.warn('Subscription verify failure:', err?.message);
+    res.status(503).json({ error: 'Verification failed. If you were charged, sign out and back in - support can confirm the payment.' });
+  }
+});
+
+// ADMIN: live payment-gateway status (masked) for the Billing -> Payment
+// Gateways pane, so the admin can see at a glance whether a pasted key is
+// installed and whether it is a test or live key.
+app.get('/api/admin/payment-status', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const keys = await getGatewayKeys();
+  const describe = (k: string) => {
+    if (!k) return { configured: false, masked: '', mode: '' };
+    const mode = k.startsWith('sk_live') || k.startsWith('rk_live') ? 'live'
+      : k.includes('test') ? 'test'
+      : k.startsWith('sk_') ? 'live' : 'unknown';
+    return { configured: true, masked: `${k.slice(0, 7)}•••${k.slice(-4)}`, mode };
+  };
+  res.json({
+    success: true,
+    stripe: { ...describe(keys.stripe), webhookConfigured: !!keys.stripeWebhook },
+    paystack: describe(keys.paystack)
+  });
+});
+
 // Stripe webhook  - event is re-fetched from Stripe so payloads cannot be forged
 app.post('/api/webhooks/stripe', async (req: Request, res: Response) => {
-  const key = cleanConfigValue(process.env.STRIPE_SECRET_KEY);
+  const key = (await getGatewayKeys()).stripe;
   if (!key) { res.status(503).json({ received: false, error: 'Stripe is not configured.' }); return; }
   try {
     const event = req.body;
@@ -6126,7 +6232,7 @@ app.post('/api/webhooks/stripe', async (req: Request, res: Response) => {
 
 // Paystack webhook  - reference is re-verified against the Paystack API
 app.post('/api/webhooks/paystack', async (req: Request, res: Response) => {
-  const key = cleanConfigValue(process.env.PAYSTACK_SECRET_KEY);
+  const key = (await getGatewayKeys()).paystack;
   if (!key) { res.status(503).json({ received: false, error: 'Paystack is not configured.' }); return; }
   try {
     const event = req.body;
@@ -7745,6 +7851,12 @@ app.post('/api/admin/integrations/save', adminAuthMiddleware, async (req: Reques
         details: `Configuration parameters updated for ${integrationId}.`,
         timestamp: new Date().toISOString()
       }]);
+
+      // Payment keys saved in the console hot-reload immediately: drop the
+      // resolver cache so the very next checkout uses the new key.
+      if (integrationId === 'stripe' || integrationId === 'paystack') {
+        invalidatePaymentKeysCache();
+      }
     }
 
     res.json({ success: true, message: 'Settings saved successfully.' });

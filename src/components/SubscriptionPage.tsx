@@ -194,6 +194,16 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
       const returnedPlan = plans.find(p => p.id === params.get('planId'));
+      // Paystack appends ?reference=REF to the callback URL. Verify the
+      // transaction server-side so the membership is actually activated
+      // (idempotent - safe even if the Paystack webhook already did it).
+      const reference = params.get('reference');
+      if (reference) {
+        fetch(`/api/subscriptions/verify?reference=${encodeURIComponent(reference)}`)
+          .then(r => r.json())
+          .then(() => { heartsync.loadServerState(); })
+          .catch(() => { /* verification retryable; the webhook is the backup */ });
+      }
       if (returnedPlan) {
         // GA4 conversion: the paid checkout succeeded (same-browser session
         // survives the gateway redirect, so GA4 attributes the purchase).
@@ -205,8 +215,8 @@ export default function SubscriptionPage({ onNavigate }: SubscriptionPageProps) 
         });
         setSelectedPlan(returnedPlan);
         setIsSuccessOverlayOpen(true);
-        window.history.replaceState({}, '', window.location.pathname);
       }
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, [plans]);
 

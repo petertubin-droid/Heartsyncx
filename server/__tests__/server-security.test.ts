@@ -399,8 +399,9 @@ describe('source-level security contract', () => {
     expect(serverSrc).not.toMatch(/delete process\.env\.ELEVENLABS_VOICE_ID/);
   });
 
-  it('both payment webhooks fulfil digital_product metadata through the service role', () => {
-    expect((serverSrc.match(/md\.kind === 'digital_product'/g) || []).length).toBe(2);
+  it('both payment webhooks (and the verified-return endpoint) fulfil digital_product metadata through the service role', () => {
+    // 3 = stripe webhook + paystack webhook + /api/subscriptions/verify
+    expect((serverSrc.match(/md\.kind === 'digital_product'/g) || []).length).toBe(3);
     expect(serverSrc).toMatch(/async function createDigitalProductOrder/);
     expect(serverSrc).toMatch(/getServiceRoleSupabase\(\)/);
   });

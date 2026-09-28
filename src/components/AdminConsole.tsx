@@ -652,6 +652,18 @@ export default function AdminConsole({
       updatedAt: '2026-07-28'
     },
     {
+      id: 'paystack',
+      name: 'Paystack Payments',
+      category: 'SaaS & Subscriptions Gateway',
+      iconType: 'paystack',
+      description: 'Processes membership checkout in NGN, USD, GHS and more via the Paystack hosted page.',
+      status: 'not_configured',
+      environment: 'sandbox',
+      publicKey: '',
+      apiKey: '',
+      updatedAt: '2026-09-28'
+    },
+    {
       id: 'elevenlabs',
       name: 'ElevenLabs TTS',
       category: 'Neural Voice Synthesis',
@@ -1883,6 +1895,66 @@ export default function AdminConsole({
       setToastMessage(null);
     }, 3000);
   };
+
+  // PAYMENT GATEWAY ACTIVATION STATE (Billing -> Payment Gateways pane).
+  // The admin pastes Stripe/Paystack secret keys here; they are stored
+  // server-side (integration_settings) and hot-reload the checkout flow.
+  const [gatewayStatus, setGatewayStatus] = useState<{ stripe: any; paystack: any } | null>(null);
+  const [gatewayKeyInputs, setGatewayKeyInputs] = useState({ stripe: '', stripeWebhook: '', paystack: '' });
+  const [gatewaySaving, setGatewaySaving] = useState<'stripe' | 'paystack' | null>(null);
+  const [gatewayKeyReveal, setGatewayKeyReveal] = useState<Record<string, boolean>>({});
+
+  const refreshGatewayStatus = async () => {
+    try {
+      const res = await adminFetch('/api/admin/payment-status');
+      if (res.ok) {
+        const data = await res.json();
+        setGatewayStatus({ stripe: data.stripe, paystack: data.paystack });
+      }
+    } catch (_) { /* status is advisory only */ }
+  };
+
+  // Fetch current gateway status whenever the Billing pane's gateways tab opens
+  useEffect(() => {
+    if (activePane === 'billing' && billingSubTab === 'gateways') {
+      refreshGatewayStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePane, billingSubTab]);
+
+  const saveGatewayKey = async (gateway: 'stripe' | 'paystack') => {
+    const key = gatewayKeyInputs[gateway].trim();
+    if (!key) {
+      triggerToast('Paste the secret key first.');
+      return;
+    }
+    setGatewaySaving(gateway);
+    try {
+      const integrationObj: any = {
+        id: gateway,
+        name: gateway === 'stripe' ? 'Stripe Payments' : 'Paystack Payments',
+        category: 'SaaS & Subscriptions Gateway',
+        description: gateway === 'stripe'
+          ? 'Processes memberships, recurring subscriptions, and digital e-book checkouts.'
+          : 'Processes membership checkout in NGN, USD, GHS and more via the Paystack hosted page.',
+        status: 'configured',
+        environment: key.includes('test') ? 'test' : 'live',
+        apiKey: key,
+        publicKey: '',
+        webhookSecret: gateway === 'stripe' ? gatewayKeyInputs.stripeWebhook.trim() : '',
+        updatedAt: new Date().toISOString().split('T')[0]
+      };
+      await saveIntegrationToServerAndSupabase(integrationObj);
+      setGatewayKeyInputs(prev => ({ ...prev, [gateway]: '' }));
+      await refreshGatewayStatus();
+      triggerToast(`${gateway === 'stripe' ? 'Stripe' : 'Paystack'} is now LIVE on the membership page. Payments are fully activated.`);
+    } catch (err: any) {
+      triggerToast(`Could not save the ${gateway} key: ${err?.message || 'unknown error'}`);
+    } finally {
+      setGatewaySaving(null);
+    }
+  };
+
   // Digital products now come from the REAL digital_products DB table via
   // /api/digital-products/all (admin). The legacy siteSettings.digital_products
   // JSON blob was a fake catalog that never reached the storefront.
@@ -14221,39 +14293,112 @@ export default function AdminConsole({
                       </div>
                     )}
 
-                    {/* SubTab 4: Payment Gateways */}
+                    {/* SubTab 4: Payment Gateways - REAL activation */}
                     {billingSubTab === 'gateways' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-5 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/40 dark:bg-zinc-950/40 space-y-3">
-                          <div className="flex justify-between items-center">
-                            <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                              <CreditCard className="w-4 h-4 text-violet-500" /> Stripe API
-                            </h4>
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase font-mono bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">Connected</span>
-                          </div>
-                          <p className="text-[11px] text-zinc-500">Stripe handles credit card processing, Apple Pay, and automated recurring billing.</p>
-                          <div className="space-y-2">
-                            <input type="text" value="pk_live_51M0...92301" readOnly className="w-full p-2 text-[10px] font-mono bg-white dark:bg-zinc-900 border rounded-xl" />
-                            <button onClick={() => triggerToast('Stripe webhook parameters verified.')} className="px-3 py-1 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-xl font-bold text-[10px] cursor-pointer">Configure Webhook</button>
-                          </div>
+                      <div className="space-y-4">
+                        <div className="p-4 border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/20 rounded-2xl flex items-start gap-3">
+                          <Key className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                          <p className="text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                            Paste your gateway secret key below to fully activate the membership checkout page. Keys are stored securely server-side and hot-reload instantly - no redeploy needed. Test keys (sk_test_...) run in sandbox mode; live keys (sk_live_...) charge real cards.
+                          </p>
                         </div>
-
-                        <div className="p-5 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/40 dark:bg-zinc-950/40 space-y-3">
-                          <div className="flex justify-between items-center">
-                            <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                              <DollarSign className="w-4 h-4 text-blue-500" /> PayPal Express
-                            </h4>
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase font-mono bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">Active</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* PAYSTACK (recommended for Nigeria/Africa) */}
+                          <div className="p-5 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/40 dark:bg-zinc-950/40 space-y-3">
+                            <div className="flex justify-between items-center">
+                              <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                <CreditCard className="w-4 h-4 text-blue-500" /> Paystack
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400">Recommended</span>
+                              </h4>
+                              {gatewayStatus?.paystack?.configured ? (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase font-mono bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                                  {gatewayStatus.paystack.mode === 'test' ? 'Test Mode' : 'Live \u2713'}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase font-mono bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">Needs Key</span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-zinc-500">Cards, bank transfer, USSD, and mobile money on the Paystack hosted page. Best rate for Nigerian readers.</p>
+                            {gatewayStatus?.paystack?.configured && (
+                              <p className="text-[10px] font-mono text-zinc-400">Installed key: {gatewayStatus.paystack.masked}</p>
+                            )}
+                            <div className="relative">
+                              <input
+                                type={gatewayKeyReveal['paystack'] ? 'text' : 'password'}
+                                value={gatewayKeyInputs.paystack}
+                                onChange={(e) => setGatewayKeyInputs(prev => ({ ...prev, paystack: e.target.value }))}
+                                placeholder="sk_test_... or sk_live_..."
+                                className="w-full p-2.5 pr-10 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[10px] font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setGatewayKeyReveal(prev => ({ ...prev, paystack: !prev['paystack'] }))}
+                                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                              >
+                                {gatewayKeyReveal['paystack'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => saveGatewayKey('paystack')}
+                              disabled={gatewaySaving === 'paystack'}
+                              className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-bold text-[10px] cursor-pointer"
+                            >
+                              {gatewaySaving === 'paystack' ? 'Saving...' : 'Save & Activate Paystack'}
+                            </button>
                           </div>
-                          <p className="text-[11px] text-zinc-500">PayPal Express checkout and instant wallet integration for international readers.</p>
-                          <div className="space-y-2">
-                            <input type="text" value="client_id_paypal_live_88102" readOnly className="w-full p-2 text-[10px] font-mono bg-white dark:bg-zinc-900 border rounded-xl" />
-                            <button onClick={() => triggerToast('PayPal Client credentials synced.')} className="px-3 py-1 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-xl font-bold text-[10px] cursor-pointer">Test Sandbox</button>
+
+                          {/* STRIPE (international) */}
+                          <div className="p-5 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/40 dark:bg-zinc-950/40 space-y-3">
+                            <div className="flex justify-between items-center">
+                              <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                <DollarSign className="w-4 h-4 text-violet-500" /> Stripe
+                              </h4>
+                              {gatewayStatus?.stripe?.configured ? (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase font-mono bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                                  {gatewayStatus.stripe.mode === 'test' ? 'Test Mode' : 'Live \u2713'}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase font-mono bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">Needs Key</span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-zinc-500">International cards, Apple Pay, and automated recurring billing for global readers.</p>
+                            {gatewayStatus?.stripe?.configured && (
+                              <p className="text-[10px] font-mono text-zinc-400">Installed key: {gatewayStatus.stripe.masked}{gatewayStatus.stripe.webhookConfigured ? ' \u2022 webhook \u2713' : ' \u2022 webhook key missing'}</p>
+                            )}
+                            <div className="relative">
+                              <input
+                                type={gatewayKeyReveal['stripe'] ? 'text' : 'password'}
+                                value={gatewayKeyInputs.stripe}
+                                onChange={(e) => setGatewayKeyInputs(prev => ({ ...prev, stripe: e.target.value }))}
+                                placeholder="sk_test_... or sk_live_..."
+                                className="w-full p-2.5 pr-10 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[10px] font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setGatewayKeyReveal(prev => ({ ...prev, stripe: !prev['stripe'] }))}
+                                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                              >
+                                {gatewayKeyReveal['stripe'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                            <input
+                              type="password"
+                              value={gatewayKeyInputs.stripeWebhook}
+                              onChange={(e) => setGatewayKeyInputs(prev => ({ ...prev, stripeWebhook: e.target.value }))}
+                              placeholder="Webhook signing secret whsec_... (optional)"
+                              className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[10px] font-mono"
+                            />
+                            <button
+                              onClick={() => saveGatewayKey('stripe')}
+                              disabled={gatewaySaving === 'stripe'}
+                              className="w-full px-3 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 text-white rounded-xl font-bold text-[10px] cursor-pointer"
+                            >
+                              {gatewaySaving === 'stripe' ? 'Saving...' : 'Save & Activate Stripe'}
+                            </button>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
+                    )}                  </div>
                 </div>
               )}
 
