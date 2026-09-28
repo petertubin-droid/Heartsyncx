@@ -8150,6 +8150,22 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
     authors = [];
   }
 
+  // Paginated Journal listing URLs (/articles?page=N). The listing shows
+  // 20 articles per page (ARTICLES_PER_PAGE mirrors ContentPages.tsx); page
+  // 1 is the canonical /articles URL already listed above. Computed from
+  // the live post count, so future articles extend the pagination
+  // automatically with no manual sync.
+  const ARTICLES_PER_PAGE = 20;
+  const totalPages = Math.max(1, Math.ceil(posts.length / ARTICLES_PER_PAGE));
+  for (let pNum = 2; pNum <= totalPages; pNum++) {
+    urls.push({
+      loc: `${baseUrl}/articles?page=${pNum}`,
+      lastmod: nowStr,
+      changefreq: 'daily',
+      priority: '0.7'
+    });
+  }
+
   // Populate dynamic URLs
   posts.forEach((p: any) => {
     let date = nowStr;

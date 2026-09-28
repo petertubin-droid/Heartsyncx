@@ -79,7 +79,20 @@
   to = "/.netlify/functions/api/:splat"
   status = 200
 
+# Sitemap: route to the Express app's dynamic /sitemap.xml generator
+# (server.ts), which builds the URL list live from the database and the
+# in-code article corpus - so future articles and the paginated
+# /articles?page=N listing URLs appear automatically. force=true is
+# required because a stale static public/sitemap.xml exists at the same
+# path; Netlify otherwise serves the static file and skips the redirect.
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/.netlify/functions/api/sitemap.xml"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/api/:splat"
   status = 200
+

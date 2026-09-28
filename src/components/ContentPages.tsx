@@ -4,7 +4,7 @@
  *  verbatim from App.tsx (2026-09-24 split, phase 3). Blocks are mutually
  *  exclusive on currentTab, so they render from one component safely.
  */
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import BlogCard from './BlogCard';
 import { AdPlacement, AdsterraDirectLink } from './AdPlacement';
 import { heartsync, getAuthors } from '../store';
@@ -23,6 +23,8 @@ import {
   AlertTriangle,
   BookmarkX,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   Lock,
   Mail,
   Play
@@ -70,6 +72,51 @@ export default function ContentPages({
   payEmail, setPayEmail, payExpiry, setPayExpiry, payCvc, setPayCvc, setAdTarget, setAdStep,
   setAdSecondsLeft
 }: ContentPagesProps) {
+  /* Paginated Journal listing: 20 articles per page, URL-driven via
+     ?page=N so crawlers can discover every listing page through the
+     dynamic sitemap (server.ts computes the same pagination). Page 1
+     is the canonical /articles URL itself. */
+  const ARTICLES_PER_PAGE = 20;
+  const readPageFromUrl = () => {
+    try {
+      const p = parseInt(new URLSearchParams(window.location.search).get('page') || '1', 10);
+      return Number.isFinite(p) && p >= 1 ? p : 1;
+    } catch {
+      return 1;
+    }
+  };
+  const [articlesPage, setArticlesPage] = useState<number>(readPageFromUrl);
+
+  const totalArticlePages = Math.max(1, Math.ceil(publishedArticles.length / ARTICLES_PER_PAGE));
+  const safeArticlesPage = Math.min(articlesPage, totalArticlePages);
+  const pagedArticles = publishedArticles.slice(
+    (safeArticlesPage - 1) * ARTICLES_PER_PAGE,
+    safeArticlesPage * ARTICLES_PER_PAGE
+  );
+
+  // Back/forward buttons: URL carries ?page=, so popstate resyncs state.
+  useEffect(() => {
+    const onPop = () => setArticlesPage(readPageFromUrl());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Re-sync when entering the articles tab (e.g. another tab's URL was
+  // pushed without ?page=, so the listing should start at page 1).
+  useEffect(() => {
+    if (currentTab === 'articles') setArticlesPage(readPageFromUrl());
+  }, [currentTab]);
+
+  const goToArticlePage = (p: number) => {
+    const clamped = Math.min(Math.max(1, p), totalArticlePages);
+    setArticlesPage(clamped);
+    const url = clamped > 1 ? `/articles?page=${clamped}` : '/articles';
+    try {
+      window.history.pushState(null, '', url);
+    } catch { /* no-op in non-browser env */ }
+    window.scrollTo({ top: 0 });
+  };
+
   return (
     <>
             {/* 2. ALL ARTICLES DIRECTORY */}
@@ -88,7 +135,7 @@ export default function ContentPages({
                   <AdPlacement slot="homepage" className="my-2" lazy />
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {publishedArticles.map(post => (
+                    {pagedArticles.map(post => (
                       <BlogCard 
                         key={post.id} 
                         post={post} 
@@ -97,6 +144,38 @@ export default function ContentPages({
                       />
                     ))}
                   </div>
+
+                  {/* Pagination: 20 articles per page with previous/next.
+                      Each /articles?page=N URL is listed in the dynamic
+                      sitemap (server.ts), so crawlers can reach every
+                      article through the listing. */}
+                  {totalArticlePages > 1 && (
+                    <nav aria-label="Article pagination" className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => goToArticlePage(safeArticlesPage - 1)}
+                        disabled={safeArticlesPage <= 1}
+                        aria-label="Previous page"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-rose-300 dark:hover:border-rose-800 hover:text-rose-600 dark:hover:text-rose-400 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        Previous
+                      </button>
+                      <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 px-2 py-2">
+                        Page {safeArticlesPage} of {totalArticlePages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => goToArticlePage(safeArticlesPage + 1)}
+                        disabled={safeArticlesPage >= totalArticlePages}
+                        aria-label="Next page"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-rose-300 dark:hover:border-rose-800 hover:text-rose-600 dark:hover:text-rose-400 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                      >
+                        Next
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </nav>
+                  )}
                 </div>
 
                 <div className="col-span-12 lg:col-span-4 lg:pl-6 border-t lg:border-t-0 lg:border-l border-rose-100/30 dark:border-zinc-850 pt-8 lg:pt-0">
