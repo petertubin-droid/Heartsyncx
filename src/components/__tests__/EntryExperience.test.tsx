@@ -22,7 +22,8 @@ describe('EntryExperience (first-visit welcome)', () => {
   it('renders the brand, headline, curiosity line and CTA', () => {
     render(<EntryExperience onComplete={() => {}} />);
     expect(screen.getByRole('dialog', { name: /welcome to heartsyncx/i })).toBeDefined();
-    expect(screen.getByText('HeartSyncX')).toBeDefined();
+    // Wordmark renders as "Heartsync" + accent-colored "X" across two nodes
+    expect(screen.getByText((_, el) => el?.textContent === 'HeartsyncX' && el.tagName === 'P')).toBeDefined();
     const h1 = screen.getByRole('heading', { level: 1 });
     expect(h1.textContent).toContain('Understand Love.');
     expect(h1.textContent).toContain('Understand Yourself.');

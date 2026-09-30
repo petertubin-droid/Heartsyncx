@@ -4,6 +4,12 @@ import { ArrowRight } from 'lucide-react';
 // HeartSyncX Entry Experience - a premium editorial welcome shown once,
 // before the main homepage, to first-time visitors only.
 //
+// Visual language upgraded to match the HeartsyncX brand reference (couple
+// hero photo, split-color headline/wordmark, gradient CTA pill, decorative
+// base flourish). A few deliberate exceptions from the reference, since
+// this renders as a full-viewport overlay rather than a scrolling page
+// section - see inline notes below.
+//
 // Design notes:
 // - Pure presentation layer: it renders ON TOP of the fully-mounted
 //   homepage (no routing, no redirects, no content gating), so crawlers,
@@ -91,29 +97,32 @@ export default function EntryExperience({ onComplete }: EntryExperienceProps) {
       className={`fixed inset-0 z-[9999] overflow-hidden bg-zinc-950 select-none ${leaving ? 'entry-leave' : ''}`}
       data-testid="entry-experience"
     >
-      {/* Background: instant gradient paint, atmospheric image fades in when loaded */}
+      {/* Background: instant gradient paint, couple photo fades in when loaded.
+          Lighter scrim up top keeps the photo readable there; it deepens
+          toward the bottom so the text block stays crisp - same composition
+          idea as the brand reference, adapted to a full-viewport overlay. */}
       <div className="absolute inset-0" aria-hidden="true">
         <img
           src="/assets/entry/entry-bg.jpg"
           alt=""
           onLoad={() => setBgReady(true)}
           onError={() => setBgReady(true)}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-out ${bgReady ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 h-full w-full object-cover object-[50%_18%] transition-opacity duration-1000 ease-out ${bgReady ? 'opacity-100' : 'opacity-0'}`}
         />
-        {/* Scrims: keep strong text contrast over the whole viewport */}
-        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/80 via-zinc-950/35 to-zinc-950/85" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(9,9,11,0.55)_0%,rgba(9,9,11,0.2)_45%,rgba(9,9,11,0.75)_100%)]" />
-        {/* Soft atmospheric accents echoing the site's rose accent */}
-        <div className="absolute -top-24 -left-16 w-72 h-72 rounded-full bg-rose-600/12 blur-3xl sm:w-96 sm:h-96" />
-        <div className="absolute -bottom-28 -right-16 w-72 h-72 rounded-full bg-indigo-600/12 blur-3xl sm:w-96 sm:h-96" />
+        {/* Scrims: photo breathes near the top, text stays legible below */}
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/45 via-zinc-950/55 to-zinc-950/95" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(9,9,11,0.35)_0%,rgba(9,9,11,0.25)_45%,rgba(9,9,11,0.8)_100%)]" />
+        {/* Soft atmospheric accents echoing the site's rose/violet gradient */}
+        <div className="absolute -top-24 -left-16 w-72 h-72 rounded-full bg-rose-600/14 blur-3xl sm:w-96 sm:h-96" />
+        <div className="absolute -bottom-28 -right-16 w-72 h-72 rounded-full bg-indigo-600/14 blur-3xl sm:w-96 sm:h-96" />
       </div>
 
       {/* Content */}
       <main
-        className="relative flex h-full w-full flex-col items-center justify-center overflow-y-auto px-6 text-center"
+        className="relative flex h-full w-full flex-col items-center justify-end overflow-y-auto px-6 pb-10 text-center sm:justify-center"
         style={{
           paddingTop: 'max(2rem, env(safe-area-inset-top))',
-          paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
+          paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))',
         }}
       >
         <div className="flex flex-col items-center">
@@ -122,28 +131,30 @@ export default function EntryExperience({ onComplete }: EntryExperienceProps) {
             <img
               src="/logo.svg"
               alt="HeartSyncX"
-              width={72}
-              height={72}
-              className="h-[72px] w-[72px] rounded-2xl ring-1 ring-white/15 shadow-[0_10px_40px_-12px_rgba(244,63,94,0.35)]"
+              width={64}
+              height={64}
+              className="h-16 w-16 rounded-2xl ring-1 ring-white/15 shadow-[0_10px_40px_-12px_rgba(244,63,94,0.4)] sm:h-[72px] sm:w-[72px]"
             />
           </div>
 
-          {/* Wordmark */}
+          {/* Wordmark - bold brand lockup, "X" carrying the accent color,
+              matching the reference's hero wordmark treatment. */}
           <p
-            className="entry-rise mt-6 font-display text-[13px] font-medium uppercase tracking-[0.42em] text-zinc-300/90 sm:text-sm"
+            className="entry-rise mt-4 font-display text-2xl font-bold tracking-tight text-zinc-50 sm:mt-5 sm:text-[28px]"
             style={rise(260)}
           >
-            HeartSyncX
+            Heartsync<span className="text-rose-400">X</span>
           </p>
 
-          {/* Headline */}
+          {/* Headline - split coloring: statement in white, the personal
+              half of the promise carried in the brand's rose accent. */}
           <h1
-            className="entry-rise mt-5 font-serif text-3xl font-semibold leading-[1.15] text-zinc-50 text-balance sm:mt-7 sm:text-5xl sm:leading-[1.1] lg:text-6xl"
+            className="entry-rise mt-5 font-serif text-3xl font-semibold leading-[1.15] text-balance sm:mt-7 sm:text-5xl sm:leading-[1.1] lg:text-6xl"
             style={rise(420)}
           >
-            Understand Love.
+            <span className="text-zinc-50">Understand Love.</span>
             <br />
-            Understand Yourself.
+            <span className="text-rose-400">Understand Yourself.</span>
           </h1>
 
           {/* Supporting message */}
@@ -155,21 +166,35 @@ export default function EntryExperience({ onComplete }: EntryExperienceProps) {
             emotions behind them.
           </p>
 
-          {/* Curiosity line */}
-          <p
-            className="entry-rise mt-8 max-w-md font-serif text-[15px] italic leading-relaxed text-zinc-400 sm:text-base"
-            style={rise(720)}
-          >
-            Some relationships need answers. Some need honesty.
-          </p>
+          {/* Curiosity line, with a hand-drawn-style underline accent */}
+          <div className="entry-rise mt-8 flex flex-col items-center sm:mt-9" style={rise(720)}>
+            <p className="max-w-md font-serif text-[15px] italic leading-relaxed text-zinc-200 sm:text-base">
+              Some relationships need answers. Some need honesty.
+            </p>
+            <svg
+              width="190"
+              height="10"
+              viewBox="0 0 190 10"
+              fill="none"
+              aria-hidden="true"
+              className="mt-1.5 text-rose-400"
+            >
+              <path
+                d="M3 6.5C45 2 130 2 187 6"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
 
-          {/* CTA */}
+          {/* CTA - gradient pill, matching the reference's brand button */}
           <button
             ref={ctaRef}
             type="button"
             onClick={enter}
             data-testid="entry-cta"
-            className="entry-rise group mt-9 inline-flex min-h-[56px] items-center justify-center gap-2.5 rounded-full bg-rose-600 px-9 py-4 text-base font-semibold text-white shadow-[0_14px_44px_-12px_rgba(244,63,94,0.6)] ring-1 ring-white/10 transition-all duration-300 ease-out hover:bg-rose-500 hover:shadow-[0_18px_54px_-12px_rgba(244,63,94,0.7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 active:scale-[0.98] sm:mt-11 sm:px-11"
+            className="entry-rise group mt-9 inline-flex min-h-[56px] items-center justify-center gap-2.5 rounded-full bg-gradient-to-r from-rose-500 to-fuchsia-500 px-9 py-4 text-base font-semibold text-white shadow-[0_14px_44px_-12px_rgba(244,63,94,0.65)] ring-1 ring-white/10 transition-all duration-300 ease-out hover:from-rose-400 hover:to-fuchsia-400 hover:shadow-[0_18px_54px_-12px_rgba(244,63,94,0.75)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 active:scale-[0.98] sm:mt-11 sm:px-11"
             style={rise(880)}
           >
             Explore HeartSyncX
@@ -184,6 +209,36 @@ export default function EntryExperience({ onComplete }: EntryExperienceProps) {
           </span>
         </div>
       </main>
+
+      {/* Decorative base flourish - a purely cosmetic gradient wave, echoing
+          the reference's bottom curve. Unlike the reference (a scrolling
+          hero peeking into the next section) this overlay covers the full
+          viewport, so it stays abstract rather than implying real content
+          beneath it. */}
+      <svg
+        className="pointer-events-none absolute bottom-0 left-0 w-full text-rose-500/25"
+        style={{ height: '14vh', minHeight: '64px' }}
+        viewBox="0 0 400 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id="entryWaveGradient" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#fb7185" />
+            <stop offset="100%" stopColor="#a855f7" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M0,55 C90,10 160,90 260,45 C320,20 370,55 400,35 L400,100 L0,100 Z"
+          fill="url(#entryWaveGradient)"
+          opacity="0.35"
+        />
+        <path
+          d="M0,70 C110,35 180,95 280,60 C330,42 365,68 400,58 L400,100 L0,100 Z"
+          fill="url(#entryWaveGradient)"
+          opacity="0.25"
+        />
+      </svg>
     </div>
   );
 }
