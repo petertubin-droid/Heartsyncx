@@ -1,4 +1,4 @@
-import { Post } from '../../../types';
+import { Post } from '../../../types.js';
 
 export const COMM_LISTEN_DONT_FIX: Post[] = [
   {

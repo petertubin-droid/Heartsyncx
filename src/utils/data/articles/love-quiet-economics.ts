@@ -1,4 +1,4 @@
-import { Post } from '../../../types';
+import { Post } from '../../../types.js';
 
 export const LOVE_QUIET_ECONOMICS: Post[] = [
   {

@@ -1,4 +1,4 @@
-import { Post } from '../../../types';
+import { Post } from '../../../types.js';
 
 export const COMM_REPAIR_BEATS_PERFECTION: Post[] = [
   {

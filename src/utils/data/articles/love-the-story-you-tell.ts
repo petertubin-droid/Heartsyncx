@@ -1,4 +1,4 @@
-import { Post } from '../../../types';
+import { Post } from '../../../types.js';
 
 export const LOVE_THE_STORY_YOU_TELL: Post[] = [
   {

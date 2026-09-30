@@ -1,4 +1,4 @@
-import { Post } from '../../../types';
+import { Post } from '../../../types.js';
 
 export const LOVE_ANXIOUS_AVOIDANT_DANCE: Post[] = [
   {

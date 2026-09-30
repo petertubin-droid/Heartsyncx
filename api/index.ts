@@ -8,7 +8,7 @@
  * straight from the filesystem by Vercel's CDN and never hit this function.
  */
 import type { Request, Response, NextFunction } from 'express';
-import { app, registerProductionRoutes } from '../server';
+import { app, registerProductionRoutes } from '../server.js';
 
 let readyPromise: Promise<void> | null = null;
 

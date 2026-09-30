@@ -8,10 +8,10 @@ import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import { getArticleSeoData } from './src/utils/seoArticleData';
-import { HEARTSYNC_ARTICLE_SEO, HEARTSYNC_ARTICLES } from './src/utils/data/articles';
-import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig, isServiceRoleKey } from './src/lib/supabaseConfig';
-import { resolveHasAdmins, shouldBlockSetupRegister } from './src/lib/setupPresence';
+import { getArticleSeoData } from './src/utils/seoArticleData.js';
+import { HEARTSYNC_ARTICLE_SEO, HEARTSYNC_ARTICLES } from './src/utils/data/articles/index.js';
+import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig, isServiceRoleKey } from './src/lib/supabaseConfig.js';
+import { resolveHasAdmins, shouldBlockSetupRegister } from './src/lib/setupPresence.js';
 import { Resend } from 'resend';
 
 // Load environmental parameters (both .env and .env.local)

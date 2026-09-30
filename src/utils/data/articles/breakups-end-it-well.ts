@@ -1,4 +1,4 @@
-import { Post } from '../../../types';
+import { Post } from '../../../types.js';
 
 export const BREAKUPS_END_IT_WELL: Post[] = [
   {

@@ -1,4 +1,4 @@
-import { Post } from '../../../types';
+import { Post } from '../../../types.js';
 
 export const SELFLOVE_BOUNDARIES_GUILT: Post[] = [
   {

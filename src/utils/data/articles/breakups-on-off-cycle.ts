@@ -1,4 +1,4 @@
-import { Post } from '../../../types';
+import { Post } from '../../../types.js';
 
 export const BREAKUPS_ON_OFF_CYCLE: Post[] = [
   {

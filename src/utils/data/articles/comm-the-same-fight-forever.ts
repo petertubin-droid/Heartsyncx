@@ -1,4 +1,4 @@
-import { Post } from '../../../types';
+import { Post } from '../../../types.js';
 
 export const COMM_THE_SAME_FIGHT_FOREVER: Post[] = [
   {
