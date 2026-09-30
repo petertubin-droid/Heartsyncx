@@ -1542,6 +1542,12 @@ export default function App() {
     showToast('Your emotional wellness comment is posted!');
   };
 
+  // HeartSyncX Entry Experience visibility: first visit + homepage only.
+  // Deep links (articles, categories) never show it, and returning
+  // visitors (flag already set) go straight to the homepage.
+  const showEntryExperience =
+    !entryDismissed && currentTab === 'home' && typeof window !== 'undefined' && window.location.pathname === '/';
+
   // Filter & Search computation helpers
   const publishedArticles = posts.filter(p => p.status === 'published');
 
@@ -1888,8 +1894,10 @@ export default function App() {
       )}
       </div>
 
-      {/* Cookie Banner Overlay */}
-      {currentTab !== 'admin' && (
+      {/* Cookie Banner Overlay - held back while the first-visit Entry
+          Experience is on screen, so newcomers are welcomed by the site
+          before the consent prompt (it appears right after they enter). */}
+      {currentTab !== 'admin' && !showEntryExperience && (
         <>
           <CookieBanner onLearnMore={() => navigateTo('cookies')} />
           <Suspense fallback={null}><LiveChatWidget /></Suspense>
@@ -2076,7 +2084,7 @@ export default function App() {
           Pure presentation: the homepage is fully mounted and crawlable
           underneath; no routing, redirects or content gating. Deep links
           (articles, categories) never show it - homepage only. */}
-      {!entryDismissed && currentTab === 'home' && typeof window !== 'undefined' && window.location.pathname === '/' && (
+      {showEntryExperience && (
         <EntryExperience onComplete={() => setEntryDismissed(true)} />
       )}
 
