@@ -19,6 +19,7 @@ const LiveChatWidget = React.lazy(() => import('./components/LiveChatWidget'));
 const SubscriptionPage = React.lazy(() => import('./components/SubscriptionPage'));
 import ArticleBodyWithInserts from './components/ArticleBodyWithInserts';
 import HomePage from './components/HomePage';
+import EntryExperience, { hasEnteredBefore } from './components/entry/EntryExperience';
 import { HeartsyncLoader, LoadingProgressBar, HeartsyncSuspense } from './components/LoadingSystem';
 import ContentPages from './components/ContentPages';
 import StorePage from './components/StorePage';
@@ -47,6 +48,10 @@ import {
 
 export default function App() {
   const { resetConsent, hasConsented, isInitialLoaded } = useCookieConsent();
+  // HeartSyncX Entry Experience: shown once, on the homepage, to
+  // first-time visitors only (client-side flag, no personal data).
+  // Checked BEFORE first render so returning visitors never see a flash.
+  const [entryDismissed, setEntryDismissed] = useState(() => hasEnteredBefore());
   // Authentication Loading State
   const [authLoading, setAuthLoading] = useState(heartsync.authLoading);
   // Global premium animated loader state
@@ -2065,6 +2070,14 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* HeartSyncX Entry Experience - premium first-visit welcome overlay.
+          Pure presentation: the homepage is fully mounted and crawlable
+          underneath; no routing, redirects or content gating. Deep links
+          (articles, categories) never show it - homepage only. */}
+      {!entryDismissed && currentTab === 'home' && typeof window !== 'undefined' && window.location.pathname === '/' && (
+        <EntryExperience onComplete={() => setEntryDismissed(true)} />
       )}
 
       {/* Accessible article image lightbox (Esc closes, focus trapped) */}

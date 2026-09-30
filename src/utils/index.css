@@ -393,6 +393,30 @@ html.dark, html.dark body {
 .animate-float-soft      { animation: float-soft 14s ease-in-out infinite; }
 .animate-float-soft-slow { animation: float-soft 22s ease-in-out infinite; }
 
+/* ---- HeartSyncX Entry Experience (first-visit welcome) ---- */
+/* Staged rise-in: each element fades up once, holding its hidden state
+   (animation-fill-mode: both) until its delay elapses. The homepage is
+   already fully mounted underneath - this is pure presentation. */
+@keyframes entry-rise-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.entry-rise { animation: entry-rise-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes entry-leave-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.025); }
+}
+.entry-leave { animation: entry-leave-out 0.46s ease both; pointer-events: none; }
+.entry-leave .entry-rise { animation: none; opacity: 1; transform: none; }
+
+/* Accessibility: honour reduced motion - show everything immediately,
+   transitions collapse to a plain fade. */
+@media (prefers-reduced-motion: reduce) {
+  .entry-rise { animation-duration: 0.01s; animation-delay: 0s !important; }
+  .entry-leave { animation-duration: 0.01s; }
+}
+
 /* Light-sweep across premium cards on hover */
 .premium-card { position: relative; overflow: hidden; }
 .premium-card::after {
