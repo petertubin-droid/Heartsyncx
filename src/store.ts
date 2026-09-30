@@ -1033,6 +1033,14 @@ export class HeartsyncStore {
       this.activeSupabaseUrl = null;
       this.activeSupabaseKey = null;
       console.log('🔌 Supabase connection credentials not configured or invalid. Running in local fallback state.');
+      // BUGFIX: restoreSupabaseSession() clears authLoading, and it is
+      // normally only called from the success branch above. Without
+      // credentials the auth-loading gate never lifted, so the whole app
+      // stayed on the preloader forever (a deployment with missing env
+      // vars showed an infinite "LOADING" screen instead of the site).
+      // restoreSupabaseSession handles supabase === null by clearing
+      // authLoading immediately - the site then boots in fallback mode.
+      this.restoreSupabaseSession();
     }
   }
 
