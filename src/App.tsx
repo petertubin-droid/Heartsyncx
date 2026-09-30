@@ -19,7 +19,7 @@ const LiveChatWidget = React.lazy(() => import('./components/LiveChatWidget'));
 const SubscriptionPage = React.lazy(() => import('./components/SubscriptionPage'));
 import ArticleBodyWithInserts from './components/ArticleBodyWithInserts';
 import HomePage from './components/HomePage';
-import EntryExperience, { hasEnteredBefore } from './components/entry/EntryExperience';
+import EntryExperience, { hasEnteredBefore, markEntered } from './components/entry/EntryExperience';
 import { HeartsyncLoader, LoadingProgressBar, HeartsyncSuspense } from './components/LoadingSystem';
 import ContentPages from './components/ContentPages';
 import StorePage from './components/StorePage';
@@ -51,7 +51,16 @@ export default function App() {
   // HeartSyncX Entry Experience: shown once, on the homepage, to
   // first-time visitors only (client-side flag, no personal data).
   // Checked BEFORE first render so returning visitors never see a flash.
-  const [entryDismissed, setEntryDismissed] = useState(() => hasEnteredBefore());
+  // Entry Experience visibility: it may only ever appear on a visitor's
+  // very first page load, before any in-app navigation. We mark the
+  // visitor as entered at boot, so clicking the logo (or any other link)
+  // later in the session always lands on the homepage itself - never a
+  // replay of the welcome overlay.
+  const [entryDismissed, setEntryDismissed] = useState(() => {
+    const seen = hasEnteredBefore();
+    if (!seen) markEntered();
+    return seen;
+  });
   // Authentication Loading State
   const [authLoading, setAuthLoading] = useState(heartsync.authLoading);
   // Global premium animated loader state
