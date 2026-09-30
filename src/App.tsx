@@ -57,9 +57,16 @@ export default function App() {
   // later in the session always lands on the homepage itself - never a
   // replay of the welcome overlay.
   const [entryDismissed, setEntryDismissed] = useState(() => {
-    const seen = hasEnteredBefore();
-    if (!seen) markEntered();
-    return seen;
+    // The welcome gets exactly one chance, ever: a first-time visitor
+    // whose very first page load is the homepage. Any other entry point
+    // (article/category deep link, reload, logo click mid-session) goes
+    // straight to real content - the overlay must never replay.
+    const firstHomepageLoad =
+      typeof window !== 'undefined' &&
+      window.location.pathname === '/' &&
+      !hasEnteredBefore();
+    markEntered(); // idempotent: consumed now either way
+    return !firstHomepageLoad;
   });
   // Authentication Loading State
   const [authLoading, setAuthLoading] = useState(heartsync.authLoading);
