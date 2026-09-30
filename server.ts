@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { getArticleSeoData } from './src/utils/seoArticleData';
-import { HEARTSYNC_ARTICLE_SEO } from './src/utils/data/articles';
+import { HEARTSYNC_ARTICLE_SEO, HEARTSYNC_ARTICLES } from './src/utils/data/articles';
 import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig, isServiceRoleKey } from './src/lib/supabaseConfig';
 import { resolveHasAdmins, shouldBlockSetupRegister } from './src/lib/setupPresence';
 import { Resend } from 'resend';
@@ -8719,6 +8719,39 @@ async function handleDynamicHtml(req: Request, res: Response) {
       }
     }
 
+    // Live-DB fallback (2026-09-30 AI-crawlability fix): serverCacheState is
+    // the boot-time projection and on a long-lived serverless instance it can
+    // be stale or partially loaded, which left DB articles with NO per-page
+    // SEO schema at all. The sitemap and /api/posts/:slug both query the DB
+    // live; do the same here so every published DB article resolves. The
+    // content column rides along in the same query.
+    if (slug && !post) {
+      const liveClient = getSupabaseClient();
+      if (liveClient) {
+        try {
+          const { data: livePost } = await queryWithTimeout(
+            liveClient
+              .from('posts')
+              .select('slug,title,excerpt,content,featured_image,publish_date,updated_at,seo_title,seo_description,seo_keywords,keywords,category_id,status,author_id')
+              .eq('slug', slug)
+              .eq('status', 'published')
+              .maybeSingle(),
+            5000
+          );
+          if (livePost) {
+            post = livePost;
+            const catObj = Array.isArray(serverCacheState.categories)
+              ? serverCacheState.categories.find((c: any) => c.id === post.category_id)
+              : null;
+            if (catObj) {
+              post.category_name = catObj.name;
+              post.category_slug = catObj.slug;
+            }
+          }
+        } catch (_) { /* fall through to the in-code corpus */ }
+      }
+    }
+
     // Articles that ship in the codebase (src/utils/data/articles) are not in
     // the database  - resolve them from the SEO projection so crawlers get
     // real titles, descriptions, and BlogPosting/BreadcrumbList schemas.
@@ -8749,6 +8782,17 @@ async function handleDynamicHtml(req: Request, res: Response) {
     // fetched per-article, see POST_LIST_COLUMNS). Fetch the body now so the
     // crawler-accessible <noscript> text and the articleBody schema carry
     // the real article instead of silently never firing for DB posts.
+    // In-code articles deliberately set content: '' in the projection above,
+    // but the full corpus IS bundled server-side (HEARTSYNC_ARTICLE_SEO is
+    // derived from it), so recover the real body for the crawler <noscript>
+    // text and the articleBody schema at zero bundle cost.
+    if (post && !post.content && !req.path.startsWith('/category/')) {
+      const corpusBody = HEARTSYNC_ARTICLES.find((a: any) => a.slug === slug);
+      if (corpusBody && typeof corpusBody.content === 'string') {
+        post.content = corpusBody.content;
+      }
+    }
+
     // Code articles are untouched (they set content: '' above), and any
     // fetch failure simply falls back to the old no-noscript behavior.
     if (post && post.content === undefined) {
@@ -9080,7 +9124,7 @@ async function handleDynamicHtml(req: Request, res: Response) {
   res.type('text/html');
   // Vercel's edge caches the function response per-path when s-maxage allows,
   // keeping serverless-served article pages fast. Harmless elsewhere.
-  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=86400, stale-while-revalidate=604800');
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400');
   res.send(html);
 }
 

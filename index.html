@@ -36,6 +36,22 @@
 </head>
   <body>
 <div id="root"></div>
+    <!-- Crawler-accessible content for non-JavaScript agents (AI crawlers,
+         text browsers, social fetchers). Browsers with JavaScript enabled
+         hide <noscript> automatically; real users never see this. -->
+    <noscript>
+      <h1>Heartsync - Mindful Insights for Connected Hearts</h1>
+      <p>Heartsync publishes evidence-based relationship writing: attachment styles, conflict repair, boundaries, breakups, self-worth and couples wellness. Articles are grounded in relationship science and written for real-life situations.</p>
+      <ul>
+        <li><a href="/articles">All articles</a></li>
+        <li><a href="/categories">Categories</a></li>
+        <li><a href="/trending">Trending insights</a></li>
+        <li><a href="/about">About Heartsync</a></li>
+        <li><a href="/faq">Frequently asked questions</a></li>
+        <li><a href="/subscription">Membership plans</a></li>
+      </ul>
+      <p>Enable JavaScript for the full interactive experience: attachment diagnostics, the LoveVault, guided journals and the AI relationship copilot.</p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
