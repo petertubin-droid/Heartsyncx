@@ -2754,6 +2754,11 @@ export class HeartsyncStore {
       : `post-${Date.now()}`;
       
     const newPost: Post = {
+      // Carry EVERY field the editor saved (paywall, rewarded-ad unlock,
+      // TTS, SEO, inserts...). The old explicit whitelist silently dropped
+      // is_premium/premium_access_type/unlock_duration etc., so a new
+      // ad-unlock draft published as a free article (2026-10-01 test find).
+      ...postInput,
       id: `post-${Date.now()}`,
       title: postInput.title || 'Untitled Post',
       slug,
