@@ -14363,11 +14363,129 @@ export default function AdminConsole({
               )}
 
               {/* REWARDED ACCESS ADS & CPM DASHBOARD */}
-              {activePane === 'rewarded_access' && (
-                <div className="space-y-6 text-xs font-sans text-left">
-                  
+              {activePane === 'rewarded_access' && (() => {
+                const saveRewardedConfig = () => {
+                  const updated: any = {
+                    ...siteSettings,
+                    rewarded_ad_config: rewardedAdConfig,
+                    rewarded_access_default_duration: siteSettings.rewarded_access_default_duration || '30m'
+                  };
+                  setSiteSettings(updated);
+                  heartsync.updateSettings(updated);
+                  adminFetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updated)
+                  }).catch(() => {});
+                  triggerToast('Rewarded ad unlock configuration saved & synced to server database!');
+                };
+                const cfg = rewardedAdConfig;
+                const setCfg = (patch: Partial<typeof cfg>) => setRewardedAdConfig({ ...cfg, ...patch });
+                const inputCls = "w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-zinc-850 text-zinc-850 dark:text-zinc-150 text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-rose-450";
+                return (
+                <div className="space-y-6 text-xs font-sans text-left animate-fadeIn">
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xl space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest font-mono bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 flex items-center gap-1">
+                            Server & DB Synced
+                          </span>
+                          <span className="text-[10px] text-zinc-400 font-mono">site_settings.rewarded_ad_config</span>
+                        </div>
+                        <h2 className="font-serif font-bold text-xl text-zinc-900 dark:text-zinc-100">Rewarded Ad Unlock Configuration</h2>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-2xl mt-0.5">
+                          Let guests unlock premium articles by watching a short ad. Tweak placement density, pass duration, and estimated CPM earnings.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={cfg.enabled}
+                            onChange={(e) => setCfg({ enabled: e.target.checked })}
+                            className="w-4 h-4 accent-rose-500 rounded"
+                          />
+                          {cfg.enabled ? 'Enabled' : 'Disabled'}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={saveRewardedConfig}
+                          className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 active:scale-95 text-white text-[11px] font-bold cursor-pointer transition-all flex items-center gap-2 shadow-sm"
+                        >
+                          <Save className="w-4 h-4" />
+                          Save Configuration
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">Ad Frequency</label>
+                        <span className="text-[10px] text-zinc-400 block -mt-1">Ads shown per N paragraphs</span>
+                        <input type="number" min={1} max={12} value={cfg.paragraphThreshold}
+                          onChange={(e) => setCfg({ paragraphThreshold: Math.max(1, Number(e.target.value) || 1) })}
+                          className={inputCls} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">Ad Duration (seconds)</label>
+                        <span className="text-[10px] text-zinc-400 block -mt-1">Time before unlock grants</span>
+                        <input type="number" min={5} max={60} value={cfg.adDurationSeconds}
+                          onChange={(e) => setCfg({ adDurationSeconds: Math.max(5, Number(e.target.value) || 5) })}
+                          className={inputCls} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">Est. CPM Rate ($)</label>
+                        <span className="text-[10px] text-zinc-400 block -mt-1">Revenue per 1,000 ad views</span>
+                        <input type="number" step="0.01" min={0} value={cfg.cpmRate}
+                          onChange={(e) => setCfg({ cpmRate: Math.max(0, Number(e.target.value) || 0) })}
+                          className={inputCls} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">Default Unlock Duration</label>
+                        <span className="text-[10px] text-zinc-400 block -mt-1">Per-article override stays intact</span>
+                        <select
+                          value={siteSettings.rewarded_access_default_duration || '30m'}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, rewarded_access_default_duration: e.target.value } as SiteSettings)}
+                          className={inputCls}
+                        >
+                          {['10m', '15m', '30m', '1h', '3h', '6h', '12h', '24h'].map((d) => (
+                            <option key={d} value={d}>{d === '10m' || d === '15m' || d === '30m' ? d.replace('m', ' minutes') : d.replace('h', ' hours')}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                      <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-750">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">Pass Validity</span>
+                        <h4 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mt-1 font-mono">{cfg.passValidityHours}h</h4>
+                        <input type="range" min={1} max={72} value={cfg.passValidityHours}
+                          onChange={(e) => setCfg({ passValidityHours: Number(e.target.value) })}
+                          className="w-full mt-2 accent-rose-500" />
+                      </div>
+                      <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block font-semibold">Lifetime Ad Views</span>
+                        <h4 className="text-lg font-bold text-emerald-900 dark:text-emerald-300 mt-1 font-mono">{cfg.totalViews.toLocaleString()}</h4>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block font-semibold">Est. Lifetime Earnings</span>
+                        <h4 className="text-lg font-bold text-emerald-900 dark:text-emerald-300 mt-1 font-mono">${((cfg.totalViews / 1000) * (cfg.cpmRate || 0)).toFixed(2)}</h4>
+                      </div>
+                    </div>
+
+                    {!cfg.enabled && (
+                      <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl p-4 flex items-start gap-3">
+                        <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                        <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                          Rewarded unlocks are disabled: guests will only reach locked premium articles via subscription or account login.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* SAAS CUSTOM DOMAINS ROUTING AND DNS SETTINGS */}
               {activePane === 'custom_domains' && (
