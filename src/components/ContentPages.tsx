@@ -719,24 +719,79 @@ export default function ContentPages({
                     );
                   }
 
+                  // The ten live categories power the "What we cover" grid below.
+                  const aboutCategories = categories.filter(Boolean).slice(0, 10);
+
                   return (
                     <>
                       <h1 className="font-serif font-extrabold text-3xl text-zinc-900 dark:text-white text-center">About Heartsync</h1>
                       <p className="text-xs text-zinc-400 text-center uppercase tracking-wider font-mono">Exploring human connectivity since 2026</p>
-                      
-                      <img alt="" 
-                        src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200" 
-                        className="w-full max-h-64 object-cover rounded-3xl" 
+
+                      <img alt=""
+                        src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200"
+                        className="w-full max-h-64 object-cover rounded-3xl"
                       />
 
                       <div className="space-y-4 text-xs leading-relaxed text-zinc-650 dark:text-zinc-400">
-                        <p>
-                          Heartsync was established as an aesthetic response to swipe-culture burnout. We believe modern digital products gamify dating, shortening conversations into instant judgements. This speed leaves individuals with deep relationship anxieties, defense patterns, and decision overload.
+                        <p className="text-sm text-zinc-800 dark:text-zinc-200 font-medium">
+                          Heartsync is a relationship and emotional wellness publication that translates the science of human connection - attachment theory, the Gottman method of couples research, and nervous-system co-regulation - into practical, readable guidance for real life.
                         </p>
                         <p>
-                          Our mission is to translate expert psychology concepts - specifically Bowlby's Attachment styles, Gottman's communication parameters, and nervous-system co-regulation templates - into beautiful, actionable lifestyle essays. We compile readable schemas so you can map your relational landscape safely.
+                          Modern dating apps gamify connection into instant judgements, leaving many people with relationship anxiety, defense patterns, and decision overload. Heartsync was established in 2026 as a response to that swipe-culture burnout: a calmer place to slow down, understand your own patterns, and build love that lasts.
                         </p>
                       </div>
+
+                      <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-3xl p-6 space-y-3">
+                        <h2 className="font-serif font-extrabold text-xl text-zinc-950 dark:text-white">Our Mission</h2>
+                        <p className="text-xs leading-relaxed text-zinc-650 dark:text-zinc-400">
+                          Our mission is to turn expert psychology - specifically Bowlby's attachment styles, the Gottmans' communication parameters, and nervous-system co-regulation templates - into beautiful, actionable essays. We compile the research into readable schemas so you can map your relational landscape safely, and take clear next steps in dating, partnership, and healing.
+                        </p>
+                      </div>
+
+                      <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-3xl p-6 space-y-4">
+                        <h2 className="font-serif font-extrabold text-xl text-zinc-950 dark:text-white">What We Cover</h2>
+                        <p className="text-xs leading-relaxed text-zinc-650 dark:text-zinc-400">
+                          Every article in our library is organized around ten practical themes, each grounded in the same body of relationship science:
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {aboutCategories.map((cat: any) => (
+                            <button
+                              key={cat.id}
+                              onClick={() => navigateTo('category', cat.slug)}
+                              className="text-left px-4 py-3 bg-zinc-50 dark:bg-zinc-850 border border-zinc-100 dark:border-zinc-800 rounded-2xl hover:border-rose-300 dark:hover:border-rose-700 transition-colors group"
+                            >
+                              <span className="block text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">{cat.name}</span>
+                              {cat.description && <span className="block text-[10px] text-zinc-400 leading-relaxed mt-0.5 line-clamp-2">{cat.description}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-3xl p-6 space-y-3">
+                        <h2 className="font-serif font-extrabold text-xl text-zinc-950 dark:text-white">How We Write</h2>
+                        <ul className="space-y-2 text-xs leading-relaxed text-zinc-650 dark:text-zinc-400 list-none">
+                          <li className="flex gap-2"><span className="text-rose-500 font-black shrink-0">01</span><span>Every essay starts from established research - attachment theory, Gottman couples science, and somatic grounding - then explains it in plain, honest language.</span></li>
+                          <li className="flex gap-2"><span className="text-rose-500 font-black shrink-0">02</span><span>We never invent studies, statistics, or experts. If the evidence is mixed, we say so.</span></li>
+                          <li className="flex gap-2"><span className="text-rose-500 font-black shrink-0">03</span><span>Guidance is written to be used: concrete phrases, practices, and reflection questions you can apply the same day.</span></li>
+                          <li className="flex gap-2"><span className="text-rose-500 font-black shrink-0">04</span><span>We are independent and reader-first. The core library stays free, supported by unobtrusive ads and an optional premium membership.</span></li>
+                        </ul>
+                      </div>
+
+                      <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-3xl p-6 space-y-3">
+                        <h2 className="font-serif font-extrabold text-xl text-zinc-950 dark:text-white">More Than Articles</h2>
+                        <p className="text-xs leading-relaxed text-zinc-650 dark:text-zinc-400">
+                          Alongside the library, Heartsync offers an AI relationship copilot for private, in-the-moment questions, audio editions of articles for calmer listening, and the LoveVault for keeping what matters to you. Readers who want the full experience can explore our membership for premium guides and digital products.
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <button onClick={() => navigateTo('articles')} className="text-[10px] font-black uppercase tracking-wider px-3 py-2 bg-rose-550 hover:bg-rose-600 text-white rounded-xl transition-colors">Browse Articles</button>
+                          <button onClick={() => navigateTo('subscription')} className="text-[10px] font-black uppercase tracking-wider px-3 py-2 bg-zinc-100 dark:bg-zinc-850 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl transition-colors">Premium Membership</button>
+                          <button onClick={() => navigateTo('contact')} className="text-[10px] font-black uppercase tracking-wider px-3 py-2 bg-zinc-100 dark:bg-zinc-850 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl transition-colors">Contact Us</button>
+                        </div>
+                      </div>
+
+                      <p className="text-xs leading-relaxed text-zinc-650 dark:text-zinc-400 text-center pb-2">
+                        Whether you are newly dating, rebuilding after a breakup, decoding a situationship, or deepening a decades-long marriage - Heartsync meets you where you are, with evidence, warmth, and zero judgement.
+                      </p>
                     </>
                   );
                 })()}

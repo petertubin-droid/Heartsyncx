@@ -8639,6 +8639,15 @@ async function handleDynamicHtml(req: Request, res: Response) {
   let canonicalUrl = `${baseUrl}${req.path}`;
   let lang = 'en';
 
+  // Dedicated metadata for the About page: this is the page Google lifts to
+  // describe the whole site, so it gets its own title/description/keywords
+  // instead of the generic homepage defaults.
+  if (req.path.replace(/\/$/, '') === '/about') {
+    seoTitle = 'About Heartsync - Evidence-Based Relationship Advice & Emotional Wellness';
+    seoDesc = 'Heartsync translates attachment theory, Gottman research, and nervous-system science into practical guidance on dating, communication, breakups, self-love, and lasting partnership. Meet our mission and editorial approach.';
+    seoKeywords = 'about heartsync, relationship advice website, attachment theory, gottman method, emotional wellness, dating advice, couples communication, breakup recovery, self love, marriage advice';
+  }
+
   // Support dynamic language query params (e.g. ?lang=es)
   if (req.query.lang && typeof req.query.lang === 'string') {
     const l = req.query.lang.toLowerCase().trim();
@@ -8663,10 +8672,11 @@ async function handleDynamicHtml(req: Request, res: Response) {
       "width": 512,
       "height": 512
     },
-    "description": "Evidence-based couples counseling guidelines and somatic trauma recovery resources.",
+    "description": "Heartsync is a relationship and emotional wellness publication that translates attachment theory, Gottman relationship research, and nervous-system science into practical guidance on dating, communication, breakups, self-love, and long-term partnership.",
     "sameAs": [
       "https://twitter.com/heartsync",
-      "https://facebook.com/heartsync"
+      "https://facebook.com/heartsync",
+      "https://www.tiktok.com/@heartsync12"
     ]
   };
 
@@ -8709,6 +8719,29 @@ async function handleDynamicHtml(req: Request, res: Response) {
     '/ai-copilot': 'AI Guide',
     '/lovevault': 'LoveVault'
   };
+  // AboutPage schema on /about: this feeds Google's Knowledge Panel and
+  // site-description extraction. The mainEntity describes the organization
+  // behind the site so search engines connect the two.
+  if (req.path.replace(/\/$/, '') === '/about') {
+    schemas.push({
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      "@id": `${baseUrl}/about#aboutpage`,
+      "url": `${baseUrl}/about`,
+      "name": "About Heartsync",
+      "description": "Heartsync turns attachment theory, Gottman relationship research, and nervous-system science into practical, readable guidance for dating, communication, breakups, self-love, and long-term partnership.",
+      "mainEntity": { "@id": `${baseUrl}/#organization` },
+      "isPartOf": { "@id": `${baseUrl}/#website` },
+      "breadcrumb": {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": `${baseUrl}/` },
+          { "@type": "ListItem", "position": 2, "name": "About", "item": `${baseUrl}/about` }
+        ]
+      }
+    });
+  }
+
   const staticLabel = STATIC_PAGE_LABELS[req.path.replace(/\/$/, '')];
   if (staticLabel && req.path !== '/') {
     schemas.push({
@@ -9127,6 +9160,24 @@ async function handleDynamicHtml(req: Request, res: Response) {
   if (post && post.content && req.path.startsWith('/article/')) {
     const noscriptHtml = `<noscript>${markdownToPlainHtml(String(post.content), post.title || seoTitle)}</noscript>`;
     html = html.replace(/<body([^>]*)>/i, `<body$1>${noscriptHtml}`);
+  }
+
+  // Server-rendered About page text for non-JavaScript agents. Google and
+  // AI answer engines fetch the raw HTML, so the About content that
+  // describes the whole site must exist here, not only in the React tree.
+  if (req.path.replace(/\/$/, '') === '/about') {
+    const aboutNoscript = `<noscript><main><h1>About Heartsync</h1>
+<p>Heartsync is a relationship and emotional wellness publication that translates the science of human connection - attachment theory, the Gottman method of couples research, and nervous-system co-regulation - into practical, readable guidance for real life.</p>
+<h2>Our Mission</h2>
+<p>Modern dating apps gamify connection into instant judgements, leaving people with relationship anxiety, defense patterns, and decision overload. Heartsync exists to slow that down: we turn expert psychology into clear, actionable essays that help you understand your own relational landscape and build connected, lasting love.</p>
+<h2>What We Cover</h2>
+<p>Our library is organized around ten practical themes: Dating, Relationships, Love &amp; Emotions, Situationships, Breakups &amp; Healing, Communication, Red Flags, Self Love &amp; Growth, Marriage &amp; Long Term Love, and Questions &amp; Advice. Every article draws on established research - Bowlby's attachment styles, the Gottmans' communication parameters, and somatic grounding techniques - and explains it in plain, honest language.</p>
+<h2>How We Work</h2>
+<p>Heartsync is an independent publication. Articles are written and reviewed against published relationship science, never invented studies or fake experts. We fund the site through unobtrusive advertising and an optional premium membership, so the core guidance stays free for every reader.</p>
+<h2>For Every Reader</h2>
+<p>Whether you are newly dating, rebuilding after a breakup, decoding a situationship, or deepening a decades-long marriage, Heartsync meets you where you are - with evidence, warmth, and zero judgement.</p>
+</main></noscript>`;
+    html = html.replace(/<body([^>]*)>/i, `<body$1>${aboutNoscript}`);
   }
 
   // Formulate dynamic search crawler and social indexing compliance meta tag layout
