@@ -790,25 +790,35 @@ activeArticle, articleBody, headings, markdownComponents, siteSettings, navigate
                                       </button>
                                     </div>
 
-                                    {/* WATCH SPONSOR AD OPTION */}
-                                    <div className="pt-1 border-t border-dashed border-zinc-200 dark:border-zinc-800 mt-2">
-                                      <span className="text-[10px] text-zinc-400 block mb-1">FREE TEMPORARY ACCESS:</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setAdTarget({ type: 'article', id: activeArticle.id, title: activeArticle.title });
-                                          setAdSecondsLeft(15);
-                                          setAdStep('intro');
-                                        }}
-                                        className="w-full text-left p-2.5 rounded-xl border border-dashed border-rose-300 dark:border-rose-900/50 hover:bg-rose-50/10 hover:border-rose-500 transition-all text-[11px] text-rose-600 dark:text-rose-400 font-bold flex items-center justify-between cursor-pointer bg-rose-50/5"
-                                      >
-                                        <span className="flex items-center gap-1.5">
-                                          <Play className="w-3 h-3 fill-current" />
-                                          Watch Ad to Unlock for 3 Hrs
-                                        </span>
-                                        <span className="bg-rose-105 dark:bg-rose-955/40 px-1.5 py-0.5 rounded text-[8.5px] font-mono">15 Secs</span>
-                                      </button>
-                                    </div>
+                                    {/* WATCH SPONSOR AD OPTION — only for articles configured as ad-unlockable in the editor */}
+                                    {(() => {
+                                      const adUnlockTypes = ['watch_ad', 'ad_unlock', 'premium_and_ad'];
+                                      const accessType = (activeArticle.premium_access_type || (activeArticle.is_premium ? 'subscribers_only' : 'free')) as string;
+                                      if (!adUnlockTypes.includes(accessType)) return null;
+                                      const rawDur = activeArticle.unlock_duration as string | number | undefined;
+                                      const hrs = typeof rawDur === 'number' && rawDur > 0 ? rawDur : 3;
+                                      const durLabel = hrs >= 1 ? `${hrs} Hr${hrs === 1 ? '' : 's'}` : `${Math.round(hrs * 60)} Mins`;
+                                      return (
+                                        <div className="pt-1 border-t border-dashed border-zinc-200 dark:border-zinc-800 mt-2">
+                                          <span className="text-[10px] text-zinc-400 block mb-1">FREE TEMPORARY ACCESS:</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setAdTarget({ type: 'article', id: activeArticle.id, title: activeArticle.title });
+                                              setAdSecondsLeft(15);
+                                              setAdStep('intro');
+                                            }}
+                                            className="w-full text-left p-2.5 rounded-xl border border-dashed border-rose-300 dark:border-rose-900/50 hover:bg-rose-50/10 hover:border-rose-500 transition-all text-[11px] text-rose-600 dark:text-rose-400 font-bold flex items-center justify-between cursor-pointer bg-rose-50/5"
+                                          >
+                                            <span className="flex items-center gap-1.5">
+                                              <Play className="w-3 h-3 fill-current" />
+                                              Watch Ad to Unlock for {durLabel}
+                                            </span>
+                                            <span className="bg-rose-105 dark:bg-rose-955/40 px-1.5 py-0.5 rounded text-[8.5px] font-mono">15 Secs</span>
+                                          </button>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
 
                                   {/* Right: Payment Gateways & Secure Form */}

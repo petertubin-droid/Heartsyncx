@@ -82,7 +82,7 @@ export interface Post {
   access_level?: 'free' | 'premium' | 'gold' | 'platinum';
   publish_at?: string;
   tts_enabled?: boolean;
-  premium_access_type?: 'free' | 'subscribers_only' | 'watch_ad' | 'premium_and_ad' | 'scheduled_premium' | 'members_only';
+  premium_access_type?: 'free' | 'subscribers_only' | 'watch_ad' | 'premium_and_ad' | 'scheduled_premium' | 'members_only' | 'ad_unlock' | 'coins' | 'subscription';
   unlock_duration?: string | number;
   ad_provider?: string;
   daily_unlock_limit?: number;

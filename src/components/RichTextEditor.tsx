@@ -1115,10 +1115,10 @@ export default function RichTextEditor({ post, isEditMode = !!post, categories =
                     onChange={(e) => setPremiumAccessType(e.target.value as any)}
                     className="w-full p-2.5 bg-zinc-50/50 dark:bg-zinc-850 border dark:border-zinc-800 rounded-xl focus:outline-none"
                   >
-                    <option value="free">🔓 Open Teaser with Ad Unlock</option>
-                    <option value="coins">🪙 Coins/Individual Purchase</option>
-                    <option value="subscription">👑 Elite Circle Subscription Only</option>
-                    <option value="ad_unlock">📺 Watch Ad Video to Unlock</option>
+                    <option value="free">🔓 Fully Open (No Paywall)</option>
+                    <option value="coins">🪙 One-Time Purchase Only</option>
+                    <option value="subscription">👑 Subscribers Only</option>
+                    <option value="ad_unlock">📺 Unlockable by Watching Ad</option>
                   </select>
                 </div>
 

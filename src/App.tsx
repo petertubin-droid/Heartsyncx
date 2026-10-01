@@ -648,6 +648,7 @@ export default function App() {
           isLocked = !isSubscribed;
           break;
         case 'watch_ad':
+        case 'ad_unlock':
           isLocked = !isSubscribed;
           break;
         case 'premium_and_ad':
@@ -2057,7 +2058,11 @@ export default function App() {
                     const rawDuration = adTarget.type === 'article'
                       ? ((publishedArticles.find(p => p.id === adTarget.id) || posts.find(p => p.id === adTarget.id))?.unlock_duration || siteSettings.rewarded_access_default_duration || '30m')
                       : (siteSettings.rewarded_access_default_duration || '30m');
-                    switch (rawDuration) {
+                    if (typeof rawDuration === 'number' && rawDuration > 0) {
+                      // Editor saves unlock_duration as hours (e.g. 24)
+                      durationHours = rawDuration;
+                      durationText = rawDuration >= 1 ? `${rawDuration} hour${rawDuration === 1 ? '' : 's'}` : `${Math.round(rawDuration * 60)} minutes`;
+                    } else switch (rawDuration) {
                       case '10m': durationHours = 10 / 60; durationText = '10 minutes'; break;
                       case '15m': durationHours = 15 / 60; durationText = '15 minutes'; break;
                       case '30m': durationHours = 30 / 60; durationText = '30 minutes'; break;

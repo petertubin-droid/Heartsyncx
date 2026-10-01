@@ -3931,6 +3931,22 @@ export default function AdminConsole({
                                     >
                                       {post.is_premium ? '👑 PREMIUM' : 'FREE'}
                                     </button>
+                                    {post.is_premium && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const isAdUnlockable = ['ad_unlock', 'watch_ad', 'premium_and_ad'].includes(post.premium_access_type as string);
+                                          const updatedPost = { ...post, premium_access_type: (isAdUnlockable ? 'subscribers_only' : 'ad_unlock') as any };
+                                          heartsync.updatePost(post.id, updatedPost);
+                                          triggerToast(`Article '${post.title}' is now ${isAdUnlockable ? 'subscribers-only' : 'unlockable by watching an ad'}`);
+                                        }}
+                                        title="Toggle watch-ad unlock access"
+                                        className={`text-[8px] font-mono uppercase font-black px-1.5 py-0.5 rounded transition-all cursor-pointer ${['ad_unlock', 'watch_ad', 'premium_and_ad'].includes(post.premium_access_type as string) ? 'bg-sky-500 text-white font-bold hover:bg-sky-600' : 'bg-zinc-100 text-zinc-650 hover:bg-zinc-200 dark:bg-zinc-850 dark:text-zinc-400'}`}
+                                      >
+                                        {['ad_unlock', 'watch_ad', 'premium_and_ad'].includes(post.premium_access_type as string) ? '📺 AD UNLOCK' : 'AD OFF'}
+                                      </button>
+                                    )}
                                   </div>
                                   <span className="text-[10px] text-zinc-400 block truncate">/article/{post.slug}</span>
                                 </div>
