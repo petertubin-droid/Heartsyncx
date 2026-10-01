@@ -633,6 +633,41 @@ const setLocalStorage = <T>(key: string, value: T): void => {
   }
 };
 
+/**
+ * Normalize raw `plans` table rows into the app-facing Plan shape.
+ *
+ * The Supabase `plans` table stores a single `price` + `billing_cycle`
+ * column (no price_monthly/price_yearly), while the whole app (Plan type,
+ * SubscriptionPage, AnalyticsPanel, AdminConsole) works with
+ * price_monthly/price_yearly. Rows arriving straight from the database
+ * therefore have undefined price fields, which previously rendered the
+ * membership page as $0.00 for every tier. This mapping derives the
+ * monthly/yearly pair from `price` following the site's own convention
+ * (yearly = monthly x 10, as in DEFAULT_PLANS) and keeps `price` in sync
+ * so the server-side upsert writes the same number back.
+ */
+export const normalizeDbPlans = (raw: any[]): Plan[] =>
+  raw.map((p: any): Plan => {
+    const price = Number(p.price);
+    const isYearlyRow = p.billing_cycle === 'yearly';
+    const monthlyFromPrice = Number.isFinite(price) && price > 0
+      ? (isYearlyRow ? Number((price / 10).toFixed(2)) : price)
+      : 0;
+    const priceMonthly = Number(p.price_monthly) > 0 ? Number(p.price_monthly) : monthlyFromPrice;
+    const priceYearly = Number(p.price_yearly) > 0
+      ? Number(p.price_yearly)
+      : (isYearlyRow && Number.isFinite(price) && price > 0
+          ? price // yearly-billed row: price IS the yearly amount
+          : (priceMonthly > 0 ? Number((priceMonthly * 10).toFixed(2)) : 0));
+    return {
+      ...p,
+      price_monthly: priceMonthly,
+      price_yearly: priceYearly,
+      price: priceMonthly, // canonical monthly number for the server upsert
+      features: Array.isArray(p.features) ? p.features : []
+    };
+  });
+
 const DEFAULT_PLANS: Plan[] = [
   {
     id: 'plan-premium',
@@ -1574,7 +1609,7 @@ export class HeartsyncStore {
       // 6b. Fetch Active Plans, Subscriptions, Payments, and Outreach Campaigns from Supabase
       try {
         const { data: plansData } = await this.supabase.from('plans').select('*');
-        if (plansData && Array.isArray(plansData)) this.plans = plansData;
+        if (plansData && Array.isArray(plansData)) this.plans = normalizeDbPlans(plansData);
       } catch (_) {}
 
       try {
@@ -2004,7 +2039,7 @@ export class HeartsyncStore {
           if (data.media_library) this.media_library = data.media_library;
           if (data.authors) this.authors = data.authors;
           if (data.pages) this.pages = data.pages;
-          if (data.plans) this.plans = data.plans;
+          if (data.plans && Array.isArray(data.plans)) this.plans = normalizeDbPlans(data.plans);
           if (data.subscriptions) this.subscriptions = data.subscriptions;
           if (data.payments) this.payments = data.payments;
           if (data.all_users) this.all_users = data.all_users;

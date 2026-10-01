@@ -4797,9 +4797,12 @@ async function syncStateToSupabase(newState: any, dbClient?: any, opts: { reader
             id: toDbUUID(pl.id) || pl.id,
             name: pl.name,
             description: pl.description || '',
-            price: Number(pl.price || pl.price_monthly) || 0,
+            // price_monthly is the canonical editable field (AdminConsole
+            // membership tier editor); a stale `price` must never win.
+            price: Number(pl.price_monthly) || Number(pl.price) || 0,
             interval: pl.interval || 'month',
-            billing_cycle: pl.billing_cycle || pl.interval || 'monthly'
+            billing_cycle: pl.billing_cycle || pl.interval || 'monthly',
+            features: Array.isArray(pl.features) ? pl.features : []
           }))
         );
       } catch (e: any) { console.warn('Supabase plans sync warning:', e.message); }
@@ -5506,7 +5509,7 @@ async function _legacySqlSyncBypass() {
           p.id,
           p.name,
           p.description || '',
-          Number(p.price) || 0,
+          Number(p.price_monthly) || Number(p.price) || 0,
           p.interval || 'month',
           JSON.stringify(Array.isArray(p.features) ? p.features : [])
         ]);

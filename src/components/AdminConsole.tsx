@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { heartsync } from '../store';
+import MembershipPlansEditor from './MembershipPlansEditor';
 import { LOADER_STYLE_OPTIONS, LoaderVariantStyle } from './LoadingSystem';
 
 // Attach the current admin session to privileged API calls.
@@ -14086,48 +14087,7 @@ export default function AdminConsole({
                     </div>
 
                     {/* SubTab 1: Membership Tiers */}
-                    {billingSubTab === 'plans' && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                          {[
-                            { name: 'Free Reader', price: '$0', period: 'forever', status: 'Active', planId: 'plan-free', features: ['Access to 5 free articles/month', 'Basic newsletter issues', 'Community comments access'] },
-                            { name: 'Premium Attuner', price: '$14.99', period: 'per month', status: 'Active', planId: 'plan-attuner', features: ['Unlimited article reading', 'Audio voice narrations (TTS)', 'Interactive diagnostic quizzes', 'Weekly intimacy guides'] },
-                            { name: 'Couples Sanctuary', price: '$29.99', period: 'per month', status: 'Active', planId: 'plan-couples', features: ['Dual-account couples pass', '24/7 Live Support Chat priority', 'Free access to all E-Book guides', 'Guided audio soundscapes'] },
-                            { name: 'Lifetime VIP Pass', price: '$199.00', period: 'one-time', status: 'Active', planId: 'plan-vip', features: ['Lifetime unlimited access', 'All future digital product downloads', 'VIP Clinical Q&A webinars', 'Dedicated relationship concierges'] }
-                          ].map((plan, idx) => (
-                            <div key={idx} className="p-5 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/30 dark:bg-zinc-950/30 space-y-3 relative">
-                              <div className="flex justify-between items-center">
-                                <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{plan.name}</span>
-                                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 uppercase">
-                                  {plan.status}
-                                </span>
-                              </div>
-                              <div className="flex items-baseline gap-1">
-                                <span className="font-serif text-2xl font-black text-rose-600 dark:text-rose-400">{plan.price}</span>
-                                <span className="text-[10px] text-zinc-400 font-mono">/ {plan.period}</span>
-                              </div>
-                              <div className="text-[10px] text-zinc-500">
-                                <strong>{(heartsync.subscriptions || []).filter((s: any) => s.plan_id === plan.planId || s.plan_name === plan.name).length}</strong> active subscribers
-                              </div>
-                              <div className="pt-2 border-t space-y-1">
-                                {plan.features.map((f, fIdx) => (
-                                  <div key={fIdx} className="text-[10px] text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
-                                    <span>{f}</span>
-                                  </div>
-                                ))}
-                              </div>
-                              <button
-                                onClick={() => triggerToast(`Configuring pricing and feature gates for ${plan.name}`)}
-                                className="w-full mt-2 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold text-[10px] text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
-                              >
-                                Edit Tier Parameters
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {billingSubTab === 'plans' && <MembershipPlansEditor />}
 
                     {/* SubTab 2: Digital E-Books & Worksheets */}
                     {billingSubTab === 'digital_products' && (
