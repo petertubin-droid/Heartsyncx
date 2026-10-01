@@ -8155,6 +8155,10 @@ app.get('/google9904a5acdaa0b412.html', (req: Request, res: Response) => {
 
 // 1b. ads.txt  - required for AdSense serving. Serves the real publisher id
 // once configured in Monetization settings; an honest comment until then.
+// The site's own AdSense publisher id (digits only) - the last-resort
+// fallback for the dynamic route so ads.txt is ALWAYS valid, matching the
+// static public/ads.txt line AdSense reviews against.
+const ADSENSE_FALLBACK_PUB_ID = '3404100134534192';
 app.get('/ads.txt', async (req: Request, res: Response) => {
   res.type('text/plain');
   try {
@@ -8171,11 +8175,16 @@ app.get('/ads.txt', async (req: Request, res: Response) => {
     if (!pubId && typeof process.env.VITE_ADSENSE_PUBLISHER_ID === 'string') {
       pubId = process.env.VITE_ADSENSE_PUBLISHER_ID.trim();
     }
-    if (/^ca-pub-\d{10,}$/.test(pubId)) {
-      res.send(`google.com, ${pubId.replace('ca-pub-', 'pub-')}, DIRECT, f08c47fec0942fa0\n`);
-    } else {
-      res.send('# ads.txt will publish the Google AdSense line once the publisher ID is configured in Monetization settings.\n');
-    }
+    // Normalize whatever shape the admin saved (ca-pub-…, pub-…, bare
+    // digits) and finally fall back to the site's own publisher id, so
+    // this route can never serve the empty stub while the static
+    // public/ads.txt carries the real line - a mismatch like that is
+    // exactly what an AdSense review rejects.
+    const digits = String(pubId || '').replace(/^(ca-)?pub-/i, '').replace(/\D/g, '');
+    const resolved = (digits.length >= 10 && digits.length <= 20)
+      ? digits
+      : ADSENSE_FALLBACK_PUB_ID;
+    res.send(`google.com, pub-${resolved}, DIRECT, f08c47fec0942fa0\n`);
   } catch {
     res.send('# ads.txt unavailable.\n');
   }

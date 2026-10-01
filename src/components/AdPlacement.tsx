@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { heartsync } from '../store';
 import { useCookieConsent } from './useCookieConsent';
+import { normalizeAdsensePublisherId } from '../utils/publisherId';
 
 export interface AdPlacementProps {
   slot: 'header' | 'sidebar' | 'in_article' | 'footer' | 'homepage' | 'article_bottom';
@@ -304,9 +305,8 @@ function trackSponsorClick(campaignId: string): void {
 }
 
 function resolvePublisherId(): string | null {
-  const candidate = str(settings().adsense_client_id) || (import.meta.env.VITE_ADSENSE_PUBLISHER_ID as string) || '';
-  if (!/^ca-pub-\d{10,}$/.test(candidate)) return null; // honest absence until a real publisher id exists
-  return candidate;
+  // Accepts ca-pub-…, pub-… and bare-digit forms; returns null when absent.
+  return normalizeAdsensePublisherId(str(settings().adsense_client_id) || (import.meta.env.VITE_ADSENSE_PUBLISHER_ID as string) || '');
 }
 
 function ensureAdsenseLibrary(publisherId: string): void {

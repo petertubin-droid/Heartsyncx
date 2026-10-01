@@ -1,3 +1,4 @@
+import { normalizeAdsensePublisherId } from '../utils/publisherId';
 import React, { useState } from 'react';
 import { heartsync } from '../store';
 import { adsterraDomainFromUrlField, normalizeAdsterraUnit, type AdsterraUnitRef } from './AdPlacement';
@@ -56,7 +57,7 @@ function resolveSlotProvider(slot: SlotFamily): ResolvedProvider {
   const s = settings();
   const adsenseActive = s.adsense_active !== false;
   const adsenseSlotId = str(s[`adsense_slot_${slot}`]);
-  const publisherId = str(s.adsense_client_id);
+  const publisherId = normalizeAdsensePublisherId(str(s.adsense_client_id)) || '';
   if (adsenseActive && /^ca-pub-\d{10,}$/.test(publisherId) && /^\d{9,16}$/.test(adsenseSlotId)) {
     return { provider: 'adsense', label: `AdSense slot ${adsenseSlotId}`, probeUrl: null };
   }
