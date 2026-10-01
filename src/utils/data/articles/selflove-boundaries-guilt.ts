@@ -68,7 +68,7 @@ The goal of all this is a quiet, almost anticlimactic state that people who grew
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-selflove-growth',
+    category_id: 'cat-self-love-growth',
     author_id: '',
     tags: ['Boundaries', 'Guilt', 'Self-Respect', 'Family Dynamics'],
     likes: 0,

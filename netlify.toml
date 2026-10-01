@@ -74,6 +74,90 @@
   to = "/.netlify/functions/api/:splat"
   status = 200
 
+
+# Legacy category slugs (pre-October 2026 taxonomy) -> new categories.
+# 301 so search engines and old inbound links land on the new pages.
+[[redirects]]
+  from = "/category/love-relationships"
+  to = "/category/relationships"
+  status = 301
+[[redirects]]
+  from = "/category/relationship-science"
+  to = "/category/relationships"
+  status = 301
+[[redirects]]
+  from = "/category/family-parenting"
+  to = "/category/relationships"
+  status = 301
+[[redirects]]
+  from = "/category/dating-romance"
+  to = "/category/dating"
+  status = 301
+[[redirects]]
+  from = "/category/mindful-dating"
+  to = "/category/dating"
+  status = 301
+[[redirects]]
+  from = "/category/dating-tips"
+  to = "/category/dating"
+  status = 301
+[[redirects]]
+  from = "/category/emotional-wellness"
+  to = "/category/love-emotions"
+  status = 301
+[[redirects]]
+  from = "/category/somatic-healing"
+  to = "/category/love-emotions"
+  status = 301
+[[redirects]]
+  from = "/category/secure-intimacy"
+  to = "/category/love-emotions"
+  status = 301
+[[redirects]]
+  from = "/category/intimacy-romance"
+  to = "/category/love-emotions"
+  status = 301
+[[redirects]]
+  from = "/category/love-psychology"
+  to = "/category/love-emotions"
+  status = 301
+[[redirects]]
+  from = "/category/communication-emotional-connection"
+  to = "/category/communication"
+  status = 301
+[[redirects]]
+  from = "/category/conscious-communication"
+  to = "/category/communication"
+  status = 301
+[[redirects]]
+  from = "/category/relationship-problems-breakups"
+  to = "/category/breakups-healing"
+  status = 301
+[[redirects]]
+  from = "/category/marriage-commitment"
+  to = "/category/marriage-long-term-love"
+  status = 301
+[[redirects]]
+  from = "/category/self-love-personal-growth"
+  to = "/category/self-love-growth"
+  status = 301
+[[redirects]]
+  from = "/category/self-growth"
+  to = "/category/self-love-growth"
+  status = 301
+[[redirects]]
+  from = "/category/personal-growth"
+  to = "/category/self-love-growth"
+  status = 301
+[[redirects]]
+  from = "/category/inner-work"
+  to = "/category/self-love-growth"
+  status = 301
+[[redirects]]
+  from = "/category/red-flags-toxic-relationships"
+  to = "/category/red-flags"
+  status = 301
+
 [[redirects]]
   from = "/category/*"
   to = "/.netlify/functions/api/:splat"

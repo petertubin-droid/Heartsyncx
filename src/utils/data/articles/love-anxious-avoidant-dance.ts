@@ -78,7 +78,7 @@ The couples who exit this loop do not exit it by becoming different people. The 
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1519823551274-5f0d0d1a0f0f?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-love-relationships',
+    category_id: 'cat-love-emotions',
     author_id: '',
     tags: ['Attachment Styles', 'Conflict Patterns', 'Pursue-Withdraw', 'Relationship Science'],
     likes: 0,

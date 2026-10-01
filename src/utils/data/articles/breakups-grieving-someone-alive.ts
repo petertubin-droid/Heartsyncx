@@ -58,7 +58,7 @@ Ambiguous grief does not end the way death-grief slowly does, and anyone selling
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1519824145371-9bfc7bd1e371?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-problems-breakups',
+    category_id: 'cat-breakups-healing',
     author_id: '',
     tags: ['Grief', 'Ambiguous Loss', 'Estrangement', 'Healing'],
     likes: 0,

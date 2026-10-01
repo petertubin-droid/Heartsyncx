@@ -66,7 +66,7 @@ Tonight there will be somewhere between five and twenty bids in your house: from
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1516727196504-6d7f4dcbc0de?auto=format&fit=crop&q=80&w=1200',
     read_time: 10,
-    category_id: 'cat-comm-connection',
+    category_id: 'cat-communication',
     author_id: '',
     tags: ['Connection', 'Gottman', 'Bids', 'Intimacy', 'Daily Habits'],
     likes: 0,

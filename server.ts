@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { getArticleSeoData } from './src/utils/seoArticleData.js';
+import { migrateCategoriesDb } from './src/lib/categoryMigration.js';
 import { HEARTSYNC_ARTICLE_SEO, HEARTSYNC_ARTICLES } from './src/utils/data/articles/index.js';
 import { cleanConfigValue, createSupabaseClient, isValidSupabaseConfig, isServiceRoleKey } from './src/lib/supabaseConfig.js';
 import { resolveHasAdmins, shouldBlockSetupRegister } from './src/lib/setupPresence.js';
@@ -4077,7 +4078,37 @@ const POST_LIST_COLUMNS = [
   'seo_keywords','is_premium','created_at','updated_at','is_featured','reading_time'
 ];
 
+// ===========================================================================
+// CATEGORY TAXONOMY MIGRATION (October 2026)
+// One-time-per-instance reshuffle of every post into the new ten-category
+// taxonomy (src/lib/categoryMigration.ts). Tries the service-role client
+// first, then the plain client; an admin session passed from
+// POST /api/state also works. Repeat runs are read-only no-ops.
+// ===========================================================================
+let categoryMigrationDone = false;
+let categoryMigrationAttempts = 0;
+
+export async function ensureCategoryMigration(dbClient?: any) {
+  if (categoryMigrationDone || categoryMigrationAttempts >= 3) return;
+  const client = dbClient || getServiceRoleSupabase() || getSupabaseClient();
+  if (!client) return;
+  categoryMigrationAttempts++;
+  try {
+    const result = await migrateCategoriesDb(client);
+    categoryMigrationDone = true;
+    if (result.postsReassigned > 0 || result.legacyCategoriesDeleted > 0) {
+      console.log(`🔄 Category taxonomy migration complete: ${result.postsReassigned} posts reassigned, ${result.legacyCategoriesDeleted} legacy categories removed.`);
+      // Drop any state cached before the reshuffle so /api/state serves the new taxonomy
+      serverCacheState = null;
+      lastSupabaseFetchTime = 0;
+    }
+  } catch (err: any) {
+    console.warn('⚠️ Category migration attempt failed (will retry on next trigger):', err?.message || err);
+  }
+}
+
 async function loadStateFromSupabase(): Promise<any> {
+  await ensureCategoryMigration();
   const supabase = getSupabaseClient();
   if (!supabase) {
     console.log('⚡ Supabase client is not initialized yet or config is invalid. Skipping server-side Supabase state load.');
@@ -7295,6 +7326,9 @@ app.post('/api/state', adminAuthMiddleware, async (req: Request, res: Response) 
     // comments, newsletter signups) which get restricted merges; anything
     // else is an admin save merged per-key.
     const readerSave = (req.headers['x-save-mode'] || '') === 'reader';
+    // Any admin save is a chance to finish the category reshuffle if the
+    // service-role client is unavailable on this instance.
+    await ensureCategoryMigration(getAdminDbClient(req));
     await saveServerCacheState(newState, getAdminDbClient(req), { reader: readerSave });
     res.json({ success: true, message: 'State synchronized successfully with backend and database.' });
   } catch (err: any) {

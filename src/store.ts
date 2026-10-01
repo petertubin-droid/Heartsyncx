@@ -26,31 +26,11 @@ import { expandAllArticles, expandArticleContent } from './utils/articleExpander
 import { MORE_CATEGORIES, MORE_POSTS } from './utils/data/moreArticles';
 import { syncBookmarksWithSW, uncacheArticleFromSW } from './utils/offlineCache';
 
+// Category taxonomy (October 2026) - shared with server.ts boot migration
+import { mapCategoryIdToNew, NEW_CATEGORIES as CURRENT_CATEGORIES } from './lib/categoryMigration';
+export { mapCategoryIdToNew };
+
 // Seed data
-/**
- * Smartly maps any historical, deleted, or unaligned category ID to one of the ten premium niches
- */
-export function mapCategoryIdToNew(oldCatId: string, title?: string, tags?: string[]): string {
-  if (!oldCatId) return 'cat-love-relationships';
-  const normOld = oldCatId.toLowerCase();
-  
-  if (['cat-love-relationships', 'love-relationships', 'cat-relationship', 'relationship-advice'].includes(normOld)) return 'cat-love-relationships';
-  if (['cat-dating-romance', 'dating-romance', 'cat-dating', 'dating-tips'].includes(normOld)) return 'cat-dating-romance';
-  if (['cat-comm-connection', 'communication-emotional-connection', 'cat-communication', 'communication'].includes(normOld)) return 'cat-comm-connection';
-  if (['cat-problems-breakups', 'relationship-problems-breakups', 'cat-breakups', 'cat-redflags'].includes(normOld)) return 'cat-problems-breakups';
-  if (['cat-selflove-growth', 'self-love-personal-growth', 'cat-growth'].includes(normOld)) return 'cat-selflove-growth';
-
-  const t = (title || '').toLowerCase();
-  const tg = (tags || []).map(x => x.toLowerCase());
-
-  if (t.includes('date') || t.includes('dating') || tg.includes('dating') || normOld.includes('dating')) return 'cat-dating-romance';
-  if (t.includes('comm') || t.includes('listen') || t.includes('speak') || normOld.includes('comm')) return 'cat-comm-connection';
-  if (t.includes('breakup') || t.includes('problem') || t.includes('grief') || normOld.includes('breakup')) return 'cat-problems-breakups';
-  if (t.includes('self') || t.includes('growth') || normOld.includes('self')) return 'cat-selflove-growth';
-
-  return 'cat-love-relationships';
-}
-
 const DEFAULT_CATEGORIES: Category[] = MORE_CATEGORIES;
 
 const DEFAULT_POSTS: Post[] = MORE_POSTS;
@@ -214,10 +194,10 @@ export const DEFAULT_SETTINGS: SiteSettings = {
       id: 'footer-sec-topics',
       title: 'Topics',
       links: [
-        { label: 'Emotional Wellness', tab: 'category', arg: 'emotional-wellness' },
-        { label: 'Relationship Science', tab: 'category', arg: 'relationship-science' },
-        { label: 'Mindful Dating', tab: 'category', arg: 'mindful-dating' },
-        { label: 'Self Growth', tab: 'category', arg: 'self-growth' }
+        { label: 'Dating', tab: 'category', arg: 'dating' },
+        { label: 'Love & Emotions', tab: 'category', arg: 'love-emotions' },
+        { label: 'Red Flags', tab: 'category', arg: 'red-flags' },
+        { label: 'Self Love & Growth', tab: 'category', arg: 'self-love-growth' }
       ],
       is_active: true
     },
@@ -1272,18 +1252,7 @@ export class HeartsyncStore {
     try {
       console.log('🔄 Starting automated relationship advice niche validation & DB repair...');
       
-      const NICHES = [
-        { id: 'cat-dating', name: 'Dating Tips', slug: 'dating-tips', description: 'Advice for dating, first dates, online dating, attraction, and finding partners.', color: '#EC4899', icon: 'Flame' },
-        { id: 'cat-relationship', name: 'Relationship Advice', slug: 'relationship-advice', description: 'Guidance for building healthy and successful relationships.', color: '#F43F5E', icon: 'Heart' },
-        { id: 'cat-communication', name: 'Communication', slug: 'communication', description: 'Communication skills, conflict resolution, emotional intelligence, and partnership dialogue.', color: '#3B82F6', icon: 'MessageSquare' },
-        { id: 'cat-redflags', name: 'Red Flags & Toxic Relationships', slug: 'red-flags-toxic-relationships', description: 'Recognizing unhealthy behaviors, manipulation, toxicity, and warning signs.', color: '#EF4444', icon: 'HeartCrack' },
-        { id: 'cat-breakups', name: 'Breakups & Healing', slug: 'breakups-healing', description: 'Heartbreak recovery, emotional healing, moving on, and self-recovery.', color: '#8B5CF6', icon: 'Activity' },
-        { id: 'cat-marriage', name: 'Marriage & Commitment', slug: 'marriage-commitment', description: 'Marriage advice, engagement, commitment, long-term partnerships, and family building.', color: '#06B6D4', icon: 'ShieldCheck' },
-        { id: 'cat-intimacy', name: 'Intimacy & Romance', slug: 'intimacy-romance', description: 'Romantic connection, affection, love languages, intimacy, and relationship bonding.', color: '#10B981', icon: 'Flame' },
-        { id: 'cat-growth', name: 'Personal Growth', slug: 'personal-growth', description: 'Self-improvement, confidence, self-love, emotional wellness, and personal development.', color: '#F59E0B', icon: 'TrendingUp' },
-        { id: 'cat-family', name: 'Family & Parenting', slug: 'family-parenting', description: 'Parenting, co-parenting, blended families, and family relationships.', color: '#14B8A6', icon: 'Users' },
-        { id: 'cat-psychology', name: 'Love Psychology', slug: 'love-psychology', description: 'Attachment styles, attraction psychology, relationship science, and emotional behavior.', color: '#6366F1', icon: 'Brain' }
-      ];
+      const NICHES = CURRENT_CATEGORIES;
 
       // 1. Ensure our 10 correct categories exist in Supabase
       for (const niche of NICHES) {

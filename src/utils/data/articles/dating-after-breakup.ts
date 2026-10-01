@@ -68,7 +68,7 @@ One last reframe, for the pressure you may be feeling: dating again is not the f
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-dating-romance',
+    category_id: 'cat-dating',
     author_id: '',
     tags: ['Dating Again', 'Healing', 'Readiness', 'Rebound'],
     likes: 0,

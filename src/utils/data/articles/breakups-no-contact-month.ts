@@ -72,7 +72,7 @@ Thirty days is not a magic number. But it is long enough for your nervous system
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1474418392105-17e67b8d7d5c?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-problems-breakups',
+    category_id: 'cat-breakups-healing',
     author_id: '',
     tags: ['Breakups', 'No Contact', 'Recovery', 'Heartbreak', 'Healing'],
     likes: 0,

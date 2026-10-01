@@ -72,7 +72,7 @@ The five love languages will likely be remembered as the relationship idea of it
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1519671482749-fd09be7cce0d?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-love-relationships',
+    category_id: 'cat-love-emotions',
     author_id: '',
     tags: ['Love Languages', 'Relationship Research', 'Affection', 'Critical Thinking'],
     likes: 0,

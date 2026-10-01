@@ -74,7 +74,7 @@ The math of the research is ultimately kind. It says you do not need a conflict-
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1516726817505-f5ed825624d8?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-comm-connection',
+    category_id: 'cat-communication',
     author_id: '',
     tags: ['Communication', 'Conflict', 'Repair', 'Gottman', 'Connection'],
     likes: 0,

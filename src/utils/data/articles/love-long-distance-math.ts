@@ -60,7 +60,7 @@ A long-distance relationship is not a sturdier or flimsier thing than a proximat
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1516035069057-33b94c8f0f6f?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-love-relationships',
+    category_id: 'cat-marriage',
     author_id: '',
     tags: ['Long Distance', 'Relationship Research', 'Planning', 'Commitment'],
     likes: 0,

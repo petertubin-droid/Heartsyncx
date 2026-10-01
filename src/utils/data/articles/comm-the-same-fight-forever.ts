@@ -60,7 +60,7 @@ You will have this fight again. The only real choice is what kind of conversatio
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-comm-connection',
+    category_id: 'cat-communication',
     author_id: '',
     tags: ['Perpetual Problems', 'Conflict', 'Gridlock', 'Dreams Within Conflict', 'Repair'],
     likes: 0,

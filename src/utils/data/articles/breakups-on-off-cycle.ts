@@ -70,7 +70,7 @@ To end honestly: on-off is not always pathology. A small share of these couples 
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1476234251651-f353803a632d?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-problems-breakups',
+    category_id: 'cat-situationships',
     author_id: '',
     tags: ['Breakups', 'Cyclical Relationships', 'Reconciliation', 'Attachment'],
     likes: 0,

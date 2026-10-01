@@ -78,7 +78,7 @@ You get there by remembering, through every one of the hundred small negotiation
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1489980705665-1b675e2b2f0f?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-problems-breakups',
+    category_id: 'cat-breakups-healing',
     author_id: '',
     tags: ['Breakups', 'Practical', 'Moving Out', 'Shared Lives'],
     likes: 0,

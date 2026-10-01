@@ -84,7 +84,7 @@ Look at your own household tonight and ask one question, out loud, with genuine 
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1484717023004-89ff969fcdc4?auto=format&fit=crop&q=80&w=1200',
     read_time: 10,
-    category_id: 'cat-love-relationships',
+    category_id: 'cat-marriage',
     author_id: '',
     tags: ['Mental Load', 'Partnership', 'Fairness', 'Household', 'Intimacy'],
     likes: 0,

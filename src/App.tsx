@@ -778,7 +778,7 @@ export default function App() {
       if (activeArticle.tags && activeArticle.tags.length > 0) {
         keywords = activeArticle.tags.join(', ');
       } else {
-        keywords = 'article, connection, emotional-wellness';
+        keywords = 'article, connection, love-emotions';
       }
       ogImage = activeArticle.featured_image || ogImage;
       ogType = 'article';

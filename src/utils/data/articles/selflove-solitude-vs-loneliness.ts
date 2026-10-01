@@ -67,7 +67,7 @@ The end state of getting this right is not a life alone or a life never alone. I
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1499728605268-245c9e1b3b0e?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-selflove-growth',
+    category_id: 'cat-self-love-growth',
     author_id: '',
     tags: ['Solitude', 'Loneliness', 'Inner Life', 'Self-Companionship'],
     likes: 0,

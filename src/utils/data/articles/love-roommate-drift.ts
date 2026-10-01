@@ -62,7 +62,7 @@ The drift is frightening because it feels like proof that passionate love is a p
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-love-relationships',
+    category_id: 'cat-marriage',
     author_id: '',
     tags: ['Long-Term Love', 'Intimacy', 'Connection', 'Rituals'],
     likes: 0,

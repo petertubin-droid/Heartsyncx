@@ -72,7 +72,7 @@ What slow dating buys, in the end, is not safety  - no amount of pacing guarante
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1517089203900-aa3ecfbf98d5?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-dating-romance',
+    category_id: 'cat-dating',
     author_id: '',
     tags: ['Slow Dating', 'Modern Dating', 'Intentional Love', 'Discernment'],
     likes: 0,

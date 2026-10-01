@@ -78,7 +78,7 @@ You will know the retraining is working not because the voice goes quiet  - it w
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1506126613408-eca97ce25299?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-selflove-growth',
+    category_id: 'cat-self-love-growth',
     author_id: '',
     tags: ['Self-Compassion', 'Inner Critic', 'Personal Growth', 'Mental Health', 'Mindfulness'],
     likes: 0,

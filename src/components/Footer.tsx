@@ -243,10 +243,10 @@ export default function Footer({ onNavigate, siteSettings, lang = 'en' }: Footer
               {(heartsync.categories && heartsync.categories.length > 0
                 ? heartsync.categories
                 : [
-                    { id: 'cat-1', name: 'Emotional Wellness', slug: 'emotional-wellness' },
-                    { id: 'cat-2', name: 'Relationship Science', slug: 'relationship-science' },
-                    { id: 'cat-3', name: 'Mindful Dating', slug: 'mindful-dating' },
-                    { id: 'cat-4', name: 'Self Growth', slug: 'self-growth' }
+                    { id: 'cat-dating', name: 'Dating', slug: 'dating' },
+                    { id: 'cat-relationships', name: 'Relationships', slug: 'relationships' },
+                    { id: 'cat-love-emotions', name: 'Love & Emotions', slug: 'love-emotions' },
+                    { id: 'cat-red-flags', name: 'Red Flags', slug: 'red-flags' }
                   ]
               ).map((cat, idx) => (
                 <li key={cat.id || idx}>

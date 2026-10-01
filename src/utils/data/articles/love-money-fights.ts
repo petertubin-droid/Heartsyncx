@@ -74,7 +74,7 @@ Money is just the most convenient stage on which couples act out their deeper qu
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=1200',
     read_time: 10,
-    category_id: 'cat-love-relationships',
+    category_id: 'cat-marriage',
     author_id: '',
     tags: ['Money', 'Conflict', 'Marriage', 'Finance', 'Partnership'],
     likes: 0,

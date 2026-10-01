@@ -76,7 +76,7 @@ Self-love, then, is not vanity, and it is not even primarily for you. It is the 
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-selflove-growth',
+    category_id: 'cat-self-love-growth',
     author_id: '',
     tags: ['Self-Love', 'Boundaries', 'Identity', 'Attachment', 'Personal Growth'],
     likes: 0,

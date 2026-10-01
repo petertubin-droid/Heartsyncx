@@ -76,7 +76,7 @@ The romantic approach asks: *how did this person make me feel?* The investigativ
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1529333166437-9750a81a37cd?auto=format&fit=crop&q=80&w=1200',
     read_time: 10,
-    category_id: 'cat-dating-romance',
+    category_id: 'cat-dating',
     author_id: '',
     tags: ['Dating', 'Early Dating', 'Red Flags', 'Compatibility', 'Intentional Dating'],
     likes: 0,

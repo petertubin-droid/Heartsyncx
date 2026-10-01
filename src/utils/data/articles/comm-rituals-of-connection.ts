@@ -68,7 +68,7 @@ This is also why the fifty-year couples smile at their small answers. They know 
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1529156069899-0f0f3dd2ee10?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-comm-connection',
+    category_id: 'cat-communication',
     author_id: '',
     tags: ['Rituals', 'Long-Term Love', 'Connection', 'Everyday Intimacy'],
     likes: 0,

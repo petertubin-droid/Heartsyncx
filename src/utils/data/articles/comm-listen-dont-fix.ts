@@ -92,7 +92,7 @@ Couples who can vent without triggering a task force are not just more pleasant 
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1516307365-6e1798819793?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-comm-connection',
+    category_id: 'cat-communication',
     author_id: '',
     tags: ['Communication', 'Listening', 'Emotional Support', 'Relationship Skills'],
     likes: 0,

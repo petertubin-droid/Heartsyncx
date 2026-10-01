@@ -82,7 +82,7 @@ An apology, done well, is not the end of a conflict. It is the proof that the re
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1518199266791-36321801c9de?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-comm-connection',
+    category_id: 'cat-communication',
     author_id: '',
     tags: ['Communication', 'Repair', 'Conflict', 'Accountability'],
     likes: 0,

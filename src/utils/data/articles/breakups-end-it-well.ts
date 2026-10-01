@@ -84,7 +84,7 @@ The relationship you are ending was real, which is precisely why the ending dese
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1474418396914-c84fecf52e8b?auto=format&fit=crop&q=80&w=1200',
     read_time: 13,
-    category_id: 'cat-problems-breakups',
+    category_id: 'cat-breakups-healing',
     author_id: '',
     tags: ['Breakups', 'Endings', 'Honesty', 'Decency'],
     likes: 0,

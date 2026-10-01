@@ -1,68 +1,19 @@
 import { Post, Category } from '../../types';
+import { NEW_CATEGORIES } from '../../lib/categoryMigration';
 import { HEARTSYNC_ARTICLES } from './articles/index';
 
-export const MORE_CATEGORIES: Category[] = [
-  {
-    id: 'cat-love-relationships',
-    name: 'Love & Relationships',
-    slug: 'love-relationships',
-    description: 'Explore the foundations of lasting intimacy, commitment, and mutual emotional support in long-term partnerships.',
-    color: '#E11D48',
-    icon: 'Heart',
-    featured_image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Love & Relationships  - Insights for Deeper Intimacy',
-    seo_description: 'Discover research-backed principles for deepening emotional connection, nurturing trust, and building enduring love.',
-    seo_keywords: ['love', 'relationships', 'intimacy', 'partnership', 'commitment']
-  },
-  {
-    id: 'cat-dating-romance',
-    name: 'Dating & Romance',
-    slug: 'dating-romance',
-    description: 'Practical guidance for navigating modern romance, intentional dating, early chemistry, and finding compatible partners.',
-    color: '#D97706',
-    icon: 'Heart',
-    featured_image: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Dating & Romance  - Mindful Approaches to Modern Courtship',
-    seo_description: 'Learn how to approach dating with clarity, build authentic romance, and recognize early compatibility indicators.',
-    seo_keywords: ['dating', 'romance', 'courtship', 'singles', 'chemistry', 'dating advice']
-  },
-  {
-    id: 'cat-comm-connection',
-    name: 'Communication & Emotional Connection',
-    slug: 'communication-emotional-connection',
-    description: 'Master the language of active listening, empathetic dialogue, vulnerability, and resolving conflicts with grace.',
-    color: '#2563EB',
-    icon: 'MessageCircle',
-    featured_image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Communication & Emotional Connection  - Speak from the Heart',
-    seo_description: 'Effective communication tools to help partners express needs, listen deeply, and cultivate lasting emotional closeness.',
-    seo_keywords: ['communication', 'emotional connection', 'active listening', 'vulnerability', 'conflict resolution']
-  },
-  {
-    id: 'cat-problems-breakups',
-    name: 'Relationship Problems & Breakups',
-    slug: 'relationship-problems-breakups',
-    description: 'Empathetic strategies for navigating difficult rough patches, boundary challenges, separation, and healing after heartbreak.',
-    color: '#7C3AED',
-    icon: 'ShieldAlert',
-    featured_image: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Relationship Problems & Breakups  - Healing and Recovery',
-    seo_description: 'Supportive perspectives on working through complex relationship challenges, processing breakups, and restoring inner peace.',
-    seo_keywords: ['breakups', 'relationship problems', 'heartbreak', 'healing', 'closure', 'recovery']
-  },
-  {
-    id: 'cat-selflove-growth',
-    name: 'Self Love & Personal Growth',
-    slug: 'self-love-personal-growth',
-    description: 'Nurture self-worth, emotional independence, healthy personal boundaries, and holistic personal development.',
-    color: '#059669',
-    icon: 'UserCheck',
-    featured_image: 'https://images.unsplash.com/photo-1499209974431-9dac3ada00d7?auto=format&fit=crop&q=80&w=1200',
-    seo_title: 'Self Love & Personal Growth  - Becoming Your Best Self',
-    seo_description: 'Inspirational guidance on building self-compassion, emotional resilience, and an authentic relationship with yourself.',
-    seo_keywords: ['self love', 'personal growth', 'self care', 'mindfulness', 'emotional resilience']
-  }
-];
+export const MORE_CATEGORIES: Category[] = NEW_CATEGORIES.map(c => ({
+  id: c.id,
+  name: c.name,
+  slug: c.slug,
+  description: c.description,
+  color: c.color,
+  icon: c.icon,
+  featured_image: c.featured_image,
+  seo_title: c.seo_title,
+  seo_description: c.seo_description,
+  seo_keywords: c.seo_keywords
+}));
 
 export const MORE_POSTS: Post[] = [
   // PERF (2026-09-24): seed article BODIES are stripped from the client
@@ -92,7 +43,7 @@ export const MORE_POSTS: Post[] = [
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&q=80&w=1200',
     read_time: 6,
-    category_id: 'cat-love-relationships',
+    category_id: 'cat-relationships',
     author_id: '',
     tags: ['Love', 'Intimacy', 'Mindfulness', 'Relationships'],
     likes: 0,
@@ -118,7 +69,7 @@ export const MORE_POSTS: Post[] = [
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200',
     read_time: 5,
-    category_id: 'cat-dating-romance',
+    category_id: 'cat-dating',
     author_id: '',
     tags: ['Dating', 'Romance', 'Compatibility', 'Single Life'],
     likes: 0,
@@ -145,7 +96,7 @@ export const MORE_POSTS: Post[] = [
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200',
     read_time: 7,
-    category_id: 'cat-comm-connection',
+    category_id: 'cat-communication',
     author_id: '',
     tags: ['Communication', 'Active Listening', 'Vulnerability', 'Relationships'],
     likes: 0,
@@ -172,7 +123,7 @@ export const MORE_POSTS: Post[] = [
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=1200',
     read_time: 6,
-    category_id: 'cat-problems-breakups',
+    category_id: 'cat-breakups-healing',
     author_id: '',
     tags: ['Breakups', 'Heartbreak', 'Healing', 'Self Care'],
     likes: 0,
@@ -198,7 +149,7 @@ export const MORE_POSTS: Post[] = [
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1499209974431-9dac3ada00d7?auto=format&fit=crop&q=80&w=1200',
     read_time: 5,
-    category_id: 'cat-selflove-growth',
+    category_id: 'cat-self-love-growth',
     author_id: '',
     tags: ['Self Love', 'Personal Growth', 'Attachment Styles', 'Mental Wellness'],
     likes: 0,

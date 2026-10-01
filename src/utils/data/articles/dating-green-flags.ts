@@ -56,7 +56,7 @@ The safe person will not give you butterflies. They will give you something the 
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1516726817505-f5c8c925a4b5?auto=format&fit=crop&q=80&w=1200',
     read_time: 10,
-    category_id: 'cat-dating-romance',
+    category_id: 'cat-dating',
     author_id: '',
     tags: ['Green Flags', 'Safety', 'Attachment', 'Early Dating', 'Intuition'],
     likes: 0,

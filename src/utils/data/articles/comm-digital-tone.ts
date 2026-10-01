@@ -89,7 +89,7 @@ The couples who text well are not the ones with perfect phrasing. They are the o
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1512485136026-7b3b2dbd66d9?auto=format&fit=crop&q=80&w=1200',
     read_time: 11,
-    category_id: 'cat-comm-connection',
+    category_id: 'cat-communication',
     author_id: '',
     tags: ['Communication', 'Texting', 'Digital Habits', 'Conflict Prevention'],
     likes: 0,

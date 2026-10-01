@@ -66,7 +66,7 @@ Rest is not what you get when you finish being human. It is one of the ways you 
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?auto=format&fit=crop&q=80&w=1200',
     read_time: 10,
-    category_id: 'cat-selflove-growth',
+    category_id: 'cat-self-love-growth',
     author_id: '',
     tags: ['Rest', 'Burnout', 'Self-Compassion', 'Boundaries', 'Recovery'],
     likes: 0,

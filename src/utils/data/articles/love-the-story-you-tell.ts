@@ -74,7 +74,7 @@ The half-second is the whole game. The milk will be spilled again; the caption i
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b8?auto=format&fit=crop&q=80&w=1200',
     read_time: 10,
-    category_id: 'cat-love-relationships',
+    category_id: 'cat-relationships',
     author_id: '',
     tags: ['Attribution', 'Conflict', 'Trust', 'Communication', 'Psychology'],
     likes: 0,

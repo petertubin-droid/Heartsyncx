@@ -78,7 +78,7 @@ A final, unusual note, because some readers will recognize themselves not in the
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1494972308805-463bc619d34e?auto=format&fit=crop&q=80&w=1200',
     read_time: 13,
-    category_id: 'cat-dating-romance',
+    category_id: 'cat-red-flags',
     author_id: '',
     tags: ['Red Flags', 'Toxic Patterns', 'Manipulation', 'Early Dating'],
     likes: 0,

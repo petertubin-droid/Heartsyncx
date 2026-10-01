@@ -84,7 +84,7 @@ People expect the end state to feel like certainty, and are discouraged when it 
     publish_date: new Date().toISOString(),
     featured_image: 'https://images.unsplash.com/photo-1506126683401-692dc233fc78?auto=format&fit=crop&q=80&w=1200',
     read_time: 12,
-    category_id: 'cat-selflove-growth',
+    category_id: 'cat-self-love-growth',
     author_id: '',
     tags: ['Self-Trust', 'Self-Worth', 'Recovery', 'Personal Growth'],
     likes: 0,
