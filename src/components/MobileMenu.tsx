@@ -95,14 +95,11 @@ export default function MobileMenu({
 
         menuEl.addEventListener('keydown', handleTabKey);
 
-        // Focus search input or close button on open
+        // Focus the first focusable element (the close button) on open -
+        // deliberately NOT the search input, which would pop the on-screen
+        // keyboard over the menu on phones before the visitor asks for it.
         setTimeout(() => {
-          const searchInput = menuEl.querySelector('input');
-          if (searchInput) {
-            searchInput.focus();
-          } else {
-            firstEl.focus();
-          }
+          firstEl.focus();
         }, 80);
 
         return () => {
@@ -339,6 +336,9 @@ export default function MobileMenu({
                       </SelectContent>
                     </Select>
                   </div>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-sans pl-10">
+                    Whole site translated via Google Translate - articles included.
+                  </p>
                 </div>
               </div>
             </div>

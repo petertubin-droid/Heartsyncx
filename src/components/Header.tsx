@@ -537,7 +537,7 @@ export default function Header({
             >
               <SelectTrigger
                 size="sm"
-                title="Language"
+                title="Language - the whole site, articles included, is translated via Google Translate"
                 className="h-8 w-auto gap-1 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 text-[10px] font-sans font-bold text-zinc-605 dark:text-zinc-405 hover:bg-rose-50/50 dark:hover:bg-zinc-850/50 hover:text-[#CE2B5E] transition-colors"
               >
                 <Globe className="w-3.5 h-3.5" />

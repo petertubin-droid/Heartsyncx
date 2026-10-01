@@ -1,0 +1,26 @@
+
+/* ==========================================================================
+   Google Translate (international edition)
+   The widget is driven programmatically from our language switcher, so its
+   own banner, tooltip and bottom frame are hidden; attribution lives in
+   the site's language switcher ("Powered by Google Translate").
+   ========================================================================== */
+.goog-te-banner-frame.skiptranslate,
+.goog-te-ftab-frame.skiptranslate,
+.goog-te-balloon-frame,
+#goog-gt-tt {
+  display: none !important;
+}
+
+/* Google pushes the page down ~40px when it shows its banner; with the
+   banner hidden we must cancel that inline shift. */
+body.skiptranslate,
+body {
+  top: 0 !important;
+}
+
+/* Never let GT styles bleed into our chrome fonts. */
+.goog-text-highlight {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}

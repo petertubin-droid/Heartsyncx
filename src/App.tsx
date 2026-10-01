@@ -36,6 +36,7 @@ import { Post, Category, Author, SiteSettings, Topic } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { Language, getSavedLanguage, getTranslation, isRTL, getLanguageInfo } from './utils/i18n';
+import { GoogleTranslateSync } from './components/GoogleTranslate';
 import { getArticleSeoData } from './utils/seoArticleData';
 import { clearUnauthorizedStorageKeys } from './utils/storageAudit';
 import { 
@@ -1578,6 +1579,10 @@ export default function App() {
       <AnimatePresence>
         {globalLoadingState && <HeartsyncLoader isFullScreen={true} />}
       </AnimatePresence>
+
+      {/* Google Translate: whole-site translation (articles included), driven
+          by the visitor's language choice; hidden anchor + programmatic sync. */}
+      {currentTab !== 'admin' && <GoogleTranslateSync lang={lang} />}
 
       {/* Dynamic Global Top Progress Route Bar */}
       <LoadingProgressBar isAnimating={isNavigating} />
