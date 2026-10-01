@@ -8706,21 +8706,101 @@ async function handleDynamicHtml(req: Request, res: Response) {
   let canonicalUrl = `${baseUrl}${req.path}`;
   let lang = 'en';
 
-  // Dedicated metadata for the About page: this is the page Google lifts to
-  // describe the whole site, so it gets its own title/description/keywords
-  // instead of the generic homepage defaults.
-  if (req.path.replace(/\/$/, '') === '/about') {
-    seoTitle = 'About Heartsync - Evidence-Based Relationship Advice & Emotional Wellness';
-    seoDesc = 'Heartsync translates attachment theory, Gottman research, and nervous-system science into practical guidance on dating, communication, breakups, self-love, and lasting partnership. Meet our mission and editorial approach.';
-    seoKeywords = 'about heartsync, relationship advice website, attachment theory, gottman method, emotional wellness, dating advice, couples communication, breakup recovery, self love, marriage advice';
-  }
+  // Dedicated per-page metadata for every non-article, non-category route.
+  // Before this map, only /about and /advertise had their own title and
+  // description; every other page (faq, contact, store, newsletter, ...)
+  // silently shipped the generic homepage defaults, which reads as thin
+  // duplicate content to crawlers and reviewers. Each entry is unique,
+  // page-specific, and matches what the React page actually renders.
+  const STATIC_PAGE_SEO: Record<string, { title: string; desc: string; keywords?: string }> = {
+    '/about': {
+      title: 'About Heartsync - Evidence-Based Relationship Advice & Emotional Wellness',
+      desc: 'Heartsync translates attachment theory, Gottman research, and nervous-system science into practical guidance on dating, communication, breakups, self-love, and lasting partnership. Meet our mission and editorial approach.',
+      keywords: 'about heartsync, relationship advice website, attachment theory, gottman method, emotional wellness, dating advice, couples communication, breakup recovery, self love, marriage advice'
+    },
+    '/advertise': {
+      title: 'Advertise on Heartsync - Reach a High-Intent Relationship & Wellness Audience',
+      desc: 'Promote your brand on Heartsync with display, native, banner and interstitial ad placements across our relationship and emotional wellness content. Click tracking, flexible scheduling and premium first-party slots.',
+      keywords: 'advertise on heartsync, relationship blog advertising, sponsor relationship content, wellness audience ads, mental health advertising, dating app promotion, emotional wellness sponsors'
+    },
+    '/articles': {
+      title: 'All Articles - Relationship Advice, Dating & Breakup Guides | Heartsync',
+      desc: 'Browse the full Heartsync library: evidence-based essays on dating, communication, attachment styles, breakups and healing, red flags, self-love and long-term partnership.',
+      keywords: 'relationship articles, dating guides, breakup advice, communication tips, attachment styles, love advice'
+    },
+    '/categories': {
+      title: 'Categories - Explore Heartsync Relationship Topics',
+      desc: 'All Heartsync topics in one place: Dating, Relationships, Love & Emotions, Situationships, Breakups & Healing, Communication, Red Flags, Self Love & Growth, Marriage & Long Term Love, and Questions & Advice.',
+      keywords: 'relationship categories, dating topics, breakup healing, self love, marriage advice topics'
+    },
+    '/trending': {
+      title: 'Trending Relationship Essays - What Readers Are Loving Now | Heartsync',
+      desc: 'The most-read Heartsync guides right now: attachment styles, no-contact recovery, green flags, communication repair and the honest science of modern dating.',
+      keywords: 'trending relationship advice, popular dating articles, most read breakup guides'
+    },
+    '/faq': {
+      title: 'Relationship Advice FAQ - Your Questions Answered | Heartsync',
+      desc: 'Clear answers to the questions readers ask most: attachment styles, situationships, breakup recovery, couples communication, and how Heartsync evidence-based guidance works.',
+      keywords: 'relationship faq, dating questions, breakup faq, communication answers'
+    },
+    '/contact': {
+      title: 'Contact Heartsync - Talk to Our Team',
+      desc: 'Reach the Heartsync team for editorial questions, premium and billing support, partnership inquiries, or help with your account. We answer every secure message.',
+      keywords: 'contact heartsync, relationship advice support, billing help, partnership inquiry'
+    },
+    '/privacy': {
+      title: 'Privacy Policy - How Heartsync Handles Your Data',
+      desc: 'How Heartsync collects, uses, and protects your information: accounts, newsletter, measurements, advertising partners including Google AdSense, and your consent choices.',
+      keywords: 'heartsync privacy policy, data protection, cookie consent, advertising privacy'
+    },
+    '/terms': {
+      title: 'Terms of Service - Using Heartsync',
+      desc: 'The terms that govern your use of Heartsync: accounts, premium membership, payments, acceptable use, and the limits of educational relationship guidance.',
+      keywords: 'heartsync terms of service, terms of use, membership terms'
+    },
+    '/cookies': {
+      title: 'Cookie Policy - Cookies & Advertising on Heartsync',
+      desc: 'What cookies Heartsync and its advertising partners (including Google AdSense) set, how your consent choice controls personalization, and how to change your choice at any time.',
+      keywords: 'cookie policy, advertising cookies, adsense cookies, consent management'
+    },
+    '/disclaimer': {
+      title: 'Disclaimer - Educational Guidance, Not Therapy | Heartsync',
+      desc: 'Heartsync publishes educational relationship guidance grounded in research. It is not medical, psychological, or professional counseling, and it never replaces qualified care.',
+      keywords: 'heartsync disclaimer, educational content disclaimer, not professional advice'
+    },
+    '/newsletter': {
+      title: 'The Weekly Heartsync - Relationship Insight in Your Inbox',
+      desc: 'Join the Heartsync weekly digest: one honest essay on dating, attachment, communication or healing, plus the new guides worth your time. Free, unsubscribe anytime.',
+      keywords: 'relationship newsletter, dating advice email, weekly digest heartsync'
+    },
+    '/store': {
+      title: 'Heartsync Store - Relationship Workbooks & Digital Guides',
+      desc: 'Premium Heartsync digital products: relationship workbooks, boundary scripts, and guided exercises you can download and keep, funded by optional premium membership.',
+      keywords: 'relationship workbook, digital guides, self help downloads, couples exercises'
+    },
+    '/subscription': {
+      title: 'Heartsync Premium - Support the Work, Unlock Everything',
+      desc: 'Heartsync Premium removes ads, unlocks premium guides and the full library, and directly funds the research-based essays that keep the site free for everyone.',
+      keywords: 'heartsync premium, membership, ad-free reading, unlock premium content'
+    },
+    '/ai-copilot': {
+      title: 'Relationship AI Copilot - Ask Heartsync Anything',
+      desc: 'A guided AI companion trained on Heartsync relationship guidance: ask about attachment, boundaries, communication triggers, or any situation you are navigating.',
+      keywords: 'relationship ai, ai advice assistant, attachment questions, boundaries help'
+    },
+    '/lovevault': {
+      title: 'LoveVault - Save, Private & Revisit What Moves You',
+      desc: 'Your private Heartsync space: keep the essays, quotes and exercises that matter to you, locked to your account and always available when you need them again.',
+      keywords: 'lovevault, saved articles, private collection, bookmark relationship guides'
+    }
+  };
 
-  // Dedicated metadata for the Advertise page - it is a real landing page
-  // for prospective partners, so give it partner-facing copy.
-  if (req.path.replace(/\/$/, '') === '/advertise') {
-    seoTitle = 'Advertise on Heartsync - Reach a High-Intent Relationship & Wellness Audience';
-    seoDesc = 'Promote your brand on Heartsync with display, native, banner and interstitial ad placements across our relationship and emotional wellness content. Click tracking, flexible scheduling and premium first-party slots.';
-    seoKeywords = 'advertise on heartsync, relationship blog advertising, sponsor relationship content, wellness audience ads, mental health advertising, dating app promotion, emotional wellness sponsors';
+  const routeKey = req.path.replace(/\/$/, '').replace('/ai_copilot', '/ai-copilot');
+  const staticSeo = STATIC_PAGE_SEO[routeKey];
+  if (staticSeo) {
+    seoTitle = staticSeo.title;
+    seoDesc = staticSeo.desc;
+    if (staticSeo.keywords) seoKeywords = staticSeo.keywords;
   }
 
   // Support dynamic language query params (e.g. ?lang=es)
@@ -9132,6 +9212,50 @@ async function handleDynamicHtml(req: Request, res: Response) {
       };
       schemas.push(breadcrumbs);
     }
+  } else if (req.path.startsWith('/author/')) {
+    // Author profile pages. Mirrors the client's resolution (find by id,
+    // fall back to the first author) so crawlers, the SPA and the sitemap
+    // all agree on who /author/<id> is. Previously this route shipped the
+    // generic homepage title and zero crawlable text.
+    const authorId = decodeURIComponent(req.path.split('/author/')[1]?.split('?')[0] || '');
+    const authorsList: any[] = Array.isArray(serverCacheState.authors) ? serverCacheState.authors : [];
+    const author = authorsList.find((a: any) => !a.is_deleted && a.id === authorId) || authorsList.find((a: any) => !a.is_deleted) || null;
+
+    if (author) {
+      seoTitle = `${author.name} - ${author.role_tag || author.role || 'Relationship Advisor'} | Heartsync`;
+      seoDesc = (author.bio && typeof author.bio === 'string' && author.bio.trim().length > 40)
+        ? author.bio.trim().slice(0, 300)
+        : `${author.name} is a ${author.role_tag || author.role || 'relationship advisor'} at Heartsync, writing evidence-based guidance on dating, attachment, communication and healing.`;
+      if (author.avatar_url) seoImage = author.avatar_url;
+      seoKeywords = `${author.name}, heartsync author, relationship advisor, dating expert`;
+
+      // Profile schema so Google understands this is a person page
+      const profileSchema = {
+        "@context": "https://schema.org",
+        "@type": "ProfilePage",
+        "mainEntity": {
+          "@type": "Person",
+          "name": author.name,
+          "description": seoDesc,
+          "url": canonicalUrl,
+          "jobTitle": author.role_tag || author.role || 'Relationship Advisor',
+          "worksFor": {
+            "@id": `${baseUrl}/#organization`
+          }
+        }
+      };
+      schemas.push(profileSchema);
+
+      const authorBreadcrumbs = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": `${baseUrl}/` },
+          { "@type": "ListItem", "position": 2, "name": author.name, "item": canonicalUrl }
+        ]
+      };
+      schemas.push(authorBreadcrumbs);
+    }
   } else {
     const lastSegment = req.path.split('/').pop() || '';
     let pageName = 'Home';
@@ -9253,6 +9377,36 @@ async function handleDynamicHtml(req: Request, res: Response) {
 <p>Whether you are newly dating, rebuilding after a breakup, decoding a situationship, or deepening a decades-long marriage, Heartsync meets you where you are - with evidence, warmth, and zero judgement.</p>
 </main></noscript>`;
     html = html.replace(/<body([^>]*)>/i, `<body$1>${aboutNoscript}`);
+  }
+
+  // Server-rendered author profile text for non-JavaScript agents. Mirrors
+  // the React author pane: avatar + name + role + bio and the author's
+  // published article list with real links, so crawlers see a full person
+  // page instead of an empty shell.
+  if (req.path.startsWith('/author/')) {
+    const authorId = decodeURIComponent(req.path.split('/author/')[1]?.split('?')[0] || '');
+    const authorsList: any[] = Array.isArray(serverCacheState.authors) ? serverCacheState.authors : [];
+    const author = authorsList.find((a: any) => !a.is_deleted && a.id === authorId) || authorsList.find((a: any) => !a.is_deleted) || null;
+    if (author) {
+      const published: any[] = Array.isArray(serverCacheState.posts)
+        ? serverCacheState.posts.filter((p: any) => p && p.author_id === author.id && (!p.status || p.status === 'published'))
+        : [];
+      const esc = (v: string) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const authorBio = (author.bio && String(author.bio).trim()) || 'Heartsync relationship expert editing wellness guides and tips.';
+      const articleItems = published.slice(0, 20).map((p: any) =>
+        `<li><a href="${baseUrl}/article/${encodeURIComponent(p.slug)}">${esc(p.title || p.slug)}</a></li>`
+      ).join('\n');
+      const authorNoscript = `<noscript><main>
+<h1>${esc(author.name)}</h1>
+<p>${esc(author.role_tag || author.role || 'Relationship Advisor')} at Heartsync</p>
+<p>${esc(authorBio)}</p>
+<h2>Articles by ${esc(author.name)}</h2>
+<ul>
+${articleItems || '<li>Articles coming soon.</li>'}
+</ul>
+</main></noscript>`;
+      html = html.replace(/<body([^>]*)>/i, `<body$1>${authorNoscript}`);
+    }
   }
 
   // Formulate dynamic search crawler and social indexing compliance meta tag layout
