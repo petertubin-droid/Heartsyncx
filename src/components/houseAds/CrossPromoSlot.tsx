@@ -56,10 +56,77 @@ export interface ExternalPromo {
   url: string;
   blurb: string;
   owner_name?: string;
+  /** Custom CTA button text ("Visit site" when empty). */
+  cta_label?: string;
+  /** ISO date - the ad is hidden until this moment (optional). */
+  start_date?: string;
+  /** ISO date - the ad is hidden after this moment (optional). */
+  end_date?: string;
   /** Absolute logo/og:image URL, shown in the single-image Display
    *  format. The admin "AI Assistant" (Generate from URL) fills this
    *  automatically from the target page's og:image. */
   logo_url?: string;
+}
+
+/* ============================================================================
+ * SLOT REGISTRY (Oct 2026 admin panel)
+ * Every physical position on the site that CAN render a cross-promo unit.
+ * The admin Slot Manager toggles each one and can override the global
+ * display format per slot. New positions only need a mount + an entry here.
+ * ==========================================================================*/
+export interface CrossPromoSlotDef {
+  id: string;
+  label: string;
+  description: string;
+  /** Rotation index so two visible slots advertise different items. */
+  defaultSlotIndex: number;
+  /** The 4 original placements stay on; new positions start off. */
+  defaultEnabled: boolean;
+}
+
+export const CROSS_PROMO_SLOT_CATALOG: CrossPromoSlotDef[] = [
+  { id: 'article_top', label: 'Article - Top', description: 'Above the article body, first thing after the title block.', defaultSlotIndex: 4, defaultEnabled: false },
+  { id: 'article_mid', label: 'Article - Mid', description: 'Halfway through the article body.', defaultSlotIndex: 2, defaultEnabled: true },
+  { id: 'article_end', label: 'Article - End', description: 'After the last block of the article body.', defaultSlotIndex: 3, defaultEnabled: true },
+  { id: 'article_after_related', label: 'Article - After Related Stories', description: 'Below the related-articles carousel.', defaultSlotIndex: 5, defaultEnabled: false },
+  { id: 'home_after_hero', label: 'Homepage - After Hero', description: 'Under the big welcome banner.', defaultSlotIndex: 6, defaultEnabled: false },
+  { id: 'home_after_about', label: 'Homepage - After About Section', description: 'The original homepage slot.', defaultSlotIndex: 0, defaultEnabled: true },
+  { id: 'home_after_newsletter', label: 'Homepage - After Newsletter Section', description: 'The original homepage slot.', defaultSlotIndex: 1, defaultEnabled: true },
+  { id: 'home_before_footer', label: 'Every Page - Before Footer', description: 'The last thing before the site footer, on every public page.', defaultSlotIndex: 7, defaultEnabled: false },
+  { id: 'categories_top', label: 'Categories Page - Top', description: 'Above the category grid.', defaultSlotIndex: 8, defaultEnabled: false },
+  { id: 'trending_top', label: 'Trending Page - Top', description: 'Above the trending list.', defaultSlotIndex: 9, defaultEnabled: false },
+];
+
+export type CrossPromoSlotOverrides = Record<string, { enabled?: boolean; format?: CrossPromoFormat | 'global' }>;
+
+/** Is a given slot position active? Master switch, then per-slot setting,
+ *  then the catalog default. Unknown slot ids default to on (backwards
+ *  compatibility for mounts that predate the registry). */
+export function isSlotActive(settings: Record<string, unknown>, slotId: string): boolean {
+  if (settings.cross_promo_enabled === false) return false;
+  const overrides = (settings.cross_promo_slots as CrossPromoSlotOverrides) || {};
+  const o = overrides[slotId];
+  if (o && typeof o.enabled === 'boolean') return o.enabled;
+  const def = CROSS_PROMO_SLOT_CATALOG.find((d) => d.id === slotId);
+  return def ? def.defaultEnabled : true;
+}
+
+/** Effective format for a slot: per-slot override or the global format. */
+export function slotFormat(settings: Record<string, unknown>, slotId: string): CrossPromoFormat {
+  const overrides = (settings.cross_promo_slots as CrossPromoSlotOverrides) || {};
+  const o = overrides[slotId];
+  if (o && o.format && o.format !== 'global') return o.format;
+  return (settings.cross_promo_format as CrossPromoFormat) || 'display';
+}
+
+/** Schedule window check: an ad with start/end dates only shows inside its
+ *  window, so campaigns auto-activate and auto-expire without admin work. */
+export function isPromoScheduled(promo: { start_date?: string; end_date?: string }, now: Date = new Date()): boolean {
+  const start = promo.start_date ? new Date(promo.start_date) : null;
+  const end = promo.end_date ? new Date(promo.end_date) : null;
+  if (start && !isNaN(start.getTime()) && now < start) return false;
+  if (end && !isNaN(end.getTime()) && now > end) return false;
+  return true;
 }
 
 /* Standard programmatic-ad chrome colors (AdSense conventions):
@@ -105,6 +172,8 @@ export interface PromoItem {
   /** Absolute logo/creative image URL for the single-image Display
    *  format. Falls back to the icon+gradient tile when absent. */
   logo?: string;
+  /** Custom CTA button text (defaults to "Visit site"). */
+  ctaLabel?: string;
 }
 
 /** Normalize an admin-entered origin: add https:// when missing, strip a
@@ -147,7 +216,7 @@ export function buildPromoItems(settings: Record<string, unknown> = {}): PromoIt
 
   const rawList = Array.isArray(settings.external_promos) ? (settings.external_promos as ExternalPromo[]) : [];
   const external: PromoItem[] = rawList
-    .filter((p) => p && p.enabled !== false && (p.url || '').trim() && (p.label || '').trim())
+    .filter((p) => p && p.enabled !== false && isPromoScheduled(p) && (p.url || '').trim() && (p.label || '').trim())
     .map((p) => {
       const url = (p.url || '').trim().match(/^https?:\/\//i) ? (p.url || '').trim() : `https://${(p.url || '').trim()}`;
       return {
@@ -164,6 +233,7 @@ export function buildPromoItems(settings: Record<string, unknown> = {}): PromoIt
         bigHeadline: p.label,
         bigBody: p.blurb || `A message from our partner ${((p.owner_name || '').trim() || hostOf(url))}.`,
         logo: (p.logo_url || '').trim() || undefined,
+        ctaLabel: (p.cta_label || '').trim() || undefined,
       };
     });
 
@@ -196,7 +266,7 @@ export function buildDisplayPromoItems(settings: Record<string, unknown> = {}): 
 
   const rawList = Array.isArray(settings.external_promos) ? (settings.external_promos as ExternalPromo[]) : [];
   const external: PromoItem[] = rawList
-    .filter((p) => p && p.enabled !== false && (p.url || '').trim() && (p.label || '').trim())
+    .filter((p) => p && p.enabled !== false && isPromoScheduled(p) && (p.url || '').trim() && (p.label || '').trim())
     .map((p) => {
       const url = (p.url || '').trim().match(/^https?:\/\//i) ? (p.url || '').trim() : `https://${(p.url || '').trim()}`;
       return {
@@ -213,6 +283,7 @@ export function buildDisplayPromoItems(settings: Record<string, unknown> = {}): 
         bigHeadline: p.label,
         bigBody: p.blurb || `A message from our partner ${((p.owner_name || '').trim() || hostOf(url))}.`,
         logo: (p.logo_url || '').trim() || undefined,
+        ctaLabel: (p.cta_label || '').trim() || undefined,
       };
     });
 
@@ -255,13 +326,14 @@ const AdChoices: React.FC<{ className?: string }> = ({ className = '' }) => (
 );
 
 /** Pill CTA button, network-ad style. */
-const CtaButton: React.FC<{ dest: PromoItem; source: string; label?: string; big?: boolean }> = ({ dest, source, label = 'Visit site', big = false }) => (
+const CtaButton: React.FC<{ dest: PromoItem; source: string; label?: string; big?: boolean }> = ({ dest, source, label, big = false }) => (
+  // Per-ad CTA text wins; the prop still overrides for special contexts.
   <button
     type="button"
     onClick={() => go(dest, source)}
     className={`shrink-0 ${big ? 'px-6 py-2.5 text-sm' : 'px-4 py-1.5 text-xs'} rounded-full bg-[#1a73e8] hover:bg-[#1765cc] text-white font-bold shadow-sm cursor-pointer transition-colors`}
   >
-    {label}
+    {label || dest.ctaLabel || 'Visit site'}
   </button>
 );
 
@@ -507,29 +579,40 @@ const Interstitial: React.FC<{ items: PromoItem[]; source: string }> = ({ items,
 };
 
 /** The slot component. Place anywhere; format and destinations come from
- *  admin settings. */
+ *  admin settings. Pass `slot` (a registry id) so the admin Slot Manager
+ *  can turn the position on/off and override its format per slot. */
 const CrossPromoSlot: React.FC<{
   /** Used for destination rotation so slots on the same page differ. */
   slotIndex?: number;
   source?: string;
-}> = ({ slotIndex = 0, source = 'heartsyncx' }) => {
+  /** Registry slot id (see CROSS_PROMO_SLOT_CATALOG). */
+  slot?: string;
+}> = ({ slotIndex, source = 'heartsyncx', slot }) => {
   const s = (heartsync.site_settings || {}) as Record<string, unknown>;
   if (s.cross_promo_enabled === false) return null;
-  const format = (s.cross_promo_format as CrossPromoFormat) || 'display';
+  if (slot) {
+    if (!isSlotActive(s, slot)) return null;
+    if (slotIndex === undefined) {
+      const def = CROSS_PROMO_SLOT_CATALOG.find((d) => d.id === slot);
+      slotIndex = def ? def.defaultSlotIndex : 0;
+    }
+  }
+  const idx = slotIndex ?? 0;
+  const format = slot ? slotFormat(s, slot) : ((s.cross_promo_format as CrossPromoFormat) || 'display');
 
   if (format === 'display') {
     const displayItems = buildDisplayPromoItems(s);
     if (displayItems.length === 0) return null;
-    return <DisplayAd items={displayItems} slotIndex={slotIndex} source={`${source}_display_${slotIndex}`} />;
+    return <DisplayAd items={displayItems} slotIndex={idx} source={`${source}_display_${idx}`} />;
   }
 
   const items = buildPromoItems(s);
   if (items.length === 0) return null;
 
   if (format === 'interstitial') return <Interstitial items={items} source={`${source}_interstitial`} />;
-  if (format === 'banner') return <Banner items={items} slotIndex={slotIndex} source={`${source}_banner_${slotIndex}`} />;
-  if (format === 'native') return <NativeUnit items={items} slotIndex={slotIndex} source={`${source}_native_${slotIndex}`} />;
-  return <RecCard items={items} slotIndex={slotIndex} source={`${source}_card_${slotIndex}`} />;
+  if (format === 'banner') return <Banner items={items} slotIndex={idx} source={`${source}_banner_${idx}`} />;
+  if (format === 'native') return <NativeUnit items={items} slotIndex={idx} source={`${source}_native_${idx}`} />;
+  return <RecCard items={items} slotIndex={idx} source={`${source}_card_${idx}`} />;
 };
 
 export default CrossPromoSlot;

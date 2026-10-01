@@ -1851,6 +1851,64 @@ Page domain: "${host}"`;
   });
 });
 
+// ============================================================================
+// AI AD COPY FROM A DESCRIPTION (Oct 2026 ad panel)
+// Two modes:
+//  - create: the admin describes a business in words; Gemini writes the
+//    headline, blurb and CTA for a draft ad row.
+//  - improve: the admin sends an existing ad's current copy; Gemini
+//    sharpens it without inventing claims.
+// Degrades to a 503 when Gemini is not configured - the panel keeps the
+// old copy and shows the error.
+// ============================================================================
+app.post('/api/gemini/ad-from-prompt', adminAuthMiddleware, async (req: Request, res: Response) => {
+  const description = String(req.body?.description || '').trim();
+  const mode = req.body?.mode === 'improve' ? 'improve' : 'create';
+  if (!description || description.length < 3) {
+    res.status(400).json({ error: 'Describe the business (or paste the current ad copy) first.' });
+    return;
+  }
+
+  const ai = await getGeminiClient();
+  if (!ai) {
+    res.status(503).json({ error: 'AI is not configured on this deployment yet. You can still create the ad by hand.' });
+    return;
+  }
+
+  const basePrompt = `You write short, honest first-party ad copy for house-ad slots on Heartsyncx, a relationship and emotional wellness publication. Rules: no clickbait, no emoji, no quotation marks, never invent claims, statistics or awards. Return ONLY a JSON object with exactly three string fields: "label" (ad headline, max 60 characters), "blurb" (one factual supporting sentence, max 110 characters), "cta_label" (a 2-4 word call-to-action button, e.g. "Try it free").`;
+
+  const prompt = mode === 'improve'
+    ? `${basePrompt}
+Improve this existing ad's copy while keeping its meaning - sharpen the wording, keep it under the length limits:
+Current headline: "${String(req.body?.current_label || description).slice(0, 120)}"
+Current blurb: "${description.slice(0, 300)}"`
+    : `${basePrompt}
+The advertiser / business being described: "${description.slice(0, 600)}"`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: { temperature: 0.6, responseMimeType: 'application/json' }
+    });
+    const text = (response.text || '').trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      res.status(502).json({ error: 'The AI response could not be parsed. Try again or write the copy by hand.' });
+      return;
+    }
+    const parsedCopy = JSON.parse(jsonMatch[0]);
+    res.json({
+      label: typeof parsedCopy.label === 'string' ? parsedCopy.label.slice(0, 80) : '',
+      blurb: typeof parsedCopy.blurb === 'string' ? parsedCopy.blurb.slice(0, 160) : '',
+      cta_label: typeof parsedCopy.cta_label === 'string' ? parsedCopy.cta_label.slice(0, 40) : '',
+    });
+  } catch (err: any) {
+    console.warn('Ad-copy Gemini generation failed:', err);
+    res.status(502).json({ error: 'AI copy generation failed. Try again or write the copy by hand.' });
+  }
+});
+
 // 1.25. Dynamic Article Summarizer
 // ============================================================================
 // AI ADVICE ENGINE  - the reader-facing relational guide (HeartSync Copilot)
@@ -8646,6 +8704,14 @@ async function handleDynamicHtml(req: Request, res: Response) {
     seoTitle = 'About Heartsync - Evidence-Based Relationship Advice & Emotional Wellness';
     seoDesc = 'Heartsync translates attachment theory, Gottman research, and nervous-system science into practical guidance on dating, communication, breakups, self-love, and lasting partnership. Meet our mission and editorial approach.';
     seoKeywords = 'about heartsync, relationship advice website, attachment theory, gottman method, emotional wellness, dating advice, couples communication, breakup recovery, self love, marriage advice';
+  }
+
+  // Dedicated metadata for the Advertise page - it is a real landing page
+  // for prospective partners, so give it partner-facing copy.
+  if (req.path.replace(/\/$/, '') === '/advertise') {
+    seoTitle = 'Advertise on Heartsync - Reach a High-Intent Relationship & Wellness Audience';
+    seoDesc = 'Promote your brand on Heartsync with display, native, banner and interstitial ad placements across our relationship and emotional wellness content. Click tracking, flexible scheduling and premium first-party slots.';
+    seoKeywords = 'advertise on heartsync, relationship blog advertising, sponsor relationship content, wellness audience ads, mental health advertising, dating app promotion, emotional wellness sponsors';
   }
 
   // Support dynamic language query params (e.g. ?lang=es)

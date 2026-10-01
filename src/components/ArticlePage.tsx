@@ -937,7 +937,8 @@ activeArticle, articleBody, headings, markdownComponents, siteSettings, navigate
                         }
 
                         return (
-                          /* Configurable typography wrapper styling */
+                          <>
+                          <CrossPromoSlot slot="article_top" source="article_top" />
                           <div 
                             style={{
                               fontFamily: siteSettings.article_font_family === 'DM Sans' ? '"DM Sans", sans-serif' :
@@ -960,8 +961,8 @@ activeArticle, articleBody, headings, markdownComponents, siteSettings, navigate
                               promoArticles={promoPicks}
                               onOpenPromoArticle={(slug) => navigateTo('article', slug)}
                               crossPromoNodes={[
-                                <CrossPromoSlot key="cp-mid" slotIndex={2} source="article_mid" />,
-                                <CrossPromoSlot key="cp-end" slotIndex={3} source="article_end" />
+                                <CrossPromoSlot key="cp-mid" slot="article_mid" source="article_mid" />,
+                                <CrossPromoSlot key="cp-end" slot="article_end" source="article_end" />
                               ]}
                               className={`markdown-body prose dark:prose-invert ${bodyWidthClass}${bodyWidthClass !== 'max-w-none' ? ' mx-auto' : ''} text-zinc-850 dark:text-zinc-200 ${lineHeightClass} ${spacingClass} ${headingsClass} ${
                                 siteSettings.article_font_size === 'sm' ? 'text-xs sm:text-sm' :
@@ -971,6 +972,7 @@ activeArticle, articleBody, headings, markdownComponents, siteSettings, navigate
                               }`}
                             />
                           </div>
+                          </>
                         );
                       })()}
 
@@ -1183,6 +1185,9 @@ activeArticle, articleBody, headings, markdownComponents, siteSettings, navigate
 
                       {/* Article-bottom ad slot (Google AdSense, lazy) */}
                       <AdPlacement slot="article_bottom" className="my-8" lazy />
+
+                      {/* Cross-promo slot after the related block (admin Slot Manager) */}
+                      <CrossPromoSlot slot="article_after_related" source="article_after_related" />
 
                       {/* INTERACTIVE COMPREHENSION QUIZ CHALLENGE */}
                       {(() => {

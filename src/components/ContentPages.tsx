@@ -15,6 +15,7 @@ import ReactMarkdown from 'react-markdown';
 import { preprocessMarkdownImages, MarkdownImageElement } from '../utils/markdownImage';
 import { LEGAL_DOCS } from '../utils/legalContent';
 import { motion } from 'motion/react';
+import CrossPromoSlot, { CROSS_PROMO_SLOT_CATALOG } from './houseAds/CrossPromoSlot';
 import { HeartsyncSuspense } from './LoadingSystem';
 const SubscriptionPage = React.lazy(() => import('./SubscriptionPage'));
 const AiCopilot = React.lazy(() => import('./AiCopilot'));
@@ -193,6 +194,8 @@ export default function ContentPages({
                     <h1 className="font-serif font-bold text-3xl text-zinc-900 dark:text-white mt-1">Interpersonal Categories</h1>
                     <p className="text-xs text-zinc-400 dark:text-zinc-500 font-sans mt-0.5">Filter through specialized connection topics to discover practical, research-backed connection steps.</p>
                   </div>
+
+                  <CrossPromoSlot slot="categories_top" source="categories_top" />
 
                   <AdPlacement slot="homepage" className="my-2" lazy />
 
@@ -632,6 +635,8 @@ export default function ContentPages({
                   <p className="text-xs text-zinc-400 dark:text-zinc-500 font-sans mt-0.5">Ranking computed on absolute view records combined with heart likes.</p>
                 </div>
 
+                <CrossPromoSlot slot="trending_top" source="trending_top" />
+
                 {(() => {
                   const sorted = [...publishedArticles].sort((a, b) => b.views + b.likes * 2 - (a.views + a.likes * 2));
 
@@ -937,24 +942,88 @@ export default function ContentPages({
               </div>
             )}
 
-            {currentTab === 'advertise' && (
-              <div className="max-w-3xl mx-auto space-y-6 font-sans text-xs text-zinc-650">
-                <div className="text-center space-y-2">
-                  <h1 className="font-serif font-extrabold text-3xl">Advertise With Heartsync</h1>
-                  <p className="text-xs text-zinc-400">Monetize premium audience alignment with couples wellness standards.</p>
+            {currentTab === 'advertise' && (() => {
+              const adFormats = [
+                { name: 'Display Ad', detail: 'A premium single-image unit: your logo, headline, one supporting sentence and a CTA button. The flagship format.' },
+                { name: 'Native In-Feed', detail: 'A quiet text unit that sits inside the article flow - thumbnail, headline, blurb and an inline link.' },
+                { name: 'Banner Strip', detail: 'A slim responsive strip with a headline link, supporting copy and up to 3 rotating link slots.' },
+                { name: 'Content Card', detail: 'A "Recommended for you" widget tile, styled like the site’s own content recommendations.' },
+                { name: 'Interstitial', detail: 'A full-screen takeover shown once per visitor session. Maximum attention, sold sparingly.' },
+              ];
+              return (
+                <div className="max-w-4xl mx-auto space-y-6 font-sans text-xs text-zinc-650">
+                  <div className="text-center space-y-2">
+                    <h1 className="font-serif font-extrabold text-3xl text-zinc-900 dark:text-white">Advertise With Heartsync</h1>
+                    <p className="text-xs text-zinc-400">Put your brand in front of readers who came here for love, connection and emotional growth.</p>
+                  </div>
+
+                  <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 space-y-4">
+                    <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Who reads Heartsync</h3>
+                    <p className="leading-relaxed">
+                      Heartsync is a relationship and emotional wellness publication grounded in attachment theory, Gottman couples research and nervous-system science. Our readers are actively invested in mental health, therapy and couples coaching, dating apps, self-growth books and courses, wellness products and healthy-living brands - a high-intent audience, not passive scrollers.
+                    </p>
+                  </div>
+
+                  <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 space-y-4">
+                    <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Ad formats we offer</h3>
+                    <div className="space-y-2.5">
+                      {adFormats.map((f) => (
+                        <div key={f.name} className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-100 dark:border-zinc-850">
+                          <span className="block font-bold text-zinc-800 dark:text-zinc-200">{f.name}</span>
+                          <span className="block text-[11px] text-zinc-400 leading-relaxed mt-0.5">{f.detail}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 space-y-4">
+                    <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Where your ad can appear</h3>
+                    <p className="leading-relaxed">Ads run across our placement network on every page of the site:</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {CROSS_PROMO_SLOT_CATALOG.map((slot) => (
+                        <div key={slot.id} className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-100 dark:border-zinc-850">
+                          <span className="block font-bold text-zinc-800 dark:text-zinc-200">{slot.label}</span>
+                          <span className="block text-[10px] text-zinc-400 leading-relaxed mt-0.5">{slot.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 space-y-4">
+                    <h3 className="font-bold text-sm text-zinc-900 dark:text-white">What a partnership includes</h3>
+                    <ul className="space-y-2 list-none">
+                      {[
+                        'Your logo, headline and copy in real ad units styled like premium network inventory - never sketchy pop-ups.',
+                        'Optional schedule: your campaign auto-starts and auto-expires on the dates you choose.',
+                        'Your own CTA text on every unit (e.g. "Book a session", "Try it free").',
+                        'Click tracking: every ad click is measured per placement and per partner in our analytics.',
+                        'No ad-blocker penalty: our placements are first-party house ads, so they reach readers even with blockers on.',
+                      ].map((item, i) => (
+                        <li key={i} className="flex gap-2.5 leading-relaxed">
+                          <span className="text-rose-500 font-black shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="p-6 rounded-3xl bg-gradient-to-br from-rose-50 to-zinc-50 dark:from-rose-950/20 dark:to-zinc-900 border border-rose-100/60 dark:border-zinc-800 space-y-3 text-center">
+                    <h3 className="font-serif font-extrabold text-lg text-zinc-950 dark:text-white">Start a campaign</h3>
+                    <p className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                      Send us your site URL and goals through the contact form - we will draft your ad, set the schedule and have your campaign live within a day. CPM/CPC and package pricing is quoted per placement and duration.
+                    </p>
+                    <button
+                      onClick={() => navigateTo('contact')}
+                      className="px-5 py-2.5 rounded-full bg-gradient-to-r from-rose-500 to-rose-600 font-bold text-white text-xs shadow-md cursor-pointer"
+                    >
+                      Contact us about advertising
+                    </button>
+                  </div>
+
+                  <AdPlacement slot="homepage" lazy />
                 </div>
-                <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 space-y-4">
-                  <h3 className="font-bold text-sm">Ad Placement Framework metrics</h3>
-                  <p className="leading-relaxed">
-                    Heartsync delivers programmatic Leaderboards, Skyscrapers, and nested In-Article monetization blocks compliant with Google AdSense rules. Our readers display deep interest in mental health, emotional wellness, couples coaching, conflict books, and dating apps.
-                  </p>
-                  <p className="leading-relaxed text-rose-500 font-bold">
-                    For customized CPM/CPC package proposals, transmit a syndication draft via our Contact Editorial form.
-                  </p>
-                </div>
-                <AdPlacement slot="homepage" lazy />
-              </div>
-            )}
+              );
+            })()}
 
             {/* 16. NEWSLETTER LANDING */}
             {currentTab === 'newsletter' && (

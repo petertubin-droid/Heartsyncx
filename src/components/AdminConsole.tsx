@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import RichTextEditor from './RichTextEditor';
+import { CrossPromoSlotManager, AdCampaignManager } from './admin/CrossPromoAdmin';
 import { getCategoryIcon, PREMIUM_ICONS_BY_GROUP, ALL_PREMIUM_ICONS } from '../utils/categoryIcons';
 
 import AnalyticsPanel from './AnalyticsPanel';
@@ -7263,10 +7264,12 @@ export default function AdminConsole({
                         <p className="text-[10px] text-zinc-400">Where the Frelux promo links point. Leave empty to use the default (freluxtools.netlify.app). Update this once Frelux moves to its custom domain and every promo link across the site changes instantly.</p>
                       </div>
 
-                      <ExternalPartnerPromosEditor />
+                      <CrossPromoSlotManager />
+
+                      <AdCampaignManager />
 
                       <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 rounded-xl text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
-                        <strong>Placement map:</strong> Article pages - mid-article + after the last block. Homepage - after the About section and after the Newsletter section.
+                        <strong>How it works:</strong> the Frelux sister-site promos always run in enabled slots; Ad Campaigns rotate alongside them. Slots off here render nothing, and scheduled ads auto-activate and auto-expire.
                         The matching Heartsyncx promos on Frelux are configured separately in the Frelux admin.
                       </div>
                     </div>
@@ -16200,196 +16203,3 @@ export default function AdminConsole({
  *  slot here: label, absolute URL, blurb and owner name per entry. The
  *  list only persists on the explicit Save button (one settings write),
  *  not per keystroke. */
-const ExternalPartnerPromosEditor: React.FC = () => {
-  const stored = ((heartsync.site_settings as Record<string, unknown>).external_promos as {
-    id?: string; enabled?: boolean; label?: string; url?: string; blurb?: string; owner_name?: string; logo_url?: string;
-  }[]) || [];
-  const [rows, setRows] = useState(stored.length > 0 ? stored.map((r) => ({
-    id: r.id || `ext-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    enabled: r.enabled !== false,
-    label: r.label || '',
-    url: r.url || '',
-    blurb: r.blurb || '',
-    owner_name: r.owner_name || '',
-    logo_url: r.logo_url || '',
-  })) : []);
-  const [savedFlash, setSavedFlash] = useState(false);
-  const [aiUrl, setAiUrl] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState('');
-
-  /** AI Assistant: paste any URL, fetch+read its real title, description
-   *  and og:image server-side, optionally sharpen the copy with Gemini,
-   *  and drop a fully-filled partner row in for the admin to review. */
-  const runAiAssistant = async () => {
-    const target = aiUrl.trim();
-    if (!target) return;
-    setAiLoading(true);
-    setAiError('');
-    try {
-      const res = await adminFetch('/api/gemini/ad-from-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: target }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error || 'Could not generate an ad from that URL.');
-      setRows((prev) => [...prev, {
-        id: `ext-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        enabled: true,
-        label: body.label || '',
-        url: body.url || target,
-        blurb: body.blurb || '',
-        owner_name: body.owner_name || '',
-        logo_url: body.logo_url || '',
-      }]);
-      setAiUrl('');
-    } catch (err: any) {
-      setAiError(err?.message || 'Something went wrong reaching that URL.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  const setRow = (id: string, patch: Partial<typeof rows[number]>) =>
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-
-  const addRow = () =>
-    setRows((prev) => [...prev, {
-      id: `ext-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      enabled: true, label: '', url: '', blurb: '', owner_name: '', logo_url: '',
-    }]);
-
-  const save = async () => {
-    await heartsync.updateSettings({
-      external_promos: rows.filter((r) => r.label.trim() || r.url.trim()),
-    });
-    setSavedFlash(true);
-    setTimeout(() => setSavedFlash(false), 2000);
-  };
-
-  return (
-    <div className="space-y-2 border border-zinc-200 dark:border-zinc-850 rounded-2xl p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">External Partner Promos</label>
-          <p className="text-[10px] text-zinc-400 mt-0.5">Let outside website owners advertise in the same promo slots. Entries rotate alongside the Frelux links; disabled entries are hidden.</p>
-        </div>
-        <span className="text-[10px] text-zinc-400">{rows.length} partner{rows.length === 1 ? '' : 's'}</span>
-      </div>
-
-      {/* AI Assistant: paste a URL, get a filled-in partner row back
-          (real title/description/logo, sharpened by Gemini when
-          configured) instead of typing every field by hand. */}
-      <div className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-900/40 space-y-2">
-        <label className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
-          <Wand2 className="w-3 h-3" /> AI Assistant — create an ad from a URL
-        </label>
-        <div className="flex gap-2">
-          <input
-            value={aiUrl}
-            onChange={(e) => setAiUrl(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !aiLoading) runAiAssistant(); }}
-            placeholder="https://partner-site.com"
-            disabled={aiLoading}
-            className="flex-1 bg-white dark:bg-zinc-900 border border-indigo-200 dark:border-indigo-900/60 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60"
-          />
-          <button
-            type="button"
-            onClick={runAiAssistant}
-            disabled={aiLoading || !aiUrl.trim()}
-            className="shrink-0 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold cursor-pointer flex items-center gap-1.5"
-          >
-            {aiLoading ? 'Analyzing…' : <><Wand2 className="w-3 h-3" /> Generate</>}
-          </button>
-        </div>
-        <p className="text-[10px] text-indigo-700/70 dark:text-indigo-400/60">Reads the page's real title, description and logo, and adds a partner row below for you to review before saving.</p>
-        {aiError && <p className="text-[10px] font-semibold text-rose-500">{aiError}</p>}
-      </div>
-
-      {rows.length === 0 && (
-        <p className="text-[11px] text-zinc-400 italic py-2">No partner promos yet. Click "Add partner" when an external advertiser comes on board.</p>
-      )}
-
-      {rows.map((r) => (
-        <div key={r.id} className="grid grid-cols-1 lg:grid-cols-12 gap-2 items-start p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-150 dark:border-zinc-850">
-          <label className="lg:col-span-1 flex items-center gap-1.5 pt-2 cursor-pointer" title="Enabled">
-            <input
-              type="checkbox"
-              checked={r.enabled}
-              onChange={(e) => setRow(r.id, { enabled: e.target.checked })}
-              className="w-4 h-4 text-emerald-500 rounded cursor-pointer"
-            />
-            <span className="text-[9px] font-bold uppercase text-zinc-400">On</span>
-          </label>
-          <div className="lg:col-span-3">
-            <input
-              value={r.label}
-              onChange={(e) => setRow(r.id, { label: e.target.value })}
-              placeholder="Headline, e.g. Buy building materials online"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs"
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <input
-              value={r.url}
-              onChange={(e) => setRow(r.id, { url: e.target.value })}
-              placeholder="https://partner-site.com"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs font-mono"
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <input
-              value={r.blurb}
-              onChange={(e) => setRow(r.id, { blurb: e.target.value })}
-              placeholder="Short description shown under the headline"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs"
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <input
-              value={r.logo_url}
-              onChange={(e) => setRow(r.id, { logo_url: e.target.value })}
-              placeholder="Logo/image URL (Display format)"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs font-mono"
-            />
-          </div>
-          <div className="lg:col-span-2 flex gap-1.5">
-            <input
-              value={r.owner_name}
-              onChange={(e) => setRow(r.id, { owner_name: e.target.value })}
-              placeholder="Ads by (name)"
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs"
-            />
-            <button
-              type="button"
-              onClick={() => setRows((prev) => prev.filter((x) => x.id !== r.id))}
-              className="shrink-0 px-2 py-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200/60 dark:border-rose-900/40 text-xs font-bold cursor-pointer"
-              title="Remove this partner promo"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      ))}
-
-      <div className="flex items-center gap-2 pt-1">
-        <button
-          type="button"
-          onClick={addRow}
-          className="px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
-        >
-          + Add partner
-        </button>
-        <button
-          type="button"
-          onClick={save}
-          className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer"
-        >
-          Save partner promos
-        </button>
-        {savedFlash && <span className="text-[10px] font-bold text-emerald-600">Saved ✓</span>}
-      </div>
-    </div>
-  );
-};

@@ -6,6 +6,7 @@ import { trackPageView } from './lib/analytics';
 const AdminConsole = React.lazy(() => import('./components/AdminConsole'));
 import Header from './components/Header';
 import Footer from './components/Footer';
+import CrossPromoSlot from './components/houseAds/CrossPromoSlot';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import RichTextEditor from './components/RichTextEditor';
 import AdminLogin from './components/AdminLogin';
@@ -1898,6 +1899,7 @@ export default function App() {
       {/* Footer element */}
       {currentTab !== 'admin' && (
         <>
+          {!isAdminArea && <CrossPromoSlot slot="home_before_footer" source="home_before_footer" />}
           <Footer onNavigate={navigateTo} siteSettings={siteSettings} lang={lang} />
           {/* Site-wide ad-network scripts (Monetag / Adsterra), consent-gated */}
           <AdNetworkScripts />

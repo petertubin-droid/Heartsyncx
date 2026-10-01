@@ -1891,9 +1891,10 @@ export default function HomePage({
                   // Cross-site house ads (admin-configured format): two
                   // homepage slots, placed on sections that carry no
                   // network ad so the two systems never stack.
-                  const CROSS_PROMO_AFTER_SECTION: Record<string, number> = {
-                    about: 0,
-                    newsletter: 1
+                  const CROSS_PROMO_AFTER_SECTION: Record<string, string> = {
+                    hero: 'home_after_hero',
+                    about: 'home_after_about',
+                    newsletter: 'home_after_newsletter'
                   };
                   const crossPromoSlotAfter = CROSS_PROMO_AFTER_SECTION[sec.type];
                   return adSlotAfter || crossPromoSlotAfter !== undefined ? (
@@ -1906,7 +1907,7 @@ export default function HomePage({
                       )}
                       {crossPromoSlotAfter !== undefined && (
                         <div className="max-w-6xl mx-auto px-4 w-full">
-                          <CrossPromoSlot slotIndex={crossPromoSlotAfter} source={`home_${crossPromoSlotAfter}`} />
+                          <CrossPromoSlot slot={crossPromoSlotAfter} source={crossPromoSlotAfter} />
                         </div>
                       )}
                     </React.Fragment>
