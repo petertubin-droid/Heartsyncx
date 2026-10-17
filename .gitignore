@@ -9,3 +9,4 @@ coverage/
 api/index.html
 playwright-report/
 test-results/
+.netlify/

@@ -1413,7 +1413,7 @@ export default function App() {
                   </span>
                   <div className="space-y-0.5">
                     {matchedCat && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider font-sans block" style={{ color: matchedCat.color }}>
+                      <span className="text-[9px] font-bold uppercase tracking-wider font-sans block text-rose-600 dark:text-rose-400">
                         {matchedCat.name}
                       </span>
                     )}
@@ -1431,10 +1431,9 @@ export default function App() {
         </div>
 
         {/* Dynamic Newsletter Subscription Section */}
-        <div className="p-6 bg-[#D9F99D] hover:bg-[#E2FFA1] dark:bg-lime-950/20 dark:hover:bg-lime-950/30 border-2 border-zinc-950 dark:border-lime-500/20 text-zinc-950 dark:text-zinc-100 rounded-3xl space-y-4 transition-all duration-300 relative overflow-hidden group shadow-xs">
-          <div className="absolute top-0 right-0 w-16 h-16 bg-[#BEF264]/20 rounded-bl-full pointer-events-none" />
+        <div className="p-6 bg-zinc-50 hover:bg-white dark:bg-zinc-900/60 dark:hover:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-950 dark:text-zinc-100 rounded-2xl space-y-4 transition-all duration-300 relative overflow-hidden group shadow-xs">
           <div className="space-y-2">
-            <span className="inline-block px-2 py-0.5 bg-zinc-950 text-[#D9F99D] text-[9px] font-bold font-mono rounded uppercase tracking-wider">ANNUAL ACCESS</span>
+            <span className="inline-block px-2 py-0.5 bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 text-[9px] font-bold font-mono rounded uppercase tracking-wider">ANNUAL ACCESS</span>
             <h3 className="font-serif font-black text-2xl lg:text-3xl text-zinc-950 dark:text-white leading-tight">
               SUBSCRIBE TO READ MORE
             </h3>
